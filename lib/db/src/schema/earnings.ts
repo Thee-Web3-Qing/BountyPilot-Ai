@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const earningsTable = pgTable("earnings", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   bountyId: integer("bounty_id"),
   platform: text("platform"),
   amount: real("amount").notNull(),

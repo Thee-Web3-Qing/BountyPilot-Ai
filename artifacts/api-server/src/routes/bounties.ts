@@ -5,22 +5,27 @@ import {
   researchBriefsTable,
   productionPlansTable,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
-import {
-  CreateBountyBody,
-  UpdateBountyBody,
-} from "@workspace/api-zod";
+import { eq, desc, and } from "drizzle-orm";
+import { CreateBountyBody, UpdateBountyBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger.js";
 import { scrapeBounty } from "../lib/scraper.js";
 import { analyzeBounty, generateResearchBrief, generateProductionPlan } from "../lib/qwen.js";
+import { requireAuth, type AuthRequest } from "../lib/auth.js";
 
 export const bountiesRouter = Router();
 
+bountiesRouter.use(requireAuth);
+
 // GET /bounties
-bountiesRouter.get("/", async (req, res) => {
+bountiesRouter.get("/", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const { status, platform } = req.query as { status?: string; platform?: string };
-    const all = await db.select().from(bountiesTable).orderBy(desc(bountiesTable.createdAt));
+    const all = await db
+      .select()
+      .from(bountiesTable)
+      .where(eq(bountiesTable.userId, userId))
+      .orderBy(desc(bountiesTable.createdAt));
     let filtered = all;
     if (status) filtered = filtered.filter((b) => b.status === status);
     if (platform) filtered = filtered.filter((b) => b.platform === platform);
@@ -31,16 +36,17 @@ bountiesRouter.get("/", async (req, res) => {
   }
 });
 
-// POST /bounties — real scrape + AI analysis
-bountiesRouter.post("/", async (req, res) => {
+// POST /bounties
+bountiesRouter.post("/", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const parsed = CreateBountyBody.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid input", details: parsed.error });
     }
     const { url } = parsed.data;
 
-    logger.info({ url }, "Scraping bounty URL");
+    logger.info({ url, userId }, "Scraping bounty URL");
     const scraped = await scrapeBounty(url);
     logger.info({ title: scraped.title, platform: scraped.platform }, "Scraped bounty");
 
@@ -50,6 +56,7 @@ bountiesRouter.post("/", async (req, res) => {
     const [bounty] = await db
       .insert(bountiesTable)
       .values({
+        userId,
         url,
         title: scraped.title,
         platform: scraped.platform,
@@ -65,6 +72,7 @@ bountiesRouter.post("/", async (req, res) => {
         importantNotes: scraped.importantNotes,
         opportunityScore: analysis.opportunityScore,
         scoreExplanation: analysis.scoreExplanation,
+        confidenceScore: scraped.confidenceScore,
         status: "discovered",
       })
       .returning();
@@ -77,10 +85,14 @@ bountiesRouter.post("/", async (req, res) => {
 });
 
 // GET /bounties/:id
-bountiesRouter.get("/:id", async (req, res) => {
+bountiesRouter.get("/:id", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const id = parseInt(req.params.id);
-    const [bounty] = await db.select().from(bountiesTable).where(eq(bountiesTable.id, id));
+    const [bounty] = await db
+      .select()
+      .from(bountiesTable)
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
     if (!bounty) return res.status(404).json({ error: "Not found" });
     res.json(bounty);
   } catch (err) {
@@ -90,13 +102,13 @@ bountiesRouter.get("/:id", async (req, res) => {
 });
 
 // PATCH /bounties/:id
-bountiesRouter.patch("/:id", async (req, res) => {
+bountiesRouter.patch("/:id", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const id = parseInt(req.params.id);
     const parsed = UpdateBountyBody.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid input" });
-    }
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+
     const updates: Record<string, unknown> = {};
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
     if (parsed.data.title !== undefined) updates.title = parsed.data.title;
@@ -106,7 +118,7 @@ bountiesRouter.patch("/:id", async (req, res) => {
     const [bounty] = await db
       .update(bountiesTable)
       .set(updates)
-      .where(eq(bountiesTable.id, id))
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
     if (!bounty) return res.status(404).json({ error: "Not found" });
     res.json(bounty);
@@ -117,10 +129,11 @@ bountiesRouter.patch("/:id", async (req, res) => {
 });
 
 // DELETE /bounties/:id
-bountiesRouter.delete("/:id", async (req, res) => {
+bountiesRouter.delete("/:id", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const id = parseInt(req.params.id);
-    await db.delete(bountiesTable).where(eq(bountiesTable.id, id));
+    await db.delete(bountiesTable).where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
     res.status(204).send();
   } catch (err) {
     logger.error(err, "Error deleting bounty");
@@ -128,14 +141,15 @@ bountiesRouter.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /bounties/:id/approve — AI generates research brief + production plan
-bountiesRouter.post("/:id/approve", async (req, res) => {
+// POST /bounties/:id/approve
+bountiesRouter.post("/:id/approve", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const id = parseInt(req.params.id);
     const [bounty] = await db
       .update(bountiesTable)
       .set({ status: "approved" })
-      .where(eq(bountiesTable.id, id))
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
     if (!bounty) return res.status(404).json({ error: "Not found" });
 
@@ -156,40 +170,18 @@ bountiesRouter.post("/:id/approve", async (req, res) => {
       rawText: "",
     };
 
-    const existingBrief = await db
-      .select()
-      .from(researchBriefsTable)
-      .where(eq(researchBriefsTable.bountyId, id));
-
+    const existingBrief = await db.select().from(researchBriefsTable).where(eq(researchBriefsTable.bountyId, id));
     if (existingBrief.length === 0) {
       logger.info({ bountyId: id }, "Generating research brief");
       const brief = await generateResearchBrief(scrapedForGen);
-      await db.insert(researchBriefsTable).values({
-        bountyId: id,
-        summary: brief.summary,
-        contentAngles: brief.contentAngles,
-        keyPoints: brief.keyPoints,
-        targetAudience: brief.targetAudience,
-        competitorAnalysis: brief.competitorAnalysis,
-      });
+      await db.insert(researchBriefsTable).values({ bountyId: id, ...brief });
     }
 
-    const existingPlan = await db
-      .select()
-      .from(productionPlansTable)
-      .where(eq(productionPlansTable.bountyId, id));
-
+    const existingPlan = await db.select().from(productionPlansTable).where(eq(productionPlansTable.bountyId, id));
     if (existingPlan.length === 0) {
       logger.info({ bountyId: id }, "Generating production plan");
       const plan = await generateProductionPlan(scrapedForGen);
-      await db.insert(productionPlansTable).values({
-        bountyId: id,
-        scriptOutline: plan.scriptOutline,
-        shotList: plan.shotList,
-        captionDraft: plan.captionDraft,
-        submissionChecklist: plan.submissionChecklist,
-        estimatedHours: plan.estimatedHours,
-      });
+      await db.insert(productionPlansTable).values({ bountyId: id, ...plan });
     }
 
     res.json(bounty);
@@ -200,13 +192,14 @@ bountiesRouter.post("/:id/approve", async (req, res) => {
 });
 
 // POST /bounties/:id/reject
-bountiesRouter.post("/:id/reject", async (req, res) => {
+bountiesRouter.post("/:id/reject", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const id = parseInt(req.params.id);
     const [bounty] = await db
       .update(bountiesTable)
       .set({ status: "rejected" })
-      .where(eq(bountiesTable.id, id))
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
     if (!bounty) return res.status(404).json({ error: "Not found" });
     res.json(bounty);
@@ -217,13 +210,14 @@ bountiesRouter.post("/:id/reject", async (req, res) => {
 });
 
 // POST /bounties/:id/save-later
-bountiesRouter.post("/:id/save-later", async (req, res) => {
+bountiesRouter.post("/:id/save-later", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const id = parseInt(req.params.id);
     const [bounty] = await db
       .update(bountiesTable)
       .set({ status: "saved_for_later" })
-      .where(eq(bountiesTable.id, id))
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
     if (!bounty) return res.status(404).json({ error: "Not found" });
     res.json(bounty);

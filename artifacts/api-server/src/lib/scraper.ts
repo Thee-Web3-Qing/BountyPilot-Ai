@@ -11,6 +11,7 @@ export interface ScrapedBounty {
   submissionLink: string;
   eligibilityRules: string;
   importantNotes: string;
+  confidenceScore?: number;
 }
 
 function extractReward(text: string): { amount: string | null; currency: string | null } {
@@ -284,6 +285,16 @@ export async function scrapeBounty(
   notesArr.push("Submit via the original listing page.");
   if (rewardAmount) notesArr.push(`Reward: ${rewardAmount} ${rewardCurrency}`);
 
+  // Calculate confidence score based on how many key fields were successfully extracted
+  let confidence = 40;
+  if (apiData) confidence += 25;
+  if (rewardAmount) confidence += 10;
+  if (deadline) confidence += 10;
+  if (contentFormat && contentFormat !== "Article / Thread") confidence += 5;
+  if (title && title.length > 15 && !title.startsWith("Content Bounty on")) confidence += 5;
+  if (html.length > 5000) confidence += 5;
+  const confidenceScore = Math.min(99, confidence);
+
   return {
     title,
     description,
@@ -299,5 +310,6 @@ export async function scrapeBounty(
     importantNotes: notesArr.join(". "),
     platform,
     rawText: searchText.slice(0, 4000),
+    confidenceScore,
   };
 }

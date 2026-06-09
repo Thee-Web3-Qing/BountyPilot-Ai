@@ -1,17 +1,20 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { bountiesTable, earningsTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { desc, eq } from "drizzle-orm";
+import { logger } from "../lib/logger.js";
+import { requireAuth, type AuthRequest } from "../lib/auth.js";
 
 export const dashboardRouter = Router();
+dashboardRouter.use(requireAuth);
 
 // GET /dashboard/summary
-dashboardRouter.get("/summary", async (_req, res) => {
+dashboardRouter.get("/summary", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const [bounties, earnings] = await Promise.all([
-      db.select().from(bountiesTable),
-      db.select().from(earningsTable),
+      db.select().from(bountiesTable).where(eq(bountiesTable.userId, userId)),
+      db.select().from(earningsTable).where(eq(earningsTable.userId, userId)),
     ]);
 
     const totalBounties = bounties.length;
@@ -49,11 +52,13 @@ dashboardRouter.get("/summary", async (_req, res) => {
 });
 
 // GET /dashboard/recent
-dashboardRouter.get("/recent", async (_req, res) => {
+dashboardRouter.get("/recent", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const bounties = await db
       .select()
       .from(bountiesTable)
+      .where(eq(bountiesTable.userId, userId))
       .orderBy(desc(bountiesTable.createdAt))
       .limit(5);
     res.json(bounties);
@@ -64,9 +69,10 @@ dashboardRouter.get("/recent", async (_req, res) => {
 });
 
 // GET /dashboard/platform-breakdown
-dashboardRouter.get("/platform-breakdown", async (_req, res) => {
+dashboardRouter.get("/platform-breakdown", async (req: AuthRequest, res) => {
   try {
-    const bounties = await db.select().from(bountiesTable);
+    const userId = req.user!.userId;
+    const bounties = await db.select().from(bountiesTable).where(eq(bountiesTable.userId, userId));
     const platformMap: Record<string, { count: number; totalReward: number }> = {};
 
     for (const b of bounties) {

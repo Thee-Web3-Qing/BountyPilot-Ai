@@ -1,16 +1,19 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { submissionsTable, bountiesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { CreateSubmissionBody, UpdateSubmissionBody } from "@workspace/api-zod";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.js";
+import { requireAuth, type AuthRequest } from "../lib/auth.js";
 
 export const submissionsRouter = Router();
+submissionsRouter.use(requireAuth);
 
 // GET /submissions
-submissionsRouter.get("/", async (_req, res) => {
+submissionsRouter.get("/", async (req: AuthRequest, res) => {
   try {
-    const submissions = await db.select().from(submissionsTable);
+    const userId = req.user!.userId;
+    const submissions = await db.select().from(submissionsTable).where(eq(submissionsTable.userId, userId));
     res.json(submissions);
   } catch (err) {
     logger.error(err, "Error listing submissions");
@@ -19,23 +22,21 @@ submissionsRouter.get("/", async (_req, res) => {
 });
 
 // POST /submissions
-submissionsRouter.post("/", async (req, res) => {
+submissionsRouter.post("/", async (req: AuthRequest, res) => {
   try {
+    const userId = req.user!.userId;
     const parsed = CreateSubmissionBody.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid input", details: parsed.error });
     }
     const { bountyId, submittedAt, submissionUrl, notes } = parsed.data;
 
-    // Update bounty status to submitted
-    await db
-      .update(bountiesTable)
-      .set({ status: "submitted" })
-      .where(eq(bountiesTable.id, bountyId));
+    await db.update(bountiesTable).set({ status: "submitted" }).where(eq(bountiesTable.id, bountyId));
 
     const [submission] = await db
       .insert(submissionsTable)
       .values({
+        userId,
         bountyId,
         submittedAt: submittedAt ? new Date(submittedAt) : new Date(),
         submissionUrl: submissionUrl ?? null,

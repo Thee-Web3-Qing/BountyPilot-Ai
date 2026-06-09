@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const submissionsTable = pgTable("submissions", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   bountyId: integer("bounty_id").notNull(),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   submissionUrl: text("submission_url"),

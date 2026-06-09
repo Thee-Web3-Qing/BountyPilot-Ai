@@ -1,7 +1,8 @@
 import type { ScrapedBounty } from "./scraper.js";
 
-const QWEN_API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-const MODEL = "qwen-plus-2025-07-28";
+const QWEN_BASE_URL = process.env.QWEN_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const QWEN_API_URL = `${QWEN_BASE_URL.replace(/\/+$/, "")}/chat/completions`;
+const MODEL = process.env.QWEN_MODEL || "qwen-plus-2025-07-28";
 
 function hasKey(): boolean {
   return !!(process.env.QWEN_API_KEY && process.env.QWEN_API_KEY.trim().length > 0);

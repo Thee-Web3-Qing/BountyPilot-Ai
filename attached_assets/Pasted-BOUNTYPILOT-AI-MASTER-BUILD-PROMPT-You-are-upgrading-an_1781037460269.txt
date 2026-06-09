@@ -1,0 +1,507 @@
+BOUNTYPILOT AI MASTER BUILD PROMPT
+
+You are upgrading an existing project called BountyPilot AI.
+
+Do not rebuild from scratch.
+
+Analyze the existing codebase first, preserve working functionality, and then extend it with the features below.
+
+⸻
+
+PRODUCT VISION
+
+BountyPilot AI is not a bounty tracker.
+
+It is a personalized autopilot agent for creator revenue workflows.
+
+The goal is to help creators move from:
+
+Opportunity Discovery → Opportunity Evaluation → Research → Content Planning → Submission → Earnings Tracking
+
+with as little manual effort as possible.
+
+The system should feel like an intelligent creator operating system rather than a dashboard.
+
+⸻
+
+CORE USER STORY
+
+A creator discovers a bounty opportunity.
+
+Instead of manually researching everything, they paste the bounty URL into BountyPilot AI.
+
+The agent:
+
+1. Reads the page
+2. Extracts important information
+3. Detects missing information
+4. Attempts fallback extraction
+5. Scores the opportunity
+6. Explains the reasoning
+7. Requests human approval
+8. Generates a research brief
+9. Generates a production plan
+10. Tracks submission
+11. Tracks earnings
+
+⸻
+
+REPLIT CORE REQUIREMENTS
+
+This application is being built and deployed on Replit Core.
+
+Use Replit Secrets / API Manager for all credentials.
+
+Never hardcode secrets.
+
+Read secrets from Replit first.
+
+Required secrets:
+
+* QWEN_API_KEY
+* QWEN_BASE_URL
+* QWEN_MODEL
+* LLM_PROVIDER
+
+Supported providers:
+
+* mock
+* qwen
+
+Behavior:
+
+If QWEN_API_KEY exists:
+
+* Use Qwen provider.
+
+If QWEN_API_KEY does not exist:
+
+* Automatically fall back to mock mode.
+* Show a warning banner.
+* Continue functioning normally.
+
+The app must never crash because of a missing API key.
+
+⸻
+
+TECH STACK
+
+Use:
+
+* Python
+* Streamlit
+* SQLite
+* BeautifulSoup
+* Playwright
+* Pandas
+* Passlib or bcrypt
+* Replit Secrets Manager
+
+Keep architecture modular.
+
+⸻
+
+MULTI-USER SAAS SYSTEM
+
+Add authentication.
+
+Each user should have their own workspace.
+
+Users must never see another user’s data.
+
+Create:
+
+* Signup page
+* Login page
+* Logout
+* Profile page
+
+Passwords must be hashed.
+
+Never store raw passwords.
+
+⸻
+
+USER PROFILE SYSTEM
+
+Each user should complete a creator profile.
+
+Fields:
+
+* Full Name
+* Creator Name
+* Email
+* Main Platforms
+* Content Formats
+* Niche
+* Skill Level
+* Preferred Bounty Types
+* Minimum Reward
+* Weekly Content Capacity
+* Target Monthly Earnings
+* Creator Strengths
+* Creator Weaknesses
+* Portfolio Links
+* Notes
+
+The profile should directly influence opportunity scoring.
+
+⸻
+
+PERSONALIZED DASHBOARD
+
+Every user gets a personalized dashboard.
+
+Show:
+
+* Total Bounties
+* Approved Bounties
+* Submitted Bounties
+* Wins
+* Losses
+* Pending Deadlines
+* Earnings
+* Average Opportunity Score
+
+Include:
+
+* Recent Activity
+* Upcoming Deadlines
+* Recommended Opportunities
+
+Dashboard must feel SaaS-like.
+
+⸻
+
+AGENT WORKFLOW
+
+When a bounty URL is submitted:
+
+Display each step visually.
+
+Step 1:
+Fetch page
+
+Step 2:
+Extract metadata
+
+Step 3:
+Extract page text
+
+Step 4:
+Build structured bounty record
+
+Step 5:
+Detect missing fields
+
+Step 6:
+Run fallback extraction
+
+Step 7:
+Calculate confidence score
+
+Step 8:
+Evaluate against creator profile
+
+Step 9:
+Generate recommendation
+
+Step 10:
+Human approval checkpoint
+
+This workflow should be visible in the UI.
+
+Show progress indicators.
+
+Show status badges.
+
+Make the agent feel alive.
+
+⸻
+
+EXTRACTION ENGINE
+
+Extract:
+
+* Title
+* Project Name
+* Reward
+* Deadline
+* Platform
+* Requirements
+* Deliverables
+* Eligibility
+* Submission Link
+* Notes
+
+Do not fabricate information.
+
+If a field is missing:
+
+* Mark it as Not Found
+* Reduce confidence score
+* Warn the user
+
+Use:
+
+* Open Graph tags
+* Meta tags
+* Page title
+* Visible page text
+
+Fallback extraction should trigger automatically.
+
+⸻
+
+CONFIDENCE SCORING
+
+Generate extraction confidence.
+
+Examples:
+
+95% = Reward + Deadline + Requirements all found
+
+50% = Reward missing
+
+30% = Multiple critical fields missing
+
+Display confidence prominently.
+
+⸻
+
+OPPORTUNITY SCORING ENGINE
+
+Score opportunities from 1-10.
+
+Factors:
+
+* Reward
+* Deadline
+* Difficulty
+* Creator Niche Match
+* Content Format Match
+* Capacity Match
+* Requirement Clarity
+* Submission Complexity
+
+Generate:
+
+Score
+
+Reason
+
+Recommendation:
+
+* Pursue
+* Save For Later
+* Skip
+
+⸻
+
+HUMAN-IN-THE-LOOP
+
+Before AI generation:
+
+Require approval.
+
+Buttons:
+
+* Approve
+* Save For Later
+* Reject
+* Edit Details
+
+Only approved opportunities can move forward.
+
+This is important for hackathon judging.
+
+⸻
+
+LLM PROVIDER SYSTEM
+
+Create:
+
+BaseLLMProvider
+
+MockLLMProvider
+
+QwenLLMProvider
+
+Provider selected using:
+
+LLM_PROVIDER
+
+Mock provider should create realistic outputs.
+
+Qwen provider should be ready for deployment.
+
+Switching providers should require only changing Replit Secrets.
+
+No code changes.
+
+⸻
+
+AI OUTPUTS
+
+After approval:
+
+Generate:
+
+Research Brief
+
+Including:
+
+* Project Overview
+* Product Explanation
+* Target Audience
+* Key Features
+* Competitors
+* Content Angles
+* Things To Mention
+* Things To Avoid
+
+Generate Production Plan
+
+Including:
+
+* Hook Ideas
+* Script Outline
+* Shot List
+* Caption Draft
+* Submission Checklist
+
+Store everything in database.
+
+⸻
+
+DATABASE STRUCTURE
+
+Create or migrate:
+
+users
+
+user_profiles
+
+bounties
+
+research_briefs
+
+production_plans
+
+submissions
+
+earnings
+
+Every table must contain user ownership relationships where appropriate.
+
+All queries must be scoped to current user.
+
+⸻
+
+SUBMISSIONS SYSTEM
+
+Track:
+
+* Submission URL
+* Platform
+* Notes
+* Proof Link
+* Submission Date
+* Status
+
+Statuses:
+
+* Draft
+* Submitted
+* Won
+* Lost
+
+⸻
+
+EARNINGS SYSTEM
+
+Track:
+
+* Amount
+* Currency
+* Date
+* Status
+* Notes
+
+Dashboard should calculate:
+
+* Total Earnings
+* Pending Earnings
+* Paid Earnings
+
+⸻
+
+SETTINGS PAGE
+
+Create a settings page.
+
+Show:
+
+Current Provider
+
+Current Model
+
+API Status
+
+Last Successful AI Call
+
+Environment
+
+Connected Services
+
+This helps during demos.
+
+⸻
+
+DEMO MODE
+
+Create a “Load Demo Data” button.
+
+Each user gets their own demo records.
+
+Never share demo data between users.
+
+⸻
+
+README UPDATE
+
+Update README with:
+
+* What BountyPilot AI is
+* Why it exists
+* Creator workflow problem
+* Multi-user architecture
+* Agent workflow
+* Human approval checkpoints
+* Mock mode
+* Qwen integration
+* Replit deployment
+* Environment variables
+* Future Alibaba Cloud deployment
+
+⸻
+
+DESIGN GOAL
+
+The final product should look and feel like:
+
+A creator operating system powered by an autonomous workflow agent.
+
+Not a spreadsheet.
+
+Not a CRUD dashboard.
+
+Not a scraper.
+
+The UI should clearly demonstrate:
+
+URL → Extraction → Analysis → Approval → Research → Production → Submission → Earnings
+
+as a complete creator business workflow.
+
+Before implementing, review the current codebase and extend it safely without removing existing working functionality.

@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const bountiesTable = pgTable("bounties", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   url: text("url").notNull(),
   title: text("title"),
   platform: text("platform"),
@@ -19,6 +20,7 @@ export const bountiesTable = pgTable("bounties", {
   importantNotes: text("important_notes"),
   opportunityScore: integer("opportunity_score"),
   scoreExplanation: text("score_explanation"),
+  confidenceScore: integer("confidence_score"),
   status: text("status").notNull().default("discovered"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -1,19 +1,62 @@
+import { useState } from "react";
 import { useGetDashboardSummary, useGetRecentBounties, useGetPlatformBreakdown } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Link } from "wouter";
+import { useAuth } from "@/contexts/auth";
+import { useQueryClient } from "@tanstack/react-query";
+import { Loader2, Zap, Database } from "lucide-react";
+import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
 
 export function Dashboard() {
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
   const { data: recent, isLoading: loadingRecent } = useGetRecentBounties();
   const { data: platformStats, isLoading: loadingPlatform } = useGetPlatformBreakdown();
+  const { user, token } = useAuth();
+  const queryClient = useQueryClient();
+  const [loadingDemo, setLoadingDemo] = useState(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
+  const [llmMock, setLlmMock] = useState<boolean | null>(null);
+
+  const loadDemo = async () => {
+    setLoadingDemo(true);
+    try {
+      const resp = await fetch("/api/demo/load", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        setDemoLoaded(true);
+        queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetRecentBountiesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetPlatformBreakdownQueryKey() });
+      }
+    } finally {
+      setLoadingDemo(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
-        <p className="text-muted-foreground font-mono mt-2">Overview of your bounty hunting operations.</p>
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
+          <p className="text-muted-foreground font-mono mt-2">Welcome back, <span className="text-foreground font-bold">@{user?.username}</span></p>
+        </div>
+        {summary && summary.totalBounties === 0 && !demoLoaded && (
+          <Button onClick={loadDemo} disabled={loadingDemo} variant="outline" className="font-mono text-xs uppercase tracking-wider border-primary/40 text-primary hover:bg-primary/10">
+            {loadingDemo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
+            Load Demo Data
+          </Button>
+        )}
+        {demoLoaded && (
+          <span className="font-mono text-xs text-green-400 flex items-center gap-2">
+            <Zap className="w-4 h-4" /> Demo data loaded
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

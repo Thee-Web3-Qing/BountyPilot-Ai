@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import {
   useCreateBounty,
@@ -15,7 +15,70 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle, Shield } from "lucide-react";
+
+const WORKFLOW_STEPS = [
+  "Fetching page content...",
+  "Detecting platform & project...",
+  "Extracting reward details...",
+  "Parsing deadlines & timeline...",
+  "Identifying content requirements...",
+  "Analysing eligibility rules...",
+  "Detecting submission format...",
+  "Scoring opportunity (1-10)...",
+  "Cross-checking completeness...",
+  "Finalising bounty profile...",
+];
+
+function WorkflowSteps({ isRunning }: { isRunning: boolean }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const [doneSteps, setDoneSteps] = useState<number[]>([]);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!isRunning) {
+      setActiveStep(0);
+      setDoneSteps([]);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      return;
+    }
+    setActiveStep(0);
+    setDoneSteps([]);
+    let step = 0;
+    intervalRef.current = setInterval(() => {
+      setDoneSteps((prev) => [...prev, step]);
+      step++;
+      setActiveStep(step);
+      if (step >= WORKFLOW_STEPS.length - 1) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      }
+    }, 700);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [isRunning]);
+
+  return (
+    <div className="flex flex-col gap-2.5 py-4">
+      {WORKFLOW_STEPS.map((step, i) => {
+        const isDone = doneSteps.includes(i);
+        const isActive = activeStep === i && isRunning;
+        return (
+          <div key={i} className={`flex items-center gap-3 font-mono text-sm transition-all duration-300 ${isDone ? "text-green-400" : isActive ? "text-primary" : "text-muted-foreground/40"}`}>
+            <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              {isDone ? (
+                <CheckCircle className="w-4 h-4 text-green-400" />
+              ) : isActive ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+              )}
+            </div>
+            <span className={isActive ? "font-bold" : ""}>{step}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const SCORE_COLOR = (score: number) => {
   if (score >= 7) return "text-green-400 border-green-400/50 bg-green-400/10";
@@ -243,10 +306,13 @@ export function BountyAdd() {
       </Card>
 
       {isLoading && (
-        <div className="flex flex-col items-center gap-4 py-12 text-muted-foreground font-mono">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm">Scanning page and scoring opportunity...</p>
-        </div>
+        <Card className="bg-card border-border">
+          <CardContent className="p-6">
+            <p className="font-mono text-xs uppercase tracking-wider text-primary mb-1">Agent Workflow</p>
+            <p className="font-mono text-xs text-muted-foreground mb-4">Running extraction pipeline...</p>
+            <WorkflowSteps isRunning={isLoading} />
+          </CardContent>
+        </Card>
       )}
 
       {extracted && editFields && !actionDone && (
@@ -360,11 +426,18 @@ export function BountyAdd() {
 
           {extracted.scoreExplanation && (
             <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="p-5">
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-2">
+              <CardContent className="p-5 flex flex-col gap-3">
+                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                   Score Explanation
                 </p>
                 <p className="text-sm text-foreground">{extracted.scoreExplanation}</p>
+                {(extracted as any).confidenceScore != null && (
+                  <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground border-t border-border/50 pt-3">
+                    <Shield className="w-3.5 h-3.5 text-blue-400" />
+                    Extraction confidence: <span className="text-blue-400 font-bold">{(extracted as any).confidenceScore}%</span>
+                    {(extracted as any).confidenceScore < 60 && <span className="text-yellow-400 ml-1">— review fields carefully</span>}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
