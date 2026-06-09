@@ -2,13 +2,20 @@ import type { ScrapedBounty } from "./scraper.js";
 
 const QWEN_BASE_URL = process.env.QWEN_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const QWEN_API_URL = `${QWEN_BASE_URL.replace(/\/+$/, "")}/chat/completions`;
-const MODEL = process.env.QWEN_MODEL || "qwen-plus-2025-07-28";
+
+// Use turbo (cheap) by default for briefs; override scoring/plan model separately
+const BRIEF_MODEL = process.env.QWEN_BRIEF_MODEL || "qwen-turbo";
+const FAST_MODEL = process.env.QWEN_MODEL || "qwen-turbo";
 
 function hasKey(): boolean {
   return !!(process.env.QWEN_API_KEY && process.env.QWEN_API_KEY.trim().length > 0);
 }
 
-async function callQwen(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callQwen(
+  systemPrompt: string,
+  userPrompt: string,
+  { model = FAST_MODEL, maxTokens = 400, timeout = 30000 }: { model?: string; maxTokens?: number; timeout?: number } = {}
+): Promise<string> {
   const resp = await fetch(QWEN_API_URL, {
     method: "POST",
     headers: {
@@ -16,15 +23,15 @@ async function callQwen(systemPrompt: string, userPrompt: string): Promise<strin
       Authorization: `Bearer ${process.env.QWEN_API_KEY}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       temperature: 0.7,
     }),
-    signal: AbortSignal.timeout(90000),
+    signal: AbortSignal.timeout(timeout),
   });
 
   if (!resp.ok) {
@@ -192,7 +199,8 @@ Bounty details:
 - Format: ${scraped.contentFormat}
 - Requirements: ${scraped.submissionRequirements?.slice(0, 300)}
 - Description: ${scraped.description?.slice(0, 400)}
-${profileContext}`
+${profileContext}`,
+      { maxTokens: 300 }
     );
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -220,66 +228,35 @@ export async function generateResearchBrief(scraped: ScrapedBounty): Promise<Res
 
   try {
     const fullContent = await callQwen(
-      `You are a senior Web3 researcher and content strategist. You write comprehensive, deeply researched creator briefs that give content creators everything they need to produce winning content without any additional research. Be specific, insightful, and actionable. Use clear markdown headings.`,
-      `Conduct comprehensive research on ${scraped.projectName || scraped.title} and produce a complete content creator brief.
+      `You are a senior Web3 researcher and content strategist. Write comprehensive, specific creator briefs. Use clear markdown headings. Be concise but complete — every section should be actionable.`,
+      `Research ${scraped.projectName || scraped.title} and write a content creator brief.
 
 Bounty context:
 - Platform: ${scraped.platform}
-- Title: ${scraped.title}
 - Format: ${scraped.contentFormat}
 - Reward: ${scraped.rewardAmount || "TBD"} ${scraped.rewardCurrency || ""}
-- Requirements: ${scraped.submissionRequirements?.slice(0, 500) || "See listing"}
-- Description: ${scraped.description?.slice(0, 600) || ""}
+- Requirements: ${scraped.submissionRequirements?.slice(0, 400) || "See listing"}
+- Description: ${scraped.description?.slice(0, 500) || ""}
 
-Write the full brief using these exact sections:
+Cover all 14 sections concisely:
 
 ## 1. Executive Summary
-- What is the project?
-- What problem does it solve?
-- Why should people care?
-
 ## 2. Beginner-Friendly Explanation
-Explain the project as if speaking to someone completely new to Web3.
-
 ## 3. Detailed Product Breakdown
-- How does the product work?
-- What are its major features?
-- What makes it unique?
-
 ## 4. Team and Background
-Founders, team, investors, funding rounds.
-
 ## 5. Market Positioning
-Competitors, advantages, disadvantages, market opportunity.
-
 ## 6. Community and Growth
-X/Twitter following, community size, engagement quality, recent growth indicators.
-
 ## 7. Latest Updates
-Partnerships, product launches, announcements, major milestones.
-
 ## 8. Important Statistics
-User numbers, volume, revenue, TVL, downloads, transactions, any relevant metrics.
-
-## 9. Strong Content Angles
-Generate at least 20 content ideas across: beginner angles, contrarian angles, educational angles, storytelling angles, viral angles.
-
-## 10. Hooks
-Generate at least 20 video hooks and 20 thread hooks.
-
+## 9. Strong Content Angles (20 ideas: beginner, contrarian, educational, storytelling, viral)
+## 10. Hooks (10 video hooks + 10 thread hooks)
 ## 11. Visual Ideas
-B-roll ideas, motion graphics ideas, visual metaphors, screen recording opportunities, comic ideas.
-
 ## 12. Frequently Misunderstood Concepts
-List common misconceptions and explain them.
-
-## 13. Key Talking Points
-Generate the 20 most important points a creator should mention.
-
+## 13. Key Talking Points (top 10)
 ## 14. Sources
-Website, documentation, X account, GitHub, blog, and any official resources.
 
-Write in a professional report style. Use bullet points and sub-headings throughout. Be specific to ${scraped.projectName || scraped.title} — do not give generic answers.`
+Be specific to ${scraped.projectName || scraped.title}. Use bullet points throughout.`,
+      { model: BRIEF_MODEL, maxTokens: 2000, timeout: 90000 }
     );
 
     const fallback = templateResearchBrief(scraped);
@@ -323,7 +300,8 @@ Bounty:
 - Deliverables: ${scraped.deliverables}
 - Deadline: ${scraped.deadline || "check listing"}
 - Submission link: ${scraped.submissionLink}
-- Requirements: ${scraped.submissionRequirements?.slice(0, 300)}`
+- Requirements: ${scraped.submissionRequirements?.slice(0, 300)}`,
+      { maxTokens: 800 }
     );
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
