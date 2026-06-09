@@ -1,0 +1,272 @@
+import type { ScrapedBounty } from "./scraper.js";
+
+const QWEN_API_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+const MODEL = "qwen-plus-2025-07-28";
+
+function hasKey(): boolean {
+  return !!(process.env.QWEN_API_KEY && process.env.QWEN_API_KEY.trim().length > 0);
+}
+
+async function callQwen(systemPrompt: string, userPrompt: string): Promise<string> {
+  const resp = await fetch(QWEN_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.QWEN_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 1024,
+      temperature: 0.7,
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Qwen API error ${resp.status}: ${err}`);
+  }
+  const data = (await resp.json()) as { choices: { message: { content: string } }[] };
+  return data.choices[0]?.message?.content || "";
+}
+
+export interface BountyAnalysis {
+  scoreExplanation: string;
+  opportunityScore: number;
+}
+
+export interface ResearchBriefContent {
+  summary: string;
+  contentAngles: string;
+  keyPoints: string;
+  targetAudience: string;
+  competitorAnalysis: string;
+}
+
+export interface ProductionPlanContent {
+  scriptOutline: string;
+  shotList: string;
+  captionDraft: string;
+  submissionChecklist: string;
+  estimatedHours: number;
+}
+
+function ruleBasedScore(rewardAmount: string | null, deadline: string | null): number {
+  let score = 5;
+  if (rewardAmount) {
+    const num = parseFloat(rewardAmount.replace(/[^0-9.]/g, ""));
+    if (num >= 5000) score += 2;
+    else if (num >= 1500) score += 1.5;
+    else if (num >= 500) score += 0.5;
+    else if (num < 100) score -= 1;
+  }
+  if (deadline) {
+    const daysLeft = (new Date(deadline).getTime() - Date.now()) / 86400000;
+    if (daysLeft < 0) score -= 3;
+    else if (daysLeft < 3) score -= 1;
+    else if (daysLeft > 14) score += 1;
+    else if (daysLeft > 7) score += 0.5;
+  }
+  return Math.max(1, Math.min(10, Math.round(score)));
+}
+
+function templateExplanation(score: number, scraped: ScrapedBounty): string {
+  const reward = scraped.rewardAmount ? `$${scraped.rewardAmount} ${scraped.rewardCurrency}` : "unspecified reward";
+  const deadlineNote = scraped.deadline
+    ? `${Math.round((new Date(scraped.deadline).getTime() - Date.now()) / 86400000)} days until deadline`
+    : "no deadline specified";
+  return `Score ${score}/10: ${reward} bounty on ${scraped.platform}. ${deadlineNote}. Format: ${scraped.contentFormat}. ${score >= 7 ? "Strong opportunity — clear deliverables and solid reward." : score >= 5 ? "Moderate opportunity — worth pursuing if format aligns with your strengths." : "Lower priority — limited reward or tight timeline."}`;
+}
+
+function templateResearchBrief(scraped: ScrapedBounty): ResearchBriefContent {
+  return {
+    summary: scraped.description || `This ${scraped.platform} bounty from ${scraped.projectName} asks creators to produce ${scraped.contentFormat} content. Focus on clear, accurate, and engaging delivery.`,
+    contentAngles: `1. Beginner explainer — break down complex concepts for a non-technical audience\n2. Comparison angle — how does ${scraped.projectName} differ from competitors?\n3. Use-case story — real people, real outcomes\n4. "Why it matters" narrative — connect to broader Web3 trends`,
+    keyPoints: `- Understand ${scraped.projectName}'s core value proposition\n- Research recent news and product updates\n- Identify common misconceptions to address\n- Gather supporting data points and statistics`,
+    targetAudience: `Crypto-curious users, existing ${scraped.platform} community members, developers considering the ecosystem, and general Web3 content consumers.`,
+    competitorAnalysis: `Search Twitter, YouTube, and Mirror for existing coverage of ${scraped.projectName}. Differentiate by going deeper, using demos, or targeting a specific sub-audience.`,
+  };
+}
+
+function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
+  const hasVideo = scraped.contentFormat.toLowerCase().includes("video");
+  const hasThread = scraped.contentFormat.toLowerCase().includes("thread") || scraped.contentFormat.toLowerCase().includes("twitter");
+  const hasArticle = scraped.contentFormat.toLowerCase().includes("article") || scraped.contentFormat.toLowerCase().includes("blog");
+
+  const scriptOutline = hasVideo
+    ? `HOOK (0-30s): Open with a surprising stat or bold claim about ${scraped.projectName}\nSECTION 1 (30-90s): What is it and why does it exist?\nSECTION 2 (90-180s): How does it work — live demo if possible\nSECTION 3 (180-240s): Why should the viewer care?\nOUTRO (240-300s): CTA — link in bio, subscribe, submit before ${scraped.deadline || "deadline"}`
+    : `HOOK: Lead with a surprising angle about ${scraped.projectName}\nSECTION 1: Context and background\nSECTION 2: Core mechanics or value proposition\nSECTION 3: Real implications and use cases\nCLOSING: Call to action`;
+
+  const shotList = hasVideo
+    ? `1. Talking head intro — clean background, good lighting\n2. Screen recording — product/protocol walkthrough\n3. Graphic overlay — key stats and comparisons\n4. B-roll — community, ecosystem, relevant visuals\n5. Outro card — social links + submission URL`
+    : hasThread
+    ? `Tweet 1: Hook with bold statement\nTweets 2-5: Core explanation broken into digestible chunks\nTweets 6-8: Supporting evidence and examples\nTweet 9: Implications / what this means for you\nTweet 10: CTA + link to submission`
+    : `Section 1: Intro + hook (200 words)\nSection 2: Background context (300 words)\nSection 3: Deep dive (400 words)\nSection 4: Practical takeaways (200 words)\nConclusion + CTA (100 words)`;
+
+  const captionDraft = `Breaking down ${scraped.projectName} for you — here's everything creators and builders need to know. ${hasThread ? "Thread 🧵" : hasVideo ? "Full video 👆" : "Full article linked."} #Web3 #${scraped.platform.replace(/\s/g, "")} #Crypto`;
+
+  const checklist = [
+    `[ ] Content published publicly (not draft/private)`,
+    scraped.contentFormat.toLowerCase().includes("video") ? `[ ] Video is minimum required length` : null,
+    `[ ] All required deliverables included: ${scraped.deliverables}`,
+    scraped.deadline ? `[ ] Submitted before deadline: ${scraped.deadline}` : `[ ] Submitted before the listed deadline`,
+    `[ ] Submission form/link completed: ${scraped.submissionLink}`,
+    `[ ] All original work — no AI-generated filler text`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const hours = hasVideo ? 10 : hasArticle && hasThread ? 6 : hasThread ? 3 : 5;
+
+  return {
+    scriptOutline,
+    shotList,
+    captionDraft,
+    submissionChecklist: checklist,
+    estimatedHours: hours,
+  };
+}
+
+export async function analyzeBounty(scraped: ScrapedBounty): Promise<BountyAnalysis> {
+  const baseScore = ruleBasedScore(scraped.rewardAmount, scraped.deadline);
+
+  if (!hasKey()) {
+    return {
+      opportunityScore: baseScore,
+      scoreExplanation: templateExplanation(baseScore, scraped),
+    };
+  }
+
+  try {
+    const text = await callQwen(
+      `You are BountyPilot, an AI assistant helping content creators evaluate crypto bounty opportunities. 
+Be concise, direct, and creator-focused. Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, and creator opportunity.`,
+      `Evaluate this bounty opportunity and respond with JSON only:
+{
+  "opportunityScore": <1-10 integer>,
+  "scoreExplanation": "<2-3 sentence explanation of the score, mentioning reward, timeline, and key reasons>"
+}
+
+Bounty details:
+- Platform: ${scraped.platform}
+- Project: ${scraped.projectName}
+- Title: ${scraped.title}
+- Reward: ${scraped.rewardAmount || "unknown"} ${scraped.rewardCurrency || ""}
+- Deadline: ${scraped.deadline || "not specified"}
+- Format: ${scraped.contentFormat}
+- Requirements: ${scraped.submissionRequirements?.slice(0, 300)}
+- Description: ${scraped.description?.slice(0, 400)}`
+    );
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        opportunityScore: Math.max(1, Math.min(10, parseInt(parsed.opportunityScore) || baseScore)),
+        scoreExplanation: parsed.scoreExplanation || templateExplanation(baseScore, scraped),
+      };
+    }
+  } catch (e) {
+    // Fall through to template
+  }
+
+  return {
+    opportunityScore: baseScore,
+    scoreExplanation: templateExplanation(baseScore, scraped),
+  };
+}
+
+export async function generateResearchBrief(scraped: ScrapedBounty): Promise<ResearchBriefContent> {
+  if (!hasKey()) {
+    return templateResearchBrief(scraped);
+  }
+
+  try {
+    const text = await callQwen(
+      `You are BountyPilot, helping content creators research and win crypto bounties. Generate actionable, specific research briefs.`,
+      `Generate a research brief for this bounty as JSON only:
+{
+  "summary": "<2-3 sentence overview of what this bounty needs and the opportunity>",
+  "contentAngles": "<4 numbered content angles/approaches the creator could take>",
+  "keyPoints": "<5 bullet points of key facts to research and include>",
+  "targetAudience": "<who the content should be aimed at>",
+  "competitorAnalysis": "<brief note on existing coverage and how to differentiate>"
+}
+
+Bounty:
+- Title: ${scraped.title}
+- Platform: ${scraped.platform}
+- Project: ${scraped.projectName}
+- Format: ${scraped.contentFormat}
+- Requirements: ${scraped.submissionRequirements?.slice(0, 400)}
+- Description: ${scraped.description?.slice(0, 500)}`
+    );
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        summary: parsed.summary || templateResearchBrief(scraped).summary,
+        contentAngles: parsed.contentAngles || templateResearchBrief(scraped).contentAngles,
+        keyPoints: parsed.keyPoints || templateResearchBrief(scraped).keyPoints,
+        targetAudience: parsed.targetAudience || templateResearchBrief(scraped).targetAudience,
+        competitorAnalysis: parsed.competitorAnalysis || templateResearchBrief(scraped).competitorAnalysis,
+      };
+    }
+  } catch (e) {
+    // Fall through to template
+  }
+
+  return templateResearchBrief(scraped);
+}
+
+export async function generateProductionPlan(scraped: ScrapedBounty): Promise<ProductionPlanContent> {
+  if (!hasKey()) {
+    return templateProductionPlan(scraped);
+  }
+
+  try {
+    const text = await callQwen(
+      `You are BountyPilot, helping content creators plan and produce winning crypto bounty submissions.`,
+      `Generate a production plan for this bounty as JSON only:
+{
+  "scriptOutline": "<detailed outline with timing/sections>",
+  "shotList": "<specific shot list or content structure>",
+  "captionDraft": "<ready-to-use caption/hook for social promotion>",
+  "submissionChecklist": "<checklist items with [ ] markers>",
+  "estimatedHours": <integer hours to complete>
+}
+
+Bounty:
+- Title: ${scraped.title}
+- Platform: ${scraped.platform}
+- Project: ${scraped.projectName}
+- Format: ${scraped.contentFormat}
+- Deliverables: ${scraped.deliverables}
+- Deadline: ${scraped.deadline || "check listing"}
+- Submission link: ${scraped.submissionLink}
+- Requirements: ${scraped.submissionRequirements?.slice(0, 300)}`
+    );
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const fallback = templateProductionPlan(scraped);
+      return {
+        scriptOutline: parsed.scriptOutline || fallback.scriptOutline,
+        shotList: parsed.shotList || fallback.shotList,
+        captionDraft: parsed.captionDraft || fallback.captionDraft,
+        submissionChecklist: parsed.submissionChecklist || fallback.submissionChecklist,
+        estimatedHours: parseInt(parsed.estimatedHours) || fallback.estimatedHours,
+      };
+    }
+  } catch (e) {
+    // Fall through to template
+  }
+
+  return templateProductionPlan(scraped);
+}

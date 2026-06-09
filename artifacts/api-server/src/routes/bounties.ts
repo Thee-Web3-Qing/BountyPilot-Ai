@@ -10,46 +10,17 @@ import {
   CreateBountyBody,
   UpdateBountyBody,
 } from "@workspace/api-zod";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.js";
+import { scrapeBounty } from "../lib/scraper.js";
+import { analyzeBounty, generateResearchBrief, generateProductionPlan } from "../lib/qwen.js";
 
 export const bountiesRouter = Router();
-
-// Mock LLM function — swap out for Qwen API when key is available
-function mockLLM(prompt: string): string {
-  return `[AI Response for: ${prompt.slice(0, 60)}...]`;
-}
-
-function detectPlatform(url: string): string {
-  if (url.includes("earn.superteam")) return "Superteam Earn";
-  if (url.includes("gibwork")) return "GibWork";
-  if (url.includes("firstdollar")) return "First Dollar";
-  if (url.includes("dorahacks")) return "DoraHacks";
-  if (url.includes("gitcoin")) return "Gitcoin";
-  return "Unknown Platform";
-}
-
-function computeScore(rewardAmount: string | null, deadline: string | null): number {
-  let score = 5;
-  if (rewardAmount) {
-    const num = parseFloat(rewardAmount.replace(/[^0-9.]/g, ""));
-    if (num > 5000) score += 2;
-    else if (num > 1000) score += 1;
-  }
-  if (deadline) {
-    const d = new Date(deadline);
-    const daysLeft = (d.getTime() - Date.now()) / 86400000;
-    if (daysLeft < 3) score -= 1;
-    else if (daysLeft > 14) score += 1;
-  }
-  return Math.max(1, Math.min(10, score));
-}
 
 // GET /bounties
 bountiesRouter.get("/", async (req, res) => {
   try {
     const { status, platform } = req.query as { status?: string; platform?: string };
-    let query = db.select().from(bountiesTable).orderBy(desc(bountiesTable.createdAt));
-    const all = await query;
+    const all = await db.select().from(bountiesTable).orderBy(desc(bountiesTable.createdAt));
     let filtered = all;
     if (status) filtered = filtered.filter((b) => b.status === status);
     if (platform) filtered = filtered.filter((b) => b.platform === platform);
@@ -60,7 +31,7 @@ bountiesRouter.get("/", async (req, res) => {
   }
 });
 
-// POST /bounties
+// POST /bounties — real scrape + AI analysis
 bountiesRouter.post("/", async (req, res) => {
   try {
     const parsed = CreateBountyBody.safeParse(req.body);
@@ -68,43 +39,32 @@ bountiesRouter.post("/", async (req, res) => {
       return res.status(400).json({ error: "Invalid input", details: parsed.error });
     }
     const { url } = parsed.data;
-    const platform = detectPlatform(url);
 
-    // Simulate extraction (mock LLM / scraping)
-    const title = `Content Bounty on ${platform}`;
-    const rewardAmount = "500";
-    const rewardCurrency = "USDC";
-    const deadline = new Date(Date.now() + 10 * 86400000).toISOString().split("T")[0];
-    const contentFormat = "Article / Twitter Thread";
-    const submissionRequirements = "Original content, min 800 words, include relevant links";
-    const deliverables = "1 long-form article + 5-tweet thread";
-    const submissionLink = url;
-    const eligibilityRules = "Open to all creators worldwide";
-    const importantNotes = "Judged on clarity, accuracy, and reach";
+    logger.info({ url }, "Scraping bounty URL");
+    const scraped = await scrapeBounty(url);
+    logger.info({ title: scraped.title, platform: scraped.platform }, "Scraped bounty");
 
-    const score = computeScore(rewardAmount, deadline);
-    const scoreExplanation = mockLLM(
-      `Score ${score}/10: Moderate reward ($${rewardAmount} USDC), clear requirements, 10 days remaining. Good fit for experienced content creators.`
-    );
+    const analysis = await analyzeBounty(scraped);
+    logger.info({ score: analysis.opportunityScore }, "Analysed bounty");
 
     const [bounty] = await db
       .insert(bountiesTable)
       .values({
         url,
-        title,
-        platform,
-        projectName: platform,
-        rewardAmount,
-        rewardCurrency,
-        deadline,
-        contentFormat,
-        submissionRequirements,
-        deliverables,
-        submissionLink,
-        eligibilityRules,
-        importantNotes,
-        opportunityScore: score,
-        scoreExplanation: `Score ${score}/10: Moderate reward ($${rewardAmount} ${rewardCurrency}), clear requirements, 10 days remaining. Good fit for experienced content creators.`,
+        title: scraped.title,
+        platform: scraped.platform,
+        projectName: scraped.projectName,
+        rewardAmount: scraped.rewardAmount,
+        rewardCurrency: scraped.rewardCurrency,
+        deadline: scraped.deadline,
+        contentFormat: scraped.contentFormat,
+        submissionRequirements: scraped.submissionRequirements,
+        deliverables: scraped.deliverables,
+        submissionLink: scraped.submissionLink,
+        eligibilityRules: scraped.eligibilityRules,
+        importantNotes: scraped.importantNotes,
+        opportunityScore: analysis.opportunityScore,
+        scoreExplanation: analysis.scoreExplanation,
         status: "discovered",
       })
       .returning();
@@ -168,7 +128,7 @@ bountiesRouter.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /bounties/:id/approve
+// POST /bounties/:id/approve — AI generates research brief + production plan
 bountiesRouter.post("/:id/approve", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -179,20 +139,38 @@ bountiesRouter.post("/:id/approve", async (req, res) => {
       .returning();
     if (!bounty) return res.status(404).json({ error: "Not found" });
 
-    // Auto-generate research brief and production plan
+    const scrapedForGen = {
+      title: bounty.title || "",
+      description: bounty.submissionRequirements || "",
+      rewardAmount: bounty.rewardAmount,
+      rewardCurrency: bounty.rewardCurrency,
+      deadline: bounty.deadline,
+      projectName: bounty.projectName || bounty.platform || "",
+      contentFormat: bounty.contentFormat || "Article / Thread",
+      submissionRequirements: bounty.submissionRequirements || "",
+      deliverables: bounty.deliverables || "",
+      submissionLink: bounty.submissionLink || bounty.url,
+      eligibilityRules: bounty.eligibilityRules || "",
+      importantNotes: bounty.importantNotes || "",
+      platform: bounty.platform || "",
+      rawText: "",
+    };
+
     const existingBrief = await db
       .select()
       .from(researchBriefsTable)
       .where(eq(researchBriefsTable.bountyId, id));
 
     if (existingBrief.length === 0) {
+      logger.info({ bountyId: id }, "Generating research brief");
+      const brief = await generateResearchBrief(scrapedForGen);
       await db.insert(researchBriefsTable).values({
         bountyId: id,
-        summary: `Research brief for "${bounty.title}" on ${bounty.platform}. This bounty requires deep knowledge of the project ecosystem and target audience.`,
-        contentAngles: `1. Deep-dive technical explainer\n2. Beginner's guide / onboarding narrative\n3. Comparison with competing protocols\n4. Use-case story with real user examples`,
-        keyPoints: `- Understand the core protocol mechanics\n- Highlight unique value propositions\n- Address common misconceptions\n- Include recent milestones and roadmap`,
-        targetAudience: `Web3 enthusiasts, crypto investors, developers entering the ecosystem, content consumers on Twitter and YouTube`,
-        competitorAnalysis: `Similar content exists on Medium and Mirror. Differentiate through clarity, unique angles, and multimedia elements.`,
+        summary: brief.summary,
+        contentAngles: brief.contentAngles,
+        keyPoints: brief.keyPoints,
+        targetAudience: brief.targetAudience,
+        competitorAnalysis: brief.competitorAnalysis,
       });
     }
 
@@ -202,13 +180,15 @@ bountiesRouter.post("/:id/approve", async (req, res) => {
       .where(eq(productionPlansTable.bountyId, id));
 
     if (existingPlan.length === 0) {
+      logger.info({ bountyId: id }, "Generating production plan");
+      const plan = await generateProductionPlan(scrapedForGen);
       await db.insert(productionPlansTable).values({
         bountyId: id,
-        scriptOutline: `INTRO (0-30s): Hook with a surprising statistic\nSECTION 1 (30-90s): Problem statement\nSECTION 2 (90-180s): Solution overview\nSECTION 3 (180-240s): How it works\nOUTRO (240-300s): Call to action + submission link`,
-        shotList: `1. Talking head intro\n2. Screen recording of protocol\n3. Graphic: key metrics\n4. B-roll: community/ecosystem\n5. Outro card with links`,
-        captionDraft: `Exploring ${bounty.platform}'s latest content bounty — here's everything you need to know about ${bounty.projectName}. Thread below. #Web3 #Crypto #ContentBounty`,
-        submissionChecklist: `[ ] Content published and accessible\n[ ] Minimum word/time requirement met\n[ ] All required links included\n[ ] Submitted before deadline (${bounty.deadline})\n[ ] Submission URL shared in form`,
-        estimatedHours: 8,
+        scriptOutline: plan.scriptOutline,
+        shotList: plan.shotList,
+        captionDraft: plan.captionDraft,
+        submissionChecklist: plan.submissionChecklist,
+        estimatedHours: plan.estimatedHours,
       });
     }
 
