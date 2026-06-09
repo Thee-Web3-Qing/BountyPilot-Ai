@@ -76,11 +76,21 @@ function ruleBasedScore(rewardAmount: string | null, deadline: string | null): n
 }
 
 function templateExplanation(score: number, scraped: ScrapedBounty): string {
-  const reward = scraped.rewardAmount ? `$${scraped.rewardAmount} ${scraped.rewardCurrency}` : "unspecified reward";
+  const hasReward = scraped.rewardAmount && Number(scraped.rewardAmount) > 0;
+  const rewardPart = hasReward
+    ? `${scraped.rewardAmount} ${scraped.rewardCurrency || "USDC"} reward`
+    : "reward listed on platform";
   const deadlineNote = scraped.deadline
-    ? `${Math.round((new Date(scraped.deadline).getTime() - Date.now()) / 86400000)} days until deadline`
-    : "no deadline specified";
-  return `Score ${score}/10: ${reward} bounty on ${scraped.platform}. ${deadlineNote}. Format: ${scraped.contentFormat}. ${score >= 7 ? "Strong opportunity — clear deliverables and solid reward." : score >= 5 ? "Moderate opportunity — worth pursuing if format aligns with your strengths." : "Lower priority — limited reward or tight timeline."}`;
+    ? (() => {
+        const d = Math.round((new Date(scraped.deadline).getTime() - Date.now()) / 86400000);
+        return d < 0 ? "deadline passed" : d === 0 ? "deadline today" : `${d} days to deadline`;
+      })()
+    : "open deadline";
+  const verdict =
+    score >= 7 ? "Strong pick — solid reward and clear deliverables."
+    : score >= 5 ? "Worth pursuing if the format fits your strengths."
+    : "Lower priority — limited reward or tight timeline.";
+  return `Score ${score}/10: ${rewardPart}. ${deadlineNote}. Format: ${scraped.contentFormat || "open"}. ${verdict}`;
 }
 
 function templateResearchBrief(scraped: ScrapedBounty): ResearchBriefContent {

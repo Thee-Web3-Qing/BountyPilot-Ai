@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
-  Loader2, RefreshCw, Globe, Plus, CheckCircle, AlertCircle,
-  Clock, Search, Zap, ChevronRight, Shield,
+  Loader2, RefreshCw, Globe, Plus, CheckCircle,
+  Clock, Search, Zap, Shield, ExternalLink, ChevronDown,
+  ChevronUp, AlertCircle, X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBountiesQueryKey } from "@workspace/api-client-react";
@@ -21,6 +20,10 @@ interface DiscoveredBounty {
   rewardCurrency: string | null;
   deadline: string | null;
   contentFormat: string | null;
+  submissionRequirements: string | null;
+  deliverables: string | null;
+  eligibilityRules: string | null;
+  importantNotes: string | null;
   opportunityScore: number | null;
   scoreExplanation: string | null;
   confidenceScore: number | null;
@@ -28,20 +31,21 @@ interface DiscoveredBounty {
   createdAt: string;
 }
 
+interface PlatformResult {
+  platform: string;
+  added: number;
+  skipped: number;
+  error?: string;
+  durationMs: number;
+}
+
 interface CrawlerStatus {
   isRunning: boolean;
   lastRunAt: string | null;
-  nextRunAt: string | null;
-  lastResults: { platform: string; added: number; skipped: number; error?: string; durationMs: number }[];
+  lastResults: PlatformResult[];
   totalAddedLastRun: number;
   totalCrawledBounties: number;
 }
-
-const SCORE_COLOR = (score: number) => {
-  if (score >= 7) return "text-green-400 border-green-400/40 bg-green-400/10";
-  if (score >= 4) return "text-yellow-400 border-yellow-400/40 bg-yellow-400/10";
-  return "text-red-400 border-red-400/40 bg-red-400/10";
-};
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -53,6 +57,263 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function daysLeft(deadline: string | null): number | null {
+  if (!deadline) return null;
+  return Math.round((new Date(deadline).getTime() - Date.now()) / 86400000);
+}
+
+function scoreColor(score: number): string {
+  if (score >= 7) return "text-green-400";
+  if (score >= 5) return "text-yellow-400";
+  return "text-red-400";
+}
+
+function scoreBg(score: number): string {
+  if (score >= 7) return "border-green-500/40 bg-green-500/10";
+  if (score >= 5) return "border-yellow-500/40 bg-yellow-500/10";
+  return "border-red-500/40 bg-red-500/10";
+}
+
+// ─── Bounty Detail Drawer ──────────────────────────────────────────────────
+function DetailDrawer({
+  bounty,
+  onClose,
+  onClaim,
+  isClaiming,
+  isClaimed,
+}: {
+  bounty: DiscoveredBounty;
+  onClose: () => void;
+  onClaim: () => void;
+  isClaiming: boolean;
+  isClaimed: boolean;
+}) {
+  const dl = daysLeft(bounty.deadline);
+  const score = bounty.opportunityScore ?? 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-lg bg-[#111] border border-border rounded-t-2xl sm:rounded-2xl max-h-[88vh] flex flex-col overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b border-border gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap">
+                {bounty.platform || "Unknown"}
+              </span>
+              {bounty.projectName && (
+                <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                  {bounty.projectName}
+                </span>
+              )}
+            </div>
+            <h2 className="text-lg font-bold leading-tight">{bounty.title || "Untitled Bounty"}</h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+          {/* Key metrics */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-card border border-border rounded-sm p-3 text-center">
+              <div className="font-mono text-xs text-muted-foreground mb-1">Reward</div>
+              <div className="font-bold text-primary text-sm">
+                {bounty.rewardAmount
+                  ? `${bounty.rewardAmount} ${bounty.rewardCurrency}`
+                  : <span className="text-muted-foreground text-xs">Not listed</span>}
+              </div>
+            </div>
+            <div className="bg-card border border-border rounded-sm p-3 text-center">
+              <div className="font-mono text-xs text-muted-foreground mb-1">Deadline</div>
+              <div className={`font-mono text-sm font-bold ${dl === null ? "text-muted-foreground text-xs" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-foreground"}`}>
+                {dl === null ? "Open" : dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d`}
+              </div>
+            </div>
+            <div className={`border rounded-sm p-3 text-center ${scoreBg(score)}`}>
+              <div className="font-mono text-xs text-muted-foreground mb-1">Score</div>
+              <div className={`font-bold text-lg ${scoreColor(score)}`}>{score}<span className="text-xs font-normal">/10</span></div>
+            </div>
+          </div>
+
+          {/* Score explanation */}
+          {bounty.scoreExplanation && (
+            <div className="bg-card border border-border rounded-sm p-3">
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-2">AI Analysis</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.scoreExplanation}</p>
+            </div>
+          )}
+
+          {/* Content format */}
+          {bounty.contentFormat && (
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Format</p>
+              <span className="font-mono text-xs border border-border px-2 py-1 rounded-sm text-foreground">{bounty.contentFormat}</span>
+            </div>
+          )}
+
+          {/* Requirements */}
+          {bounty.submissionRequirements && (
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Requirements</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.submissionRequirements}</p>
+            </div>
+          )}
+
+          {/* Deliverables */}
+          {bounty.deliverables && (
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Deliverables</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.deliverables}</p>
+            </div>
+          )}
+
+          {/* Eligibility */}
+          {bounty.eligibilityRules && (
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Eligibility</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.eligibilityRules}</p>
+            </div>
+          )}
+
+          {/* Confidence */}
+          {bounty.confidenceScore != null && (
+            <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+              <Shield className="w-3.5 h-3.5 text-blue-400" />
+              Data confidence: <span className="text-blue-400">{bounty.confidenceScore}%</span>
+              <span className="ml-1">· added {timeAgo(bounty.createdAt)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Action footer */}
+        <div className="p-4 border-t border-border flex gap-3">
+          <a
+            href={bounty.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-wider border border-border rounded-sm py-2.5 text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" /> Visit Source
+          </a>
+          <Button
+            onClick={onClaim}
+            disabled={isClaiming || isClaimed}
+            className={`flex-1 font-mono text-xs uppercase tracking-wider ${isClaimed ? "bg-green-600 hover:bg-green-600" : ""}`}
+          >
+            {isClaiming ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : isClaimed ? (
+              <><CheckCircle className="w-3.5 h-3.5 mr-1.5" />Added!</>
+            ) : (
+              <><Plus className="w-3.5 h-3.5 mr-1.5" />Add to Pipeline</>
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Bounty Card ───────────────────────────────────────────────────────────
+function BountyCard({
+  bounty,
+  isClaiming,
+  isClaimed,
+  onClaim,
+  onExpand,
+}: {
+  bounty: DiscoveredBounty;
+  isClaiming: boolean;
+  isClaimed: boolean;
+  onClaim: (e: React.MouseEvent) => void;
+  onExpand: () => void;
+}) {
+  const score = bounty.opportunityScore ?? 0;
+  const dl = daysLeft(bounty.deadline);
+
+  return (
+    <div
+      onClick={onExpand}
+      className="bg-card border border-border hover:border-primary/40 active:border-primary/60 rounded-sm p-4 cursor-pointer transition-colors"
+    >
+      {/* Row 1: platform + time */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap leading-tight">
+          {bounty.platform || "Unknown"}
+        </span>
+        {bounty.projectName && (
+          <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
+            {bounty.projectName}
+          </span>
+        )}
+        <span className="font-mono text-[10px] text-muted-foreground/60 ml-auto whitespace-nowrap">
+          {timeAgo(bounty.createdAt)}
+        </span>
+      </div>
+
+      {/* Row 2: title */}
+      <h3 className="font-bold text-base leading-snug mb-3 line-clamp-2 pr-1">
+        {bounty.title || "Untitled Bounty"}
+      </h3>
+
+      {/* Row 3: metrics + score + claim */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Reward */}
+        {bounty.rewardAmount ? (
+          <span className="font-mono text-sm font-bold text-primary whitespace-nowrap">
+            {bounty.rewardAmount} {bounty.rewardCurrency}
+          </span>
+        ) : (
+          <span className="font-mono text-xs text-muted-foreground/50">reward TBD</span>
+        )}
+
+        {/* Format pill */}
+        {bounty.contentFormat && (
+          <span className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
+            {bounty.contentFormat.split("/")[0].trim()}
+          </span>
+        )}
+
+        {/* Deadline pill */}
+        {dl !== null && (
+          <span className={`font-mono text-[10px] flex items-center gap-1 whitespace-nowrap ${dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-muted-foreground"}`}>
+            <Clock className="w-3 h-3 shrink-0" />
+            {dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d`}
+          </span>
+        )}
+
+        {/* Score badge */}
+        <div className={`ml-auto flex items-center gap-0.5 border px-2 py-1 rounded-sm shrink-0 ${scoreBg(score)}`}>
+          <span className={`font-mono text-base font-bold leading-none ${scoreColor(score)}`}>{score}</span>
+          <span className="font-mono text-[10px] text-muted-foreground">/10</span>
+        </div>
+      </div>
+
+      {/* Row 4: add button (stops propagation so it doesn't open drawer) */}
+      <div className="mt-3 flex items-center gap-2">
+        <Button
+          onClick={onClaim}
+          disabled={isClaiming || isClaimed}
+          size="sm"
+          className={`font-mono text-xs uppercase tracking-wider flex-1 sm:flex-none ${isClaimed ? "bg-green-600 hover:bg-green-600" : ""}`}
+        >
+          {isClaiming ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : isClaimed ? <><CheckCircle className="w-3.5 h-3.5 mr-1.5" />Added</>
+            : <><Plus className="w-3.5 h-3.5 mr-1.5" />Add to Pipeline</>}
+        </Button>
+        <span className="font-mono text-[10px] text-muted-foreground/50 flex items-center gap-1 ml-auto">
+          Tap for details <ChevronDown className="w-3 h-3" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Discover Page ────────────────────────────────────────────────────
 export function Discover() {
   const [bounties, setBounties] = useState<DiscoveredBounty[]>([]);
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
@@ -62,9 +323,9 @@ export function Discover() {
   const [triggering, setTriggering] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPlatform, setFilterPlatform] = useState("");
+  const [selected, setSelected] = useState<DiscoveredBounty | null>(null);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
-
   const token = localStorage.getItem("bountypilot_token");
 
   const fetchData = useCallback(async () => {
@@ -82,11 +343,12 @@ export function Discover() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    const iv = setInterval(fetchData, 30000);
+    return () => clearInterval(iv);
   }, [fetchData]);
 
-  const handleClaim = async (bountyId: number) => {
+  const handleClaim = async (bountyId: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setClaiming(bountyId);
     try {
       const resp = await fetch(`/api/discover/${bountyId}/claim`, {
@@ -97,7 +359,9 @@ export function Discover() {
         const data = await resp.json();
         setClaimed((prev) => new Set([...prev, bountyId]));
         queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
-        setTimeout(() => navigate(`/bounties/${data.id}`), 800);
+        if (selected?.id === bountyId) {
+          setTimeout(() => navigate(`/bounties/${data.id}`), 900);
+        }
       } else if (resp.status === 409) {
         const data = await resp.json();
         navigate(`/bounties/${data.bountyId}`);
@@ -114,13 +378,14 @@ export function Discover() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      setTimeout(fetchData, 2000);
+      setTimeout(fetchData, 3000);
     } finally {
-      setTimeout(() => setTriggering(false), 3000);
+      setTimeout(() => setTriggering(false), 4000);
     }
   };
 
   const platforms = [...new Set(bounties.map((b) => b.platform).filter(Boolean))] as string[];
+
   const filtered = bounties.filter((b) => {
     if (filterPlatform && b.platform !== filterPlatform) return false;
     if (search) {
@@ -135,15 +400,16 @@ export function Discover() {
   });
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-start justify-between flex-wrap gap-4">
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">Discover</h1>
-          <p className="text-muted-foreground font-mono text-sm mt-1">
-            Auto-fetched bounties from 20 platforms · Updated hourly
+          <h1 className="text-2xl font-bold font-sans uppercase tracking-tight">Discover</h1>
+          <p className="text-muted-foreground font-mono text-xs mt-0.5">
+            Auto-fetched from 20 platforms · refreshes every hour
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button
             onClick={handleTrigger}
             disabled={triggering || crawlerStatus?.isRunning}
@@ -154,92 +420,80 @@ export function Discover() {
             {triggering || crawlerStatus?.isRunning
               ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
               : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />}
-            {crawlerStatus?.isRunning ? "Crawling..." : "Refresh Now"}
-          </Button>
-          <Button onClick={fetchData} variant="ghost" size="sm" className="font-mono text-xs">
-            <RefreshCw className="w-3.5 h-3.5" />
+            {crawlerStatus?.isRunning ? "Crawling…" : "Refresh"}
           </Button>
         </div>
       </div>
 
       {/* Crawler status bar */}
       {crawlerStatus && (
-        <div className={`flex flex-wrap items-center gap-4 px-4 py-3 rounded-sm border font-mono text-xs ${crawlerStatus.isRunning ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
-          <div className="flex items-center gap-2">
+        <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2.5 rounded-sm border font-mono text-xs ${crawlerStatus.isRunning ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}>
+          <div className="flex items-center gap-1.5">
             {crawlerStatus.isRunning
-              ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-              : <Globe className="w-3.5 h-3.5 text-muted-foreground" />}
-            <span className={crawlerStatus.isRunning ? "text-primary font-bold" : "text-muted-foreground"}>
-              {crawlerStatus.isRunning ? "Crawling platforms..." : "Crawler idle"}
+              ? <Loader2 className="w-3 h-3 animate-spin text-primary" />
+              : <Globe className="w-3 h-3 text-muted-foreground" />}
+            <span className={crawlerStatus.isRunning ? "text-primary" : "text-muted-foreground"}>
+              {crawlerStatus.isRunning ? "Crawling…" : "Idle"}
             </span>
           </div>
           {crawlerStatus.lastRunAt && (
-            <span className="text-muted-foreground">
-              Last run: <span className="text-foreground">{timeAgo(crawlerStatus.lastRunAt)}</span>
-            </span>
+            <span className="text-muted-foreground">Last: <span className="text-foreground">{timeAgo(crawlerStatus.lastRunAt)}</span></span>
           )}
           <span className="text-muted-foreground">
-            Pool: <span className="text-foreground font-bold">{crawlerStatus.totalCrawledBounties}</span> bounties
+            Pool: <span className="text-foreground font-bold">{crawlerStatus.totalCrawledBounties}</span>
           </span>
           {crawlerStatus.totalAddedLastRun > 0 && (
-            <span className="text-green-400">
-              +{crawlerStatus.totalAddedLastRun} last run
-            </span>
+            <span className="text-green-400">+{crawlerStatus.totalAddedLastRun} last run</span>
           )}
-          <span className="text-muted-foreground ml-auto">
-            Next: <span className="text-foreground">top of hour</span>
-          </span>
+          <span className="text-muted-foreground ml-auto">Next: top of hour</span>
         </div>
       )}
 
-      {/* Last crawl results */}
-      {crawlerStatus?.lastResults && crawlerStatus.lastResults.length > 0 && (
-        <Card className="bg-card border-border">
-          <CardContent className="p-5">
-            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">Last Crawl — Per Platform</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {crawlerStatus.lastResults.map((r) => (
-                <div key={r.platform} className={`flex items-center gap-2 px-3 py-2 rounded-sm border text-xs font-mono ${r.error ? "border-red-500/20 bg-red-500/5" : r.added > 0 ? "border-green-500/20 bg-green-500/5" : "border-border"}`}>
-                  {r.error
-                    ? <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
-                    : r.added > 0
-                    ? <CheckCircle className="w-3 h-3 text-green-400 shrink-0" />
-                    : <Clock className="w-3 h-3 text-muted-foreground shrink-0" />}
-                  <span className="truncate text-foreground">{r.platform}</span>
-                  {r.added > 0 && <span className="text-green-400 ml-auto">+{r.added}</span>}
-                  {r.error && <span className="text-red-400 ml-auto">err</span>}
-                </div>
-              ))}
+      {/* Last crawl per-platform results */}
+      {crawlerStatus?.lastResults?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {crawlerStatus.lastResults.map((r) => (
+            <div
+              key={r.platform}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-sm border font-mono text-[10px] ${r.error ? "border-red-500/30 text-red-400" : r.added > 0 ? "border-green-500/30 text-green-400" : "border-border text-muted-foreground"}`}
+            >
+              {r.error
+                ? <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                : r.added > 0
+                ? <CheckCircle className="w-2.5 h-2.5 shrink-0" />
+                : <Clock className="w-2.5 h-2.5 shrink-0" />}
+              <span>{r.platform}</span>
+              {r.added > 0 && <span className="font-bold">+{r.added}</span>}
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      {/* Search + platform filter */}
+      <div className="flex flex-col gap-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search bounties..."
+            placeholder="Search bounties…"
             className="pl-9 font-mono text-sm bg-background"
           />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
           <button
             onClick={() => setFilterPlatform("")}
-            className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-colors ${!filterPlatform ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
           >
-            All
+            All ({bounties.length})
           </button>
-          {platforms.slice(0, 8).map((p) => (
+          {platforms.map((p) => (
             <button
               key={p}
               onClick={() => setFilterPlatform(filterPlatform === p ? "" : p)}
-              className={`font-mono text-xs px-3 py-1.5 rounded-sm border transition-colors ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+              className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
             >
-              {p}
+              {p} ({bounties.filter((b) => b.platform === p).length})
             </button>
           ))}
         </div>
@@ -247,26 +501,26 @@ export function Discover() {
 
       {/* Bounties list */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-muted-foreground font-mono gap-3">
-          <Loader2 className="w-6 h-6 animate-spin" /> Loading discover pool...
+        <div className="flex items-center justify-center py-16 text-muted-foreground font-mono gap-3 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin" /> Loading…
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-20 text-center">
-          <Globe className="w-12 h-12 text-muted-foreground/30" />
+        <div className="flex flex-col items-center gap-4 py-16 text-center">
+          <Globe className="w-10 h-10 text-muted-foreground/30" />
           <div>
-            <p className="font-mono text-sm text-muted-foreground">No bounties in pool yet</p>
-            <p className="font-mono text-xs text-muted-foreground/60 mt-1">
-              {crawlerStatus?.isRunning ? "Crawl is running — check back shortly" : "Click \"Refresh Now\" to trigger a crawl"}
+            <p className="font-mono text-sm text-muted-foreground">No bounties yet</p>
+            <p className="font-mono text-xs text-muted-foreground/50 mt-1">
+              {crawlerStatus?.isRunning ? "Crawl running — check back in a moment" : "Click Refresh to pull the latest"}
             </p>
           </div>
           {!crawlerStatus?.isRunning && (
-            <Button onClick={handleTrigger} disabled={triggering} variant="outline" className="font-mono text-xs uppercase">
-              <Zap className="w-4 h-4 mr-2" /> Trigger Crawl
+            <Button onClick={handleTrigger} disabled={triggering} variant="outline" size="sm" className="font-mono text-xs uppercase">
+              <Zap className="w-3.5 h-3.5 mr-1.5" /> Trigger Crawl
             </Button>
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           <p className="font-mono text-xs text-muted-foreground">{filtered.length} bounties found</p>
           {filtered.map((bounty) => (
             <BountyCard
@@ -274,100 +528,23 @@ export function Discover() {
               bounty={bounty}
               isClaiming={claiming === bounty.id}
               isClaimed={claimed.has(bounty.id)}
-              onClaim={() => handleClaim(bounty.id)}
+              onClaim={(e) => handleClaim(bounty.id, e)}
+              onExpand={() => setSelected(bounty)}
             />
           ))}
         </div>
       )}
+
+      {/* Detail drawer */}
+      {selected && (
+        <DetailDrawer
+          bounty={selected}
+          onClose={() => setSelected(null)}
+          onClaim={() => handleClaim(selected.id)}
+          isClaiming={claiming === selected.id}
+          isClaimed={claimed.has(selected.id)}
+        />
+      )}
     </div>
-  );
-}
-
-function BountyCard({
-  bounty, isClaiming, isClaimed, onClaim,
-}: {
-  bounty: DiscoveredBounty;
-  isClaiming: boolean;
-  isClaimed: boolean;
-  onClaim: () => void;
-}) {
-  const score = bounty.opportunityScore ?? 0;
-  const daysLeft = bounty.deadline
-    ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
-    : null;
-
-  return (
-    <Card className="bg-card border-border hover:border-primary/30 transition-colors group">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">{bounty.platform || "Unknown"}</span>
-              {bounty.projectName && (
-                <>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span className="font-mono text-xs text-muted-foreground">{bounty.projectName}</span>
-                </>
-              )}
-              <span className="text-muted-foreground/40 ml-auto">·</span>
-              <span className="font-mono text-xs text-muted-foreground">{timeAgo(bounty.createdAt)}</span>
-            </div>
-
-            <h3 className="font-bold text-base truncate pr-2">{bounty.title || "Untitled Bounty"}</h3>
-
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {bounty.rewardAmount && (
-                <span className="font-mono text-sm font-bold text-primary">
-                  {bounty.rewardAmount} {bounty.rewardCurrency}
-                </span>
-              )}
-              {bounty.contentFormat && (
-                <span className="font-mono text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-sm">
-                  {bounty.contentFormat}
-                </span>
-              )}
-              {daysLeft !== null && (
-                <span className={`font-mono text-xs flex items-center gap-1 ${daysLeft < 3 ? "text-red-400" : daysLeft < 7 ? "text-yellow-400" : "text-muted-foreground"}`}>
-                  <Clock className="w-3 h-3" />
-                  {daysLeft < 0 ? "Expired" : daysLeft === 0 ? "Today" : `${daysLeft}d left`}
-                </span>
-              )}
-              {bounty.confidenceScore != null && (
-                <span className="font-mono text-xs text-blue-400/70 flex items-center gap-1">
-                  <Shield className="w-3 h-3" /> {bounty.confidenceScore}%
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-3 shrink-0">
-            {score > 0 && (
-              <div className={`flex items-center gap-1 border px-3 py-1.5 rounded-sm ${SCORE_COLOR(score)}`}>
-                <span className="font-mono text-lg font-bold">{score}</span>
-                <span className="font-mono text-xs">/10</span>
-              </div>
-            )}
-            <Button
-              onClick={onClaim}
-              disabled={isClaiming || isClaimed}
-              size="sm"
-              className={`font-mono text-xs uppercase tracking-wider ${isClaimed ? "bg-green-600 hover:bg-green-600" : ""}`}
-            >
-              {isClaiming ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : isClaimed ? (
-                <><CheckCircle className="w-3.5 h-3.5 mr-1" /> Added</>
-              ) : (
-                <><Plus className="w-3.5 h-3.5 mr-1" /> Add to Pipeline</>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {bounty.scoreExplanation && (
-          <p className="font-mono text-xs text-muted-foreground mt-3 line-clamp-2">{bounty.scoreExplanation}</p>
-        )}
-      </CardContent>
-    </Card>
   );
 }

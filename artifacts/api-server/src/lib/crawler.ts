@@ -1,9 +1,10 @@
 import { db } from "@workspace/db";
 import { bountiesTable } from "@workspace/db";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, like, isNotNull } from "drizzle-orm";
 import { scrapeBounty } from "./scraper.js";
 import { analyzeBounty } from "./qwen.js";
 import { logger } from "./logger.js";
+import { fetchWithBrowser } from "./browser.js";
 
 export interface CrawlPlatformResult {
   platform: string;
@@ -127,20 +128,54 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
 // ─── First Dollar — public JSON API ─────────────────────────
 async function fetchFirstDollar(): Promise<PlatformBountyHint[]> {
   try {
-    const resp = await fetch("https://app.firstdollar.money/api/bounties?limit=10", {
+    const resp = await fetch("https://app.firstdollar.money/api/bounties?limit=12&status=open", {
       headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json() as { success?: boolean; data?: Array<Record<string, unknown>> };
-    const items = data.data || [];
-    return items.slice(0, 8).map((b) => ({
-      url: `https://app.firstdollar.money/bounties/${b.id}`,
-      title: b.title as string | undefined,
-      projectName: (b.companyName as string | undefined) || (b.company as Record<string, unknown>)?.name as string | undefined,
-      description: b.description as string | undefined,
-    }));
+    const items = (data.data || []).filter((b) => b.status !== "completed").slice(0, 8);
+
+    // Enrich with individual bounty data for reward/deadline
+    const hints: PlatformBountyHint[] = await Promise.all(
+      items.map(async (b) => {
+        let rewardAmount: string | undefined;
+        let rewardCurrency: string | undefined;
+        let deadline: string | undefined;
+        let projectName: string | undefined;
+
+        try {
+          const detail = await fetch(`https://app.firstdollar.money/api/bounties/${b.id}`, {
+            headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
+            signal: AbortSignal.timeout(8000),
+          });
+          if (detail.ok) {
+            const dData = await detail.json() as { data?: Record<string, unknown> };
+            const d = dData.data || {};
+            const prize = d.totalPrizePool ?? d.firstPlacePrize ?? d.prizePool;
+            rewardAmount = prize != null ? String(prize) : undefined;
+            rewardCurrency = (d.paymentTokenName as string | undefined) || (d.paymentToken as string | undefined) || "USDC";
+            const dl = (d.submissionDeadline ?? d.applicationDeadline ?? d.deadline) as string | undefined;
+            if (dl) {
+              try { deadline = new Date(dl).toISOString().split("T")[0]; } catch {}
+            }
+            const co = d.company as Record<string, unknown> | undefined;
+            projectName = (co?.name as string | undefined) || (d.companyName as string | undefined);
+          }
+        } catch {}
+
+        return {
+          url: `https://app.firstdollar.money/bounties/${b.id}`,
+          title: b.title as string | undefined,
+          projectName,
+          rewardAmount,
+          rewardCurrency,
+          deadline,
+        };
+      })
+    );
+    return hints;
   } catch (e) {
     logger.warn({ err: e }, "First Dollar API fetch failed");
     return [];
@@ -203,10 +238,137 @@ async function fetchGenericListing(config: PlatformConfig): Promise<PlatformBoun
       } catch {}
     }
 
-    return config.fetchLinks(html, config.listingUrl);
+    const links = config.fetchLinks(html, config.listingUrl);
+    if (links.length > 0) return links;
+
+    // Fallback: try headless browser for SPAs that returned empty HTML
+    logger.info({ platform: config.name }, "Falling back to headless browser");
+    try {
+      const renderedHtml = await fetchWithBrowser(config.listingUrl, 25000);
+      return config.fetchLinks(renderedHtml, config.listingUrl);
+    } catch (browserErr) {
+      logger.warn({ platform: config.name, err: (browserErr as Error).message }, "Browser fallback failed");
+      return [];
+    }
   } catch (e) {
     logger.warn({ platform: config.name, err: (e as Error).message }, "Generic HTML fetch failed");
-    return [];
+    // Still try browser
+    try {
+      const renderedHtml = await fetchWithBrowser(config.listingUrl, 25000);
+      return config.fetchLinks(renderedHtml, config.listingUrl);
+    } catch {
+      return [];
+    }
+  }
+}
+
+// ─── Fix stale "unspecified reward" score explanations ──────
+async function fixUnspecifiedBounties(): Promise<void> {
+  try {
+    const stale = await db
+      .select()
+      .from(bountiesTable)
+      .where(
+        and(
+          isNull(bountiesTable.userId),
+          isNotNull(bountiesTable.rewardAmount),
+          like(bountiesTable.scoreExplanation, "%unspecified reward%")
+        )
+      );
+
+    for (const bounty of stale) {
+      const hasReward = bounty.rewardAmount && Number(bounty.rewardAmount) > 0;
+      const reward = hasReward ? `${bounty.rewardAmount} ${bounty.rewardCurrency || "USDC"}` : null;
+      const dl = bounty.deadline
+        ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
+        : null;
+      const deadlineNote = dl !== null ? `${dl} days until deadline` : "no deadline specified";
+      const score = bounty.opportunityScore ?? 5;
+      const verdict =
+        score >= 7 ? "Strong opportunity — clear deliverables and solid reward."
+        : score >= 5 ? "Moderate opportunity — worth pursuing if format aligns with your strengths."
+        : "Lower priority — limited reward or tight timeline.";
+      const rewardPart = reward ? `${reward} reward` : "reward listed on platform";
+      const newExplanation = `Score ${score}/10: ${rewardPart}. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
+
+      await db
+        .update(bountiesTable)
+        .set({ scoreExplanation: newExplanation })
+        .where(eq(bountiesTable.id, bounty.id));
+    }
+
+    if (stale.length > 0) {
+      logger.info({ fixed: stale.length }, "Fixed unspecified reward explanations (with reward)");
+    }
+
+    // Also fix entries where rewardAmount IS null — just clean up the text
+    const nullRewardStale = await db
+      .select({ id: bountiesTable.id, platform: bountiesTable.platform, contentFormat: bountiesTable.contentFormat, opportunityScore: bountiesTable.opportunityScore, deadline: bountiesTable.deadline })
+      .from(bountiesTable)
+      .where(
+        and(
+          isNull(bountiesTable.userId),
+          isNull(bountiesTable.rewardAmount),
+          like(bountiesTable.scoreExplanation, "%unspecified reward%")
+        )
+      );
+
+    for (const bounty of nullRewardStale) {
+      const score = bounty.opportunityScore ?? 5;
+      const dl = bounty.deadline
+        ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
+        : null;
+      const deadlineNote = dl !== null ? (dl < 0 ? "deadline passed" : `${dl} days to deadline`) : "open deadline";
+      const verdict =
+        score >= 7 ? "Strong pick — solid reward and clear deliverables."
+        : score >= 5 ? "Worth pursuing if the format fits your strengths."
+        : "Lower priority — limited reward or tight timeline.";
+      const newExplanation = `Score ${score}/10: reward listed on platform. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
+
+      await db
+        .update(bountiesTable)
+        .set({ scoreExplanation: newExplanation })
+        .where(eq(bountiesTable.id, bounty.id));
+    }
+
+    if (nullRewardStale.length > 0) {
+      logger.info({ fixed: nullRewardStale.length }, "Fixed unspecified reward text (no reward data)");
+    }
+
+    // Also fix entries where rewardAmount = "0" — "$0 USDC" is worse than "reward listed on platform"
+    const zeroRewardStale = await db
+      .select({ id: bountiesTable.id, platform: bountiesTable.platform, contentFormat: bountiesTable.contentFormat, opportunityScore: bountiesTable.opportunityScore, deadline: bountiesTable.deadline })
+      .from(bountiesTable)
+      .where(
+        and(
+          isNull(bountiesTable.userId),
+          eq(bountiesTable.rewardAmount, "0"),
+        )
+      );
+
+    for (const bounty of zeroRewardStale) {
+      const score = bounty.opportunityScore ?? 4;
+      const dl = bounty.deadline
+        ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
+        : null;
+      const deadlineNote = dl !== null ? (dl < 0 ? "deadline passed" : dl === 0 ? "deadline today" : `${dl} days to deadline`) : "open deadline";
+      const verdict =
+        score >= 7 ? "Strong pick — solid reward and clear deliverables."
+        : score >= 5 ? "Worth pursuing if the format fits your strengths."
+        : "Lower priority — limited reward or tight timeline.";
+      const newExplanation = `Score ${score}/10: reward listed on platform. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
+
+      await db
+        .update(bountiesTable)
+        .set({ scoreExplanation: newExplanation })
+        .where(eq(bountiesTable.id, bounty.id));
+    }
+
+    if (zeroRewardStale.length > 0) {
+      logger.info({ fixed: zeroRewardStale.length }, "Fixed $0 reward entries");
+    }
+  } catch (err) {
+    logger.warn({ err }, "fixUnspecifiedBounties failed");
   }
 }
 
@@ -359,7 +521,16 @@ async function getExistingUrls(): Promise<Set<string>> {
 async function storeBountyHint(hint: PlatformBountyHint, platform: string): Promise<boolean> {
   try {
     const scraped = await scrapeBounty(hint.url);
-    const analysis = await analyzeBounty(scraped);
+
+    // Merge API hint data over scraped data — API is authoritative for reward/deadline
+    const merged = {
+      ...scraped,
+      rewardAmount: hint.rewardAmount || scraped.rewardAmount,
+      rewardCurrency: hint.rewardCurrency || scraped.rewardCurrency,
+      deadline: hint.deadline || scraped.deadline,
+    };
+
+    const analysis = await analyzeBounty(merged);
 
     await db.insert(bountiesTable).values({
       userId: null,
@@ -367,9 +538,9 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
       title: hint.title || scraped.title,
       platform: scraped.platform || platform,
       projectName: hint.projectName || scraped.projectName,
-      rewardAmount: hint.rewardAmount || scraped.rewardAmount,
-      rewardCurrency: hint.rewardCurrency || scraped.rewardCurrency,
-      deadline: hint.deadline || scraped.deadline,
+      rewardAmount: merged.rewardAmount,
+      rewardCurrency: merged.rewardCurrency,
+      deadline: merged.deadline,
       contentFormat: scraped.contentFormat,
       submissionRequirements: scraped.submissionRequirements,
       deliverables: scraped.deliverables,
@@ -495,6 +666,9 @@ export async function crawlAll(): Promise<CrawlPlatformResult[]> {
     status.lastResults = results;
     status.totalAddedLastRun = totalAdded;
     status.totalCrawledBounties = totalCrawled;
+
+    // Retroactively fix any "unspecified reward" entries from before API merge fix
+    await fixUnspecifiedBounties();
 
     logger.info({ totalAdded, platforms: results.length }, "Crawl complete");
     return results;
