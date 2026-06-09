@@ -38,3 +38,9 @@ externalPort = 80
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+QWEN_MODEL = "qwen-plus"
