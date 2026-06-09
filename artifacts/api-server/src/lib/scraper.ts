@@ -53,6 +53,26 @@ function extractDeadline(text: string): string | null {
   return null;
 }
 
+// Strip HTML tags and decode common entities to plain text
+export function stripHtml(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function extractContentFormat(text: string): string {
   const lower = text.toLowerCase();
   const formats: string[] = [];
@@ -276,8 +296,9 @@ export async function scrapeBounty(
   const title = (rawTitle || `Content Bounty on ${platform}`).slice(0, 200);
   const description = rawDescription || `A content creation bounty on ${platform} by ${projectName}.`;
 
-  const submissionRequirements = rawDescription
-    ? `${rawDescription.slice(0, 400)}. Original content required.`
+  const cleanDescription = stripHtml(rawDescription);
+  const submissionRequirements = cleanDescription
+    ? `${cleanDescription.slice(0, 600)}`
     : `Original content required for this ${platform} bounty. Check the listing page for full requirements.`;
 
   const notesArr: string[] = [];

@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Loader2, RefreshCw, Globe, Plus, CheckCircle,
-  Clock, Search, Zap, Shield, ExternalLink, ChevronDown,
-  ChevronUp, AlertCircle, X,
+  Clock, Search, Zap, Shield, ExternalLink, X,
+  Sparkles, AlertCircle,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBountiesQueryKey } from "@workspace/api-client-react";
@@ -31,6 +31,13 @@ interface DiscoveredBounty {
   createdAt: string;
 }
 
+interface UserProfile {
+  contentFormats: string | null;
+  minimumReward: number | null;
+  skillLevel: string | null;
+  niche: string | null;
+}
+
 interface PlatformResult {
   platform: string;
   added: number;
@@ -45,6 +52,26 @@ interface CrawlerStatus {
   lastResults: PlatformResult[];
   totalAddedLastRun: number;
   totalCrawledBounties: number;
+}
+
+// Strip residual HTML tags and decode entities for safe plain-text display
+function stripHtml(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return raw
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function timeAgo(iso: string): string {
@@ -74,6 +101,24 @@ function scoreBg(score: number): string {
   return "border-red-500/40 bg-red-500/10";
 }
 
+// Check if a bounty matches the user's profile preferences
+function matchesProfile(bounty: DiscoveredBounty, profile: UserProfile): boolean {
+  // Minimum reward check
+  if (profile.minimumReward && profile.minimumReward > 0) {
+    const reward = bounty.rewardAmount ? parseFloat(bounty.rewardAmount) : 0;
+    if (reward < profile.minimumReward) return false;
+  }
+  // Content format check — match any overlapping keyword
+  if (profile.contentFormats) {
+    const userFmts = profile.contentFormats.toLowerCase();
+    const bountyFmt = (bounty.contentFormat || "").toLowerCase();
+    const keywords = ["video", "thread", "article", "newsletter", "podcast", "infographic", "blog"];
+    const userKws = keywords.filter((k) => userFmts.includes(k));
+    if (userKws.length > 0 && !userKws.some((k) => bountyFmt.includes(k))) return false;
+  }
+  return true;
+}
+
 // ─── Bounty Detail Drawer ──────────────────────────────────────────────────
 function DetailDrawer({
   bounty,
@@ -90,6 +135,9 @@ function DetailDrawer({
 }) {
   const dl = daysLeft(bounty.deadline);
   const score = bounty.opportunityScore ?? 0;
+  const requirements = stripHtml(bounty.submissionRequirements);
+  const deliverables = stripHtml(bounty.deliverables);
+  const eligibility = stripHtml(bounty.eligibilityRules);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -122,14 +170,14 @@ function DetailDrawer({
             <div className="bg-card border border-border rounded-sm p-3 text-center">
               <div className="font-mono text-xs text-muted-foreground mb-1">Reward</div>
               <div className="font-bold text-primary text-sm">
-                {bounty.rewardAmount
-                  ? `${bounty.rewardAmount} ${bounty.rewardCurrency}`
-                  : <span className="text-muted-foreground text-xs">Not listed</span>}
+                {bounty.rewardAmount && Number(bounty.rewardAmount) > 0
+                  ? `${bounty.rewardAmount} ${bounty.rewardCurrency || "USDC"}`
+                  : <span className="text-muted-foreground text-xs">See platform</span>}
               </div>
             </div>
             <div className="bg-card border border-border rounded-sm p-3 text-center">
               <div className="font-mono text-xs text-muted-foreground mb-1">Deadline</div>
-              <div className={`font-mono text-sm font-bold ${dl === null ? "text-muted-foreground text-xs" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-foreground"}`}>
+              <div className={`font-mono text-sm font-bold ${dl === null ? "text-muted-foreground text-xs" : dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-foreground"}`}>
                 {dl === null ? "Open" : dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d`}
               </div>
             </div>
@@ -156,26 +204,26 @@ function DetailDrawer({
           )}
 
           {/* Requirements */}
-          {bounty.submissionRequirements && (
+          {requirements && (
             <div>
               <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Requirements</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.submissionRequirements}</p>
+              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{requirements}</p>
             </div>
           )}
 
           {/* Deliverables */}
-          {bounty.deliverables && (
+          {deliverables && deliverables !== bounty.contentFormat && (
             <div>
               <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Deliverables</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.deliverables}</p>
+              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{deliverables}</p>
             </div>
           )}
 
           {/* Eligibility */}
-          {bounty.eligibilityRules && (
+          {eligibility && (
             <div>
               <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Eligibility</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.eligibilityRules}</p>
+              <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{eligibility}</p>
             </div>
           )}
 
@@ -260,25 +308,22 @@ function BountyCard({
         {bounty.title || "Untitled Bounty"}
       </h3>
 
-      {/* Row 3: metrics + score + claim */}
+      {/* Row 3: metrics + score */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Reward */}
-        {bounty.rewardAmount ? (
+        {bounty.rewardAmount && Number(bounty.rewardAmount) > 0 ? (
           <span className="font-mono text-sm font-bold text-primary whitespace-nowrap">
-            {bounty.rewardAmount} {bounty.rewardCurrency}
+            {bounty.rewardAmount} {bounty.rewardCurrency || "USDC"}
           </span>
         ) : (
           <span className="font-mono text-xs text-muted-foreground/50">reward TBD</span>
         )}
 
-        {/* Format pill */}
         {bounty.contentFormat && (
           <span className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
             {bounty.contentFormat.split("/")[0].trim()}
           </span>
         )}
 
-        {/* Deadline pill */}
         {dl !== null && (
           <span className={`font-mono text-[10px] flex items-center gap-1 whitespace-nowrap ${dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-muted-foreground"}`}>
             <Clock className="w-3 h-3 shrink-0" />
@@ -286,14 +331,13 @@ function BountyCard({
           </span>
         )}
 
-        {/* Score badge */}
         <div className={`ml-auto flex items-center gap-0.5 border px-2 py-1 rounded-sm shrink-0 ${scoreBg(score)}`}>
           <span className={`font-mono text-base font-bold leading-none ${scoreColor(score)}`}>{score}</span>
           <span className="font-mono text-[10px] text-muted-foreground">/10</span>
         </div>
       </div>
 
-      {/* Row 4: add button (stops propagation so it doesn't open drawer) */}
+      {/* Row 4: add button */}
       <div className="mt-3 flex items-center gap-2">
         <Button
           onClick={onClaim}
@@ -305,8 +349,8 @@ function BountyCard({
             : isClaimed ? <><CheckCircle className="w-3.5 h-3.5 mr-1.5" />Added</>
             : <><Plus className="w-3.5 h-3.5 mr-1.5" />Add to Pipeline</>}
         </Button>
-        <span className="font-mono text-[10px] text-muted-foreground/50 flex items-center gap-1 ml-auto">
-          Tap for details <ChevronDown className="w-3 h-3" />
+        <span className="font-mono text-[10px] text-muted-foreground/50 ml-auto">
+          Tap for details
         </span>
       </div>
     </div>
@@ -316,6 +360,7 @@ function BountyCard({
 // ─── Main Discover Page ────────────────────────────────────────────────────
 export function Discover() {
   const [bounties, setBounties] = useState<DiscoveredBounty[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<number | null>(null);
@@ -323,6 +368,7 @@ export function Discover() {
   const [triggering, setTriggering] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPlatform, setFilterPlatform] = useState("");
+  const [forYouMode, setForYouMode] = useState(false);
   const [selected, setSelected] = useState<DiscoveredBounty | null>(null);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -330,12 +376,17 @@ export function Discover() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [bRes, sRes] = await Promise.all([
+      const [bRes, sRes, meRes] = await Promise.all([
         fetch("/api/discover", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/discover/status", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       if (bRes.ok) setBounties(await bRes.json());
       if (sRes.ok) setCrawlerStatus(await sRes.json());
+      if (meRes.ok) {
+        const me = await meRes.json();
+        if (me.profile) setProfile(me.profile);
+      }
     } finally {
       setLoading(false);
     }
@@ -386,18 +437,33 @@ export function Discover() {
 
   const platforms = [...new Set(bounties.map((b) => b.platform).filter(Boolean))] as string[];
 
-  const filtered = bounties.filter((b) => {
-    if (filterPlatform && b.platform !== filterPlatform) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        b.title?.toLowerCase().includes(q) ||
-        b.platform?.toLowerCase().includes(q) ||
-        b.projectName?.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const hasProfileFilter = profile && (
+    (profile.minimumReward && profile.minimumReward > 0) ||
+    profile.contentFormats
+  );
+
+  const forYouCount = hasProfileFilter
+    ? bounties.filter((b) => matchesProfile(b, profile!)).length
+    : 0;
+
+  const filtered = bounties
+    .filter((b) => {
+      if (forYouMode && hasProfileFilter && !matchesProfile(b, profile!)) return false;
+      if (filterPlatform && b.platform !== filterPlatform) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return (
+          b.title?.toLowerCase().includes(q) ||
+          b.platform?.toLowerCase().includes(q) ||
+          b.projectName?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (forYouMode) return (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
+      return 0;
+    });
 
   return (
     <div className="flex flex-col gap-5">
@@ -469,35 +535,68 @@ export function Discover() {
         </div>
       )}
 
-      {/* Search + platform filter */}
-      <div className="flex flex-col gap-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search bounties…"
-            className="pl-9 font-mono text-sm bg-background"
-          />
-        </div>
-        <div className="flex gap-1.5 flex-wrap">
-          <button
-            onClick={() => setFilterPlatform("")}
-            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-          >
-            All ({bounties.length})
-          </button>
-          {platforms.map((p) => (
-            <button
-              key={p}
-              onClick={() => setFilterPlatform(filterPlatform === p ? "" : p)}
-              className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
-            >
-              {p} ({bounties.filter((b) => b.platform === p).length})
-            </button>
-          ))}
-        </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search bounties…"
+          className="pl-9 font-mono text-sm bg-background"
+        />
       </div>
+
+      {/* Filter row */}
+      <div className="flex gap-1.5 flex-wrap">
+        {/* For You smart filter */}
+        {hasProfileFilter ? (
+          <button
+            onClick={() => { setForYouMode(!forYouMode); setFilterPlatform(""); }}
+            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary hover:bg-primary/10"}`}
+          >
+            <Sparkles className="w-3 h-3" />
+            For You ({forYouCount})
+          </button>
+        ) : (
+          <button
+            onClick={() => navigate("/profile")}
+            className="font-mono text-[11px] px-2.5 py-1 rounded-sm border border-dashed border-border text-muted-foreground/60 hover:text-muted-foreground transition-colors whitespace-nowrap flex items-center gap-1"
+          >
+            <Sparkles className="w-3 h-3" />
+            Set skills for smart filter
+          </button>
+        )}
+
+        <button
+          onClick={() => { setFilterPlatform(""); setForYouMode(false); }}
+          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform && !forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+        >
+          All ({bounties.length})
+        </button>
+        {platforms.map((p) => (
+          <button
+            key={p}
+            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setForYouMode(false); }}
+            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+          >
+            {p} ({bounties.filter((b) => b.platform === p).length})
+          </button>
+        ))}
+      </div>
+
+      {/* For You context banner */}
+      {forYouMode && profile && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-sm border border-primary/20 bg-primary/5 font-mono text-xs text-primary/80">
+          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            Filtered by your profile
+            {profile.minimumReward ? ` · min ${profile.minimumReward} USDC` : ""}
+            {profile.contentFormats ? ` · ${profile.contentFormats}` : ""}
+            {" · "}sorted by score
+          </span>
+          <button onClick={() => setForYouMode(false)} className="ml-auto hover:text-primary"><X className="w-3 h-3" /></button>
+        </div>
+      )}
 
       {/* Bounties list */}
       {loading ? (
@@ -508,20 +607,30 @@ export function Discover() {
         <div className="flex flex-col items-center gap-4 py-16 text-center">
           <Globe className="w-10 h-10 text-muted-foreground/30" />
           <div>
-            <p className="font-mono text-sm text-muted-foreground">No bounties yet</p>
+            <p className="font-mono text-sm text-muted-foreground">
+              {forYouMode ? "No bounties match your profile yet" : "No bounties yet"}
+            </p>
             <p className="font-mono text-xs text-muted-foreground/50 mt-1">
-              {crawlerStatus?.isRunning ? "Crawl running — check back in a moment" : "Click Refresh to pull the latest"}
+              {forYouMode
+                ? "Try updating your profile skills, or browse All"
+                : crawlerStatus?.isRunning
+                ? "Crawl running — check back in a moment"
+                : "Click Refresh to pull the latest"}
             </p>
           </div>
-          {!crawlerStatus?.isRunning && (
+          {forYouMode ? (
+            <Button onClick={() => setForYouMode(false)} variant="outline" size="sm" className="font-mono text-xs uppercase">
+              Show All
+            </Button>
+          ) : !crawlerStatus?.isRunning ? (
             <Button onClick={handleTrigger} disabled={triggering} variant="outline" size="sm" className="font-mono text-xs uppercase">
               <Zap className="w-3.5 h-3.5 mr-1.5" /> Trigger Crawl
             </Button>
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          <p className="font-mono text-xs text-muted-foreground">{filtered.length} bounties found</p>
+          <p className="font-mono text-xs text-muted-foreground">{filtered.length} bounties{forYouMode ? " matching your profile" : ""}</p>
           {filtered.map((bounty) => (
             <BountyCard
               key={bounty.id}

@@ -1,7 +1,7 @@
 import { db } from "@workspace/db";
 import { bountiesTable } from "@workspace/db";
 import { eq, isNull, and, like, isNotNull } from "drizzle-orm";
-import { scrapeBounty } from "./scraper.js";
+import { scrapeBounty, stripHtml } from "./scraper.js";
 import { analyzeBounty } from "./qwen.js";
 import { logger } from "./logger.js";
 import { fetchWithBrowser } from "./browser.js";
@@ -259,6 +259,46 @@ async function fetchGenericListing(config: PlatformConfig): Promise<PlatformBoun
     } catch {
       return [];
     }
+  }
+}
+
+// ─── Strip HTML from stored requirements/description fields ─
+async function fixHtmlInRequirements(): Promise<void> {
+  try {
+    const rows = await db
+      .select({
+        id: bountiesTable.id,
+        submissionRequirements: bountiesTable.submissionRequirements,
+        eligibilityRules: bountiesTable.eligibilityRules,
+        deliverables: bountiesTable.deliverables,
+      })
+      .from(bountiesTable)
+      .where(isNull(bountiesTable.userId));
+
+    let fixed = 0;
+    for (const row of rows) {
+      const hasHtml =
+        /<[a-z][^>]*>/i.test(row.submissionRequirements || "") ||
+        /<[a-z][^>]*>/i.test(row.eligibilityRules || "") ||
+        /<[a-z][^>]*>/i.test(row.deliverables || "");
+      if (!hasHtml) continue;
+
+      await db
+        .update(bountiesTable)
+        .set({
+          submissionRequirements: row.submissionRequirements
+            ? stripHtml(row.submissionRequirements).slice(0, 600) : row.submissionRequirements,
+          eligibilityRules: row.eligibilityRules
+            ? stripHtml(row.eligibilityRules) : row.eligibilityRules,
+          deliverables: row.deliverables
+            ? stripHtml(row.deliverables) : row.deliverables,
+        })
+        .where(eq(bountiesTable.id, row.id));
+      fixed++;
+    }
+    if (fixed > 0) logger.info({ fixed }, "Stripped HTML from requirements fields");
+  } catch (err) {
+    logger.warn({ err }, "fixHtmlInRequirements failed");
   }
 }
 
@@ -667,7 +707,8 @@ export async function crawlAll(): Promise<CrawlPlatformResult[]> {
     status.totalAddedLastRun = totalAdded;
     status.totalCrawledBounties = totalCrawled;
 
-    // Retroactively fix any "unspecified reward" entries from before API merge fix
+    // Clean HTML from stored text fields and fix stale score explanations
+    await fixHtmlInRequirements();
     await fixUnspecifiedBounties();
 
     logger.info({ totalAdded, platforms: results.length }, "Crawl complete");
