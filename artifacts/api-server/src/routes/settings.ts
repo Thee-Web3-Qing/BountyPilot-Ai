@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { getCrawlerStatus } from "../lib/cron.js";
 
 export const settingsRouter = Router();
 
@@ -20,5 +21,6 @@ settingsRouter.get("/status", requireAuth, (_req: AuthRequest, res) => {
       : "Running in mock mode — add QWEN_API_KEY to enable AI generation",
     environment: process.env.NODE_ENV || "development",
     supportedProviders: ["mock", "qwen"],
+    crawler: getCrawlerStatus(),
   });
 });

@@ -9,6 +9,7 @@ import { earningsRouter } from "./earnings";
 import { dashboardRouter } from "./dashboard";
 import { demoRouter } from "./demo";
 import { settingsRouter } from "./settings";
+import { discoverRouter } from "./discover";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/earnings", earningsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/demo", demoRouter);
 router.use("/settings", settingsRouter);
+router.use("/discover", discoverRouter);
 
 export default router;

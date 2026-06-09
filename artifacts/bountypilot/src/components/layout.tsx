@@ -1,12 +1,13 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins, User, Settings2, LogOut } from "lucide-react";
+import { Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins, User, Settings2, LogOut, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/bounties", label: "All Bounties", icon: ListTodo },
+  { href: "/discover", label: "Discover", icon: Globe },
+  { href: "/bounties", label: "My Bounties", icon: ListTodo },
   { href: "/bounties/add", label: "Hunt Bounty", icon: Plus },
   { href: "/submissions", label: "Submissions", icon: Award },
   { href: "/earnings", label: "Earnings", icon: Coins },

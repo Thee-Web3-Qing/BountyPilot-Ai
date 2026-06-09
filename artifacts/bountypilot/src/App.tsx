@@ -16,6 +16,7 @@ import { Login } from "./pages/login";
 import { Signup } from "./pages/signup";
 import { Profile } from "./pages/profile";
 import { Settings } from "./pages/settings";
+import { Discover } from "./pages/discover";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ function Router() {
           <Layout>
             <Switch>
               <Route path="/" component={Dashboard} />
+              <Route path="/discover" component={Discover} />
               <Route path="/bounties" component={Bounties} />
               <Route path="/bounties/add" component={BountyAdd} />
               <Route path="/bounties/:id" component={BountyDetail} />
