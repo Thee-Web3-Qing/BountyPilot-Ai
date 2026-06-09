@@ -142,7 +142,17 @@ function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
   };
 }
 
-export async function analyzeBounty(scraped: ScrapedBounty): Promise<BountyAnalysis> {
+export interface UserProfile {
+  contentFormats?: string | null;
+  mainPlatforms?: string | null;
+  niche?: string | null;
+  skillLevel?: string | null;
+  preferredBountyTypes?: string | null;
+  minimumReward?: number | null;
+  creatorStrengths?: string | null;
+}
+
+export async function analyzeBounty(scraped: ScrapedBounty, profile?: UserProfile): Promise<BountyAnalysis> {
   const baseScore = ruleBasedScore(scraped.rewardAmount, scraped.deadline);
 
   if (!hasKey()) {
@@ -152,14 +162,24 @@ export async function analyzeBounty(scraped: ScrapedBounty): Promise<BountyAnaly
     };
   }
 
+  const profileContext = profile ? `
+Creator profile (personalise the score for THIS creator):
+- Platforms: ${profile.mainPlatforms || "not specified"}
+- Content formats: ${profile.contentFormats || "not specified"}
+- Niche: ${profile.niche || "not specified"}
+- Skill level: ${profile.skillLevel || "not specified"}
+- Preferred bounty types: ${profile.preferredBountyTypes || "not specified"}
+- Minimum reward: $${profile.minimumReward || 0}
+- Strengths: ${profile.creatorStrengths || "not specified"}` : "";
+
   try {
     const text = await callQwen(
       `You are BountyPilot, an AI assistant helping content creators evaluate crypto bounty opportunities. 
-Be concise, direct, and creator-focused. Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, and creator opportunity.`,
+Be concise, direct, and creator-focused. Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, format match, and creator-specific opportunity.`,
       `Evaluate this bounty opportunity and respond with JSON only:
 {
   "opportunityScore": <1-10 integer>,
-  "scoreExplanation": "<2-3 sentence explanation of the score, mentioning reward, timeline, and key reasons>"
+  "scoreExplanation": "<2-3 sentence explanation personalised to this creator, mentioning reward, timeline, format fit, and key reasons>"
 }
 
 Bounty details:
@@ -170,7 +190,8 @@ Bounty details:
 - Deadline: ${scraped.deadline || "not specified"}
 - Format: ${scraped.contentFormat}
 - Requirements: ${scraped.submissionRequirements?.slice(0, 300)}
-- Description: ${scraped.description?.slice(0, 400)}`
+- Description: ${scraped.description?.slice(0, 400)}
+${profileContext}`
     );
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);

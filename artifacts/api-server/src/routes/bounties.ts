@@ -4,6 +4,7 @@ import {
   bountiesTable,
   researchBriefsTable,
   productionPlansTable,
+  userProfilesTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { CreateBountyBody, UpdateBountyBody } from "@workspace/api-zod";
@@ -50,7 +51,8 @@ bountiesRouter.post("/", async (req: AuthRequest, res) => {
     const scraped = await scrapeBounty(url);
     logger.info({ title: scraped.title, platform: scraped.platform }, "Scraped bounty");
 
-    const analysis = await analyzeBounty(scraped);
+    const [userProfile] = await db.select().from(userProfilesTable).where(eq(userProfilesTable.userId, userId));
+    const analysis = await analyzeBounty(scraped, userProfile ?? undefined);
     logger.info({ score: analysis.opportunityScore }, "Analysed bounty");
 
     const [bounty] = await db

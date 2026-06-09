@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -74,6 +74,10 @@ export function BountyDetail() {
   const [rescraping, setRescraping] = useState(false);
   const [rescrapeResult, setRescrapeResult] = useState<{ prevConfidence: number; newConfidence: number } | null>(null);
 
+  // AI generation state
+  const [generatingBrief, setGeneratingBrief] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+
   const handleStatusChange = (status: string) => {
     updateMutation.mutate(
       { id: bountyId, data: { status } },
@@ -109,6 +113,38 @@ export function BountyDetail() {
         },
       }
     );
+  };
+
+  const handleGenerateBrief = async () => {
+    if (!token || generatingBrief) return;
+    setGeneratingBrief(true);
+    try {
+      const resp = await fetch(`/api/research-briefs/bounty/${bountyId}/generate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        queryClient.invalidateQueries({ queryKey: getGetResearchBriefByBountyQueryKey(bountyId) });
+      }
+    } finally {
+      setGeneratingBrief(false);
+    }
+  };
+
+  const handleGeneratePlan = async () => {
+    if (!token || generatingPlan) return;
+    setGeneratingPlan(true);
+    try {
+      const resp = await fetch(`/api/production-plans/bounty/${bountyId}/generate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        queryClient.invalidateQueries({ queryKey: getGetProductionPlanByBountyQueryKey(bountyId) });
+      }
+    } finally {
+      setGeneratingPlan(false);
+    }
   };
 
   const handleRescrape = async () => {
@@ -394,42 +430,80 @@ export function BountyDetail() {
 
       {loadingBrief ? (
         <Skeleton className="h-32 w-full" />
-      ) : brief ? (
+      ) : (
         <Card className="bg-card border-border">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Research Brief</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateBrief}
+              disabled={generatingBrief}
+              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+            >
+              {generatingBrief
+                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
+            </Button>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
-            <Field label="Summary" value={brief.summary} />
-            <Field label="Content Angles" value={brief.contentAngles} />
-            <Field label="Key Points" value={brief.keyPoints} />
-            <Field label="Target Audience" value={brief.targetAudience} />
-            <Field label="Competitor Analysis" value={brief.competitorAnalysis} />
+            {brief ? (
+              <>
+                <Field label="Summary" value={brief.summary} />
+                <Field label="Content Angles" value={brief.contentAngles} />
+                <Field label="Key Points" value={brief.keyPoints} />
+                <Field label="Target Audience" value={brief.targetAudience} />
+                <Field label="Competitor Analysis" value={brief.competitorAnalysis} />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground font-mono">
+                {generatingBrief ? "AI is generating your research brief…" : "No research brief yet. Click Generate with AI to create one."}
+              </p>
+            )}
           </CardContent>
         </Card>
-      ) : null}
+      )}
 
       {loadingPlan ? (
         <Skeleton className="h-32 w-full" />
-      ) : plan ? (
+      ) : (
         <Card className="bg-card border-border">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Production Plan</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGeneratePlan}
+              disabled={generatingPlan}
+              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+            >
+              {generatingPlan
+                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
+            </Button>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
-            {plan.estimatedHours && (
-              <div>
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">Estimated Time</p>
-                <p className="text-primary font-bold font-mono">{plan.estimatedHours}h</p>
-              </div>
+            {plan ? (
+              <>
+                {plan.estimatedHours && (
+                  <div>
+                    <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">Estimated Time</p>
+                    <p className="text-primary font-bold font-mono">{plan.estimatedHours}h</p>
+                  </div>
+                )}
+                <PreField label="Script Outline" value={plan.scriptOutline} />
+                <PreField label="Shot List" value={plan.shotList} />
+                <Field label="Caption Draft" value={plan.captionDraft} />
+                <PreField label="Submission Checklist" value={plan.submissionChecklist} />
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground font-mono">
+                {generatingPlan ? "AI is building your production plan…" : "No production plan yet. Click Generate with AI to create one."}
+              </p>
             )}
-            <PreField label="Script Outline" value={plan.scriptOutline} />
-            <PreField label="Shot List" value={plan.shotList} />
-            <Field label="Caption Draft" value={plan.captionDraft} />
-            <PreField label="Submission Checklist" value={plan.submissionChecklist} />
           </CardContent>
         </Card>
-      ) : null}
+      )}
     </div>
   );
 }
