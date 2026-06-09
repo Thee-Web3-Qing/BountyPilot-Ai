@@ -1,0 +1,185 @@
+Build an MVP web app called BountyPilot AI.
+
+BountyPilot AI is an AI workflow agent for content creators who earn from content bounties. The app helps creators turn bounty website links into structured, actionable content tasks.
+
+Core MVP goal:
+
+A user should be able to paste a bounty URL from platforms like Superteam Earn, GibWork, First Dollar, DoraHacks, or Gitcoin, and the app should extract the bounty information, score the opportunity, generate a research brief, and create a content production plan with a human approval checkpoint.
+
+Tech stack:
+
+Use Python with Streamlit for the frontend.
+
+Use FastAPI only if needed, but keep the first MVP simple.
+
+Use SQLite for the database.
+
+Use Playwright and BeautifulSoup for reading bounty pages.
+
+Use environment variables for API keys.
+
+Design the code so Qwen API can be plugged in as the main LLM provider.
+
+For now, create a mock LLM function if no API key is available.
+
+Main pages:
+
+1. Dashboard
+
+2. Add Bounty
+
+3. Research Brief
+
+4. Production Plan
+
+5. Submissions Tracker
+
+6. Earnings Tracker
+
+Main workflow:
+
+1. User pastes a bounty URL.
+
+2. App fetches the page content.
+
+3. App extracts:
+
+   - Bounty title
+
+   - Platform name
+
+   - Project name
+
+   - Reward amount
+
+   - Deadline
+
+   - Content format
+
+   - Submission requirements
+
+   - Deliverables
+
+   - Submission link
+
+   - Eligibility rules
+
+   - Important notes
+
+4. App generates an opportunity score from 1 to 10 based on:
+
+   - Reward size
+
+   - Deadline urgency
+
+   - Content difficulty
+
+   - Clarity of requirements
+
+   - Creator fit
+
+5. App creates a short explanation for the score.
+
+6. App shows a human approval checkpoint:
+
+   - Approve bounty
+
+   - Reject bounty
+
+   - Save for later
+
+7. If approved, app generates:
+
+   - Research brief
+
+   - Content angle ideas
+
+   - Script outline
+
+   - Shot list
+
+   - Caption draft
+
+   - Submission checklist
+
+8. App saves everything to SQLite.
+
+9. Dashboard shows all bounties with status:
+
+   - Discovered
+
+   - Approved
+
+   - Researching
+
+   - Scripting
+
+   - Recording
+
+   - Editing
+
+   - Submitted
+
+   - Won
+
+   - Lost
+
+Important product positioning:
+
+This is not just a scraper. It is an autopilot agent for creator bounty workflows. The workflow is:
+
+Opportunity discovery → Requirement extraction → Opportunity scoring → Human approval → Research brief → Content production plan → Submission tracking → Earnings tracking.
+
+UI requirements:
+
+Keep the UI clean and creator-friendly.
+
+Use cards for bounties.
+
+Use tables for trackers.
+
+Use clear buttons for approval actions.
+
+Use simple status badges.
+
+Database tables:
+
+1. bounties
+
+2. research_briefs
+
+3. production_plans
+
+4. submissions
+
+5. earnings
+
+Include sample demo data so the app looks useful even before a user adds real links.
+
+Create a README.md explaining:
+
+- What BountyPilot AI does
+
+- How to run locally
+
+- Required environment variables
+
+- How the agent workflow works
+
+- Future Qwen Cloud integration plan
+
+- Hackathon track: Track 4, Autopilot Agent
+
+Also include:
+
+- requirements.txt
+
+- .env.example
+
+- basic error handling
+
+- comments in the code
+
+- open source MIT license file
+
+Build the first working version now.

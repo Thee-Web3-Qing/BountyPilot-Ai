@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: BountyPilot AI API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: bounties
+    description: Bounty management
+  - name: research
+    description: Research briefs
+  - name: production
+    description: Production plans
+  - name: submissions
+    description: Submission tracking
+  - name: earnings
+    description: Earnings tracking
+  - name: dashboard
+    description: Dashboard summaries
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,381 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /bounties:
+    get:
+      operationId: listBounties
+      tags: [bounties]
+      summary: List all bounties
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: platform
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of bounties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bounty"
+    post:
+      operationId: createBounty
+      tags: [bounties]
+      summary: Add a new bounty by URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BountyInput"
+      responses:
+        "201":
+          description: Created bounty with extraction and scoring
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bounty"
+
+  /bounties/{id}:
+    get:
+      operationId: getBounty
+      tags: [bounties]
+      summary: Get a single bounty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bounty detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bounty"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateBounty
+      tags: [bounties]
+      summary: Update bounty (status, approval, etc.)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BountyUpdate"
+      responses:
+        "200":
+          description: Updated bounty
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bounty"
+    delete:
+      operationId: deleteBounty
+      tags: [bounties]
+      summary: Delete a bounty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /bounties/{id}/approve:
+    post:
+      operationId: approveBounty
+      tags: [bounties]
+      summary: Approve a bounty and trigger AI generation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bounty approved, research brief and production plan generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bounty"
+
+  /bounties/{id}/reject:
+    post:
+      operationId: rejectBounty
+      tags: [bounties]
+      summary: Reject a bounty
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bounty rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bounty"
+
+  /bounties/{id}/save-later:
+    post:
+      operationId: saveBountyForLater
+      tags: [bounties]
+      summary: Save a bounty for later
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bounty saved for later
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bounty"
+
+  /research-briefs:
+    get:
+      operationId: listResearchBriefs
+      tags: [research]
+      summary: List research briefs
+      responses:
+        "200":
+          description: List of research briefs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResearchBrief"
+
+  /research-briefs/{id}:
+    get:
+      operationId: getResearchBrief
+      tags: [research]
+      summary: Get a research brief
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Research brief
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchBrief"
+
+  /research-briefs/bounty/{bountyId}:
+    get:
+      operationId: getResearchBriefByBounty
+      tags: [research]
+      summary: Get research brief for a specific bounty
+      parameters:
+        - name: bountyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Research brief
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchBrief"
+
+  /production-plans:
+    get:
+      operationId: listProductionPlans
+      tags: [production]
+      summary: List production plans
+      responses:
+        "200":
+          description: List of production plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductionPlan"
+
+  /production-plans/bounty/{bountyId}:
+    get:
+      operationId: getProductionPlanByBounty
+      tags: [production]
+      summary: Get production plan for a specific bounty
+      parameters:
+        - name: bountyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Production plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionPlan"
+
+  /submissions:
+    get:
+      operationId: listSubmissions
+      tags: [submissions]
+      summary: List all submissions
+      responses:
+        "200":
+          description: List of submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+    post:
+      operationId: createSubmission
+      tags: [submissions]
+      summary: Log a submission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionInput"
+      responses:
+        "201":
+          description: Created submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  /submissions/{id}:
+    patch:
+      operationId: updateSubmission
+      tags: [submissions]
+      summary: Update a submission (result, notes)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionUpdate"
+      responses:
+        "200":
+          description: Updated submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  /earnings:
+    get:
+      operationId: listEarnings
+      tags: [earnings]
+      summary: List all earnings records
+      responses:
+        "200":
+          description: List of earnings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Earning"
+    post:
+      operationId: createEarning
+      tags: [earnings]
+      summary: Log an earning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EarningInput"
+      responses:
+        "201":
+          description: Created earning
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Earning"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Dashboard stats - counts by status, total earnings, pipeline value
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent:
+    get:
+      operationId: getRecentBounties
+      tags: [dashboard]
+      summary: Recently added bounties
+      responses:
+        "200":
+          description: Recent bounties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bounty"
+
+  /dashboard/platform-breakdown:
+    get:
+      operationId: getPlatformBreakdown
+      tags: [dashboard]
+      summary: Bounty counts by platform
+      responses:
+        "200":
+          description: Platform breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatformStat"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +417,235 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Bounty:
+      type: object
+      required: [id, url, status, createdAt]
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        title:
+          type: ["string", "null"]
+        platform:
+          type: ["string", "null"]
+        projectName:
+          type: ["string", "null"]
+        rewardAmount:
+          type: ["string", "null"]
+        rewardCurrency:
+          type: ["string", "null"]
+        deadline:
+          type: ["string", "null"]
+        contentFormat:
+          type: ["string", "null"]
+        submissionRequirements:
+          type: ["string", "null"]
+        deliverables:
+          type: ["string", "null"]
+        submissionLink:
+          type: ["string", "null"]
+        eligibilityRules:
+          type: ["string", "null"]
+        importantNotes:
+          type: ["string", "null"]
+        opportunityScore:
+          type: ["integer", "null"]
+        scoreExplanation:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [discovered, saved_for_later, approved, rejected, researching, scripting, recording, editing, submitted, won, lost]
+        createdAt:
+          type: string
+        updatedAt:
+          type: ["string", "null"]
+
+    BountyInput:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+
+    BountyUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        title:
+          type: string
+        rewardAmount:
+          type: string
+        deadline:
+          type: string
+
+    ResearchBrief:
+      type: object
+      required: [id, bountyId, createdAt]
+      properties:
+        id:
+          type: integer
+        bountyId:
+          type: integer
+        summary:
+          type: ["string", "null"]
+        contentAngles:
+          type: ["string", "null"]
+        keyPoints:
+          type: ["string", "null"]
+        targetAudience:
+          type: ["string", "null"]
+        competitorAnalysis:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ProductionPlan:
+      type: object
+      required: [id, bountyId, createdAt]
+      properties:
+        id:
+          type: integer
+        bountyId:
+          type: integer
+        scriptOutline:
+          type: ["string", "null"]
+        shotList:
+          type: ["string", "null"]
+        captionDraft:
+          type: ["string", "null"]
+        submissionChecklist:
+          type: ["string", "null"]
+        estimatedHours:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+
+    Submission:
+      type: object
+      required: [id, bountyId, createdAt]
+      properties:
+        id:
+          type: integer
+        bountyId:
+          type: integer
+        submittedAt:
+          type: ["string", "null"]
+        submissionUrl:
+          type: ["string", "null"]
+        result:
+          type: ["string", "null"]
+          enum: [pending, won, lost, null]
+        rewardReceived:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SubmissionInput:
+      type: object
+      required: [bountyId]
+      properties:
+        bountyId:
+          type: integer
+        submittedAt:
+          type: string
+        submissionUrl:
+          type: string
+        notes:
+          type: string
+
+    SubmissionUpdate:
+      type: object
+      properties:
+        result:
+          type: string
+        rewardReceived:
+          type: number
+        notes:
+          type: string
+        submissionUrl:
+          type: string
+
+    Earning:
+      type: object
+      required: [id, createdAt]
+      properties:
+        id:
+          type: integer
+        bountyId:
+          type: ["integer", "null"]
+        platform:
+          type: ["string", "null"]
+        amount:
+          type: number
+        currency:
+          type: string
+        receivedAt:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    EarningInput:
+      type: object
+      required: [amount, currency]
+      properties:
+        bountyId:
+          type: integer
+        platform:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        receivedAt:
+          type: string
+        notes:
+          type: string
+
+    DashboardSummary:
+      type: object
+      required: [totalBounties, totalEarnings, activeBounties, wonBounties, pipelineValue]
+      properties:
+        totalBounties:
+          type: integer
+        totalEarnings:
+          type: number
+        activeBounties:
+          type: integer
+        wonBounties:
+          type: integer
+        pipelineValue:
+          type: number
+        averageScore:
+          type: ["number", "null"]
+        statusBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusCount"
+
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+
+    PlatformStat:
+      type: object
+      required: [platform, count]
+      properties:
+        platform:
+          type: string
+        count:
+          type: integer
+        totalReward:
+          type: ["number", "null"]
