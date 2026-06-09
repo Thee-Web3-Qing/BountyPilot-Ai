@@ -508,6 +508,29 @@ export function BountyDetail() {
   );
 }
 
+function parseAiContent(value: string): string[] | null {
+  const trimmed = value.trim();
+  // JSON array like ["a","b"]
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {}
+  }
+  // Qwen sometimes returns {"a","b"} or {"a","b","c"}
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    const inner = trimmed.slice(1, -1);
+    try {
+      const arr = JSON.parse(`[${inner}]`);
+      if (Array.isArray(arr) && arr.length > 1) return arr.map(String);
+    } catch {}
+  }
+  // Comma-separated multi-line bullets starting with - or •
+  const lines = trimmed.split("\n").map(l => l.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+  if (lines.length > 1 && trimmed.includes("\n")) return lines;
+  return null;
+}
+
 function Field({
   label,
   value,
@@ -518,10 +541,22 @@ function Field({
   className?: string;
 }) {
   if (!value) return null;
+  const items = parseAiContent(value);
   return (
     <div className={className}>
-      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-      <p className="text-sm">{value}</p>
+      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-2">{label}</p>
+      {items ? (
+        <ul className="flex flex-col gap-2">
+          {items.map((item, i) => (
+            <li key={i} className="flex gap-2 text-sm leading-relaxed">
+              <span className="text-primary font-mono mt-0.5 flex-shrink-0">→</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm leading-relaxed">{value}</p>
+      )}
     </div>
   );
 }
@@ -534,12 +569,24 @@ function PreField({
   value: string | null | undefined;
 }) {
   if (!value) return null;
+  const items = parseAiContent(value);
   return (
     <div>
-      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-      <pre className="text-sm font-mono whitespace-pre-wrap bg-background border border-border rounded-sm p-3 leading-relaxed">
-        {value}
-      </pre>
+      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-2">{label}</p>
+      {items ? (
+        <ul className="flex flex-col gap-2.5">
+          {items.map((item, i) => (
+            <li key={i} className="flex gap-2 text-sm leading-relaxed">
+              <span className="text-primary font-mono mt-0.5 flex-shrink-0 text-xs">{String(i + 1).padStart(2, "0")}.</span>
+              <span className="font-mono text-sm">{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <pre className="text-sm font-mono whitespace-pre-wrap bg-background border border-border rounded-sm p-3 leading-relaxed">
+          {value}
+        </pre>
+      )}
     </div>
   );
 }

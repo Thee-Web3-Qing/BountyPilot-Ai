@@ -17,6 +17,7 @@ import { Signup } from "./pages/signup";
 import { Profile } from "./pages/profile";
 import { Settings } from "./pages/settings";
 import { Discover } from "./pages/discover";
+import { Landing } from "./pages/landing";
 
 const queryClient = new QueryClient();
 
@@ -37,7 +38,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
-      <Route>
+      <Route path="/" nest>
         {isAuthenticated ? (
           <Layout>
             <Switch>
@@ -54,7 +55,10 @@ function Router() {
             </Switch>
           </Layout>
         ) : (
-          <Login />
+          <Switch>
+            <Route path="/" component={Landing} />
+            <Route component={Login} />
+          </Switch>
         )}
       </Route>
     </Switch>
