@@ -1,0 +1,42 @@
+Given where you are right now, here’s what to prioritize — ranked by impact on your score:
+
+🔴 Must Do (moves you from 7 → 8.5)
+
+1. Connect Qwen and make it visible
+Don’t just plug it in quietly. Make the AI output front and center — when a user opens a bounty, show a generated research brief and content angle ideas. That single feature demonstrates the “autopilot agent” claim more than everything else combined.
+
+2. Close the workflow loop
+Right now you have a great front half. Add the bare minimum back half:
+
+	•	A simple “Mark as Submitted” button with a date field
+	•	A basic earnings log (bounty name, reward amount, won/lost)
+That’s 2 screens. It makes the workflow genuinely start-to-finish.
+
+3. Fix the 20+ platforms claim
+You have infra for 20+ but only 6 working. Either get 10+ actually pulling live data, or quietly remove the claim. Judges will open DevTools.
+
+🟡 High Value (moves you from 8.5 → 9)
+
+4. Personalise the AI scoring
+Use the profile data you’re already collecting. Pass contentFormats, skillLevel, niche into the Qwen prompt when scoring. The score changes per user. That’s genuinely agentic and nobody else will have it.
+
+5. Add one visible agentic loop
+Something like: agent scores a bounty → sees score is low because deadline is unclear → calls scraper again to retry extraction → updates confidence score. Even one retry/self-correction loop makes it an agent, not a pipeline.
+
+6. Show crawler activity live
+You have /discover/status already. Surface it on the dashboard — “Last crawled 4 minutes ago, 3 new bounties found.” Makes the autonomous crawling visible and impressive to judges.
+
+🟢 Polish (separates good from memorable)
+
+7. Demo video showing the full loop
+Paste URL → crawl → score → AI brief → pipeline → submitted → earned. 90 seconds. Judges watch these at 2x speed and remember the ones with a clear story.
+
+8. One real end-to-end example in your README
+Walk through a real Superteam Earn bounty, show every step of what the agent did. Concrete beats abstract every time.
+
+9. Rename “rule-based fallback” internally
+In your submission write-up, frame it as “hybrid scoring — AI + deterministic signals.” Same thing, sounds intentional not incomplete.
+
+The Single Highest-Leverage Thing
+
+If you only have time for one thing: connect Qwen and generate a real research brief for a live bounty. That transforms your submission from “impressive scraping infrastructure” to “AI autopilot agent.” Everything else is secondary to that.

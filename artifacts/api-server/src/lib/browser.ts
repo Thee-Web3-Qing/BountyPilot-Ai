@@ -18,8 +18,22 @@ async function getBrowser(): Promise<Browser> {
 
   _launching = true;
   try {
+    // Try common system Chromium paths as fallback when Puppeteer's bundled Chrome is missing
+    const { execSync } = await import("child_process");
+    let executablePath: string | undefined;
+    const candidates = [
+      "/usr/bin/chromium-browser",
+      "/usr/bin/chromium",
+      "/usr/bin/google-chrome",
+      "/usr/bin/google-chrome-stable",
+    ];
+    for (const p of candidates) {
+      try { execSync(`test -x ${p}`); executablePath = p; break; } catch {}
+    }
+
     _browser = await puppeteer.launch({
       headless: true,
+      ...(executablePath ? { executablePath } : {}),
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
