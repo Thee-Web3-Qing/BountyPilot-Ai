@@ -152,8 +152,8 @@ export function BountyDetail() {
     );
   }
 
-  const confidencePct = Math.round((bounty.confidenceScore ?? 0) * 100);
-  const lowConfidence = (bounty.confidenceScore ?? 1) < 0.55;
+  const confidencePct = Math.round(bounty.confidenceScore ?? 0);
+  const lowConfidence = (bounty.confidenceScore ?? 100) < 55;
 
   return (
     <div className="flex flex-col gap-6">
@@ -220,7 +220,7 @@ export function BountyDetail() {
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-400" />
                     <span className="font-mono text-xs text-green-400">
-                      Extraction retry complete — confidence {Math.round(rescrapeResult.prevConfidence * 100)}% → {Math.round(rescrapeResult.newConfidence * 100)}%
+                      Extraction retry complete — confidence {Math.round(rescrapeResult.prevConfidence)}% → {Math.round(rescrapeResult.newConfidence)}%
                     </span>
                   </div>
                 ) : (
@@ -252,7 +252,7 @@ export function BountyDetail() {
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <Field label="Platform" value={bounty.platform} />
           <Field label="Project" value={bounty.projectName} />
-          <Field label="Deadline" value={bounty.deadline} />
+          <Field label="Deadline" value={bounty.deadline ? new Date(bounty.deadline).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : null} />
           <Field label="Content Format" value={bounty.contentFormat} />
           <Field label="Deliverables" value={bounty.deliverables} className="md:col-span-2" />
           <Field label="Submission Requirements" value={bounty.submissionRequirements} className="md:col-span-2" />

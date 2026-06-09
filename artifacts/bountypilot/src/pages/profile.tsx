@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, User } from "lucide-react";
+import { Loader2, CheckCircle, User, X, Plus } from "lucide-react";
 
 interface Profile {
   fullName?: string; creatorName?: string; mainPlatforms?: string;
@@ -14,6 +14,28 @@ interface Profile {
   creatorStrengths?: string; creatorWeaknesses?: string;
   portfolioLinks?: string; notes?: string;
 }
+
+const PLATFORMS = [
+  "YouTube", "Twitter / X", "LinkedIn", "Instagram", "TikTok",
+  "Mirror", "Substack", "Farcaster", "Lens", "Discord", "Telegram", "Medium",
+];
+
+const CONTENT_FORMATS = [
+  "Article / Thread", "Long-form Video", "Short-form Video", "Podcast",
+  "Newsletter", "Tutorial", "Design", "Infographic", "Comic Strip", "Meme",
+];
+
+const NICHES = [
+  "DeFi", "NFTs", "Layer 2", "Gaming", "DePIN", "DAOs",
+  "Infrastructure", "Trading", "Education", "Web3 General",
+];
+
+const SKILL_LEVELS = ["Beginner", "Intermediate", "Expert"];
+
+const BOUNTY_TYPES = [
+  "Articles", "Videos", "Threads", "Tutorials",
+  "Technical Writing", "Design", "Memes", "Podcasts",
+];
 
 export function Profile() {
   const { user, token } = useAuth();
@@ -30,7 +52,8 @@ export function Profile() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const set = (k: keyof Profile, v: string | number) => setProfile((p) => ({ ...p, [k]: v }));
+  const set = (k: keyof Profile, v: string | number) =>
+    setProfile((p) => ({ ...p, [k]: v }));
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +92,7 @@ export function Profile() {
       </div>
 
       <p className="text-muted-foreground font-mono text-xs border-l-2 border-primary/50 pl-3">
-        Your profile is used to personalise opportunity scoring — the more you fill in, the better the AI understands your strengths and goals.
+        Your profile personalises opportunity scoring — the more you fill in, the better the AI understands your strengths and goals.
       </p>
 
       <form onSubmit={handleSave} className="flex flex-col gap-6">
@@ -81,12 +104,37 @@ export function Profile() {
         </Section>
 
         <Section title="Creator Focus">
-          <Field label="Main Platforms" value={profile.mainPlatforms} onChange={(v) => set("mainPlatforms", v)} placeholder="YouTube, Twitter, Mirror, Substack..." />
-          <Field label="Content Formats" value={profile.contentFormats} onChange={(v) => set("contentFormats", v)} placeholder="Long-form video, Twitter threads, articles..." />
-          <Field label="Niche" value={profile.niche} onChange={(v) => set("niche", v)} placeholder="DeFi, Layer 2, NFTs, Gaming, DePIN..." />
+          <MultiChipSelect
+            label="Main Platforms"
+            options={PLATFORMS}
+            value={profile.mainPlatforms || ""}
+            onChange={(v) => set("mainPlatforms", v)}
+          />
+          <MultiChipSelect
+            label="Content Formats"
+            options={CONTENT_FORMATS}
+            value={profile.contentFormats || ""}
+            onChange={(v) => set("contentFormats", v)}
+          />
+          <MultiChipSelect
+            label="Niche"
+            options={NICHES}
+            value={profile.niche || ""}
+            onChange={(v) => set("niche", v)}
+          />
           <Row2>
-            <Field label="Skill Level" value={profile.skillLevel} onChange={(v) => set("skillLevel", v)} placeholder="Beginner / Intermediate / Expert" />
-            <Field label="Preferred Bounty Types" value={profile.preferredBountyTypes} onChange={(v) => set("preferredBountyTypes", v)} placeholder="Articles, Videos, Threads..." />
+            <SingleChipSelect
+              label="Skill Level"
+              options={SKILL_LEVELS}
+              value={profile.skillLevel || ""}
+              onChange={(v) => set("skillLevel", v)}
+            />
+            <MultiChipSelect
+              label="Preferred Bounty Types"
+              options={BOUNTY_TYPES}
+              value={profile.preferredBountyTypes || ""}
+              onChange={(v) => set("preferredBountyTypes", v)}
+            />
           </Row2>
         </Section>
 
@@ -124,10 +172,131 @@ export function Profile() {
   );
 }
 
+// ─── Multi-chip selector (comma-separated storage) ─────────────────────────
+function MultiChipSelect({
+  label, options, value, onChange,
+}: {
+  label: string; options: string[]; value: string; onChange: (v: string) => void;
+}) {
+  const selected = value
+    ? value.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const toggle = (opt: string) => {
+    const next = selected.includes(opt)
+      ? selected.filter((s) => s !== opt)
+      : [...selected, opt];
+    onChange(next.join(", "));
+  };
+
+  const removeCustom = (opt: string) => {
+    const next = selected.filter((s) => s !== opt);
+    onChange(next.join(", "));
+  };
+
+  const customItems = selected.filter((s) => !options.includes(s));
+  const [customInput, setCustomInput] = useState("");
+
+  const addCustom = () => {
+    const val = customInput.trim();
+    if (!val || selected.includes(val)) { setCustomInput(""); return; }
+    onChange([...selected, val].join(", "));
+    setCustomInput("");
+  };
+
+  return (
+    <div>
+      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-2">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => {
+          const active = selected.includes(opt);
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => toggle(opt)}
+              className={`font-mono text-xs px-2.5 py-1 rounded-sm border transition-colors ${
+                active
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+        {customItems.map((opt) => (
+          <span
+            key={opt}
+            className="font-mono text-xs px-2.5 py-1 rounded-sm border border-primary bg-primary/15 text-primary flex items-center gap-1"
+          >
+            {opt}
+            <button type="button" onClick={() => removeCustom(opt)} className="hover:text-red-400 ml-0.5">
+              <X className="w-2.5 h-2.5" />
+            </button>
+          </span>
+        ))}
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
+            placeholder="Custom…"
+            className="font-mono text-xs px-2 py-1 rounded-sm border border-dashed border-border bg-transparent text-muted-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60 w-20"
+          />
+          {customInput.trim() && (
+            <button
+              type="button"
+              onClick={addCustom}
+              className="text-primary hover:text-primary/70"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Single-chip selector (radio style) ───────────────────────────────────
+function SingleChipSelect({
+  label, options, value, onChange,
+}: {
+  label: string; options: string[]; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-2">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => {
+          const active = value === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(active ? "" : opt)}
+              className={`font-mono text-xs px-2.5 py-1 rounded-sm border transition-colors ${
+                active
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Supporting components ─────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card className="bg-card border-border">
-      <CardContent className="p-6 flex flex-col gap-4">
+      <CardContent className="p-6 flex flex-col gap-5">
         <p className="font-mono text-xs uppercase tracking-wider text-primary border-b border-border pb-2">{title}</p>
         {children}
       </CardContent>
@@ -136,10 +305,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Row2({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{children}</div>;
+  return <div className="grid grid-cols-1 md:grid-cols-2 gap-5">{children}</div>;
 }
 
-function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value?: string; onChange: (v: string) => void; placeholder: string; type?: string }) {
+function Field({ label, value, onChange, placeholder, type = "text" }: {
+  label: string; value?: string; onChange: (v: string) => void; placeholder: string; type?: string;
+}) {
   return (
     <div>
       <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">{label}</label>
@@ -148,7 +319,9 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
   );
 }
 
-function TextareaField({ label, value, onChange, placeholder }: { label: string; value?: string; onChange: (v: string) => void; placeholder: string }) {
+function TextareaField({ label, value, onChange, placeholder }: {
+  label: string; value?: string; onChange: (v: string) => void; placeholder: string;
+}) {
   return (
     <div>
       <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">{label}</label>

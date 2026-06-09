@@ -139,14 +139,19 @@ function DetailDrawer({
   const deliverables = stripHtml(bounty.deliverables);
   const eligibility = stripHtml(bounty.eligibilityRules);
 
+  const deadlineDate = bounty.deadline
+    ? new Date(bounty.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+  const lowConfidence = bounty.confidenceScore != null && bounty.confidenceScore < 55;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-[#111] border border-border rounded-t-2xl sm:rounded-2xl max-h-[88vh] flex flex-col overflow-hidden shadow-2xl">
+      <div className="relative w-full sm:max-w-xl md:max-w-2xl bg-[#111] border border-border rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-border gap-3">
+        <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-border gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap">
                 {bounty.platform || "Unknown"}
               </span>
@@ -155,58 +160,71 @@ function DetailDrawer({
                   {bounty.projectName}
                 </span>
               )}
+              {bounty.contentFormat && (
+                <span className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
+                  {bounty.contentFormat}
+                </span>
+              )}
             </div>
-            <h2 className="text-lg font-bold leading-tight">{bounty.title || "Untitled Bounty"}</h2>
+            <h2 className="text-base sm:text-lg font-bold leading-snug">{bounty.title || "Untitled Bounty"}</h2>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5 p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
           {/* Key metrics */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <div className="bg-card border border-border rounded-sm p-3 text-center">
-              <div className="font-mono text-xs text-muted-foreground mb-1">Reward</div>
-              <div className="font-bold text-primary text-sm">
+              <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Reward</div>
+              <div className="font-bold text-primary text-sm leading-tight">
                 {bounty.rewardAmount && Number(bounty.rewardAmount) > 0
                   ? `${bounty.rewardAmount} ${bounty.rewardCurrency || "USDC"}`
                   : <span className="text-muted-foreground text-xs">See platform</span>}
               </div>
             </div>
             <div className="bg-card border border-border rounded-sm p-3 text-center">
-              <div className="font-mono text-xs text-muted-foreground mb-1">Deadline</div>
-              <div className={`font-mono text-sm font-bold ${dl === null ? "text-muted-foreground text-xs" : dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-foreground"}`}>
-                {dl === null ? "Open" : dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d`}
+              <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Deadline</div>
+              <div className={`font-mono text-xs font-bold leading-tight ${dl === null ? "text-muted-foreground" : dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-foreground"}`}>
+                {dl === null ? "Open" : dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d left`}
+                {deadlineDate && dl !== null && dl >= 0 && (
+                  <div className="text-muted-foreground font-normal mt-0.5" style={{ fontSize: "9px" }}>{deadlineDate}</div>
+                )}
               </div>
             </div>
             <div className={`border rounded-sm p-3 text-center ${scoreBg(score)}`}>
-              <div className="font-mono text-xs text-muted-foreground mb-1">Score</div>
-              <div className={`font-bold text-lg ${scoreColor(score)}`}>{score}<span className="text-xs font-normal">/10</span></div>
+              <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Score</div>
+              <div className={`font-bold text-xl leading-tight ${scoreColor(score)}`}>{score}<span className="text-xs font-normal text-muted-foreground">/10</span></div>
             </div>
           </div>
 
-          {/* Score explanation */}
-          {bounty.scoreExplanation && (
-            <div className="bg-card border border-border rounded-sm p-3">
-              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-2">AI Analysis</p>
-              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.scoreExplanation}</p>
+          {/* Low confidence notice */}
+          {lowConfidence && (
+            <div className="flex items-start gap-3 px-3 py-3 rounded-sm border border-yellow-500/30 bg-yellow-500/5">
+              <AlertCircle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-xs text-yellow-400 font-bold">Partial data ({bounty.confidenceScore}% confidence)</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  The crawler couldn't extract full details from this listing. Requirements below may be incomplete — visit the source for accurate information.
+                </p>
+              </div>
             </div>
           )}
 
-          {/* Content format */}
-          {bounty.contentFormat && (
-            <div>
-              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Format</p>
-              <span className="font-mono text-xs border border-border px-2 py-1 rounded-sm text-foreground">{bounty.contentFormat}</span>
+          {/* Score explanation */}
+          {bounty.scoreExplanation && (
+            <div className="bg-card border border-border rounded-sm p-3.5">
+              <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">AI Analysis</p>
+              <p className="text-sm text-foreground/80 leading-relaxed">{bounty.scoreExplanation}</p>
             </div>
           )}
 
           {/* Requirements */}
           {requirements && (
             <div>
-              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Requirements</p>
+              <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Requirements</p>
               <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{requirements}</p>
             </div>
           )}
@@ -214,7 +232,7 @@ function DetailDrawer({
           {/* Deliverables */}
           {deliverables && deliverables !== bounty.contentFormat && (
             <div>
-              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Deliverables</p>
+              <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Deliverables</p>
               <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{deliverables}</p>
             </div>
           )}
@@ -222,30 +240,29 @@ function DetailDrawer({
           {/* Eligibility */}
           {eligibility && (
             <div>
-              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-1.5">Eligibility</p>
+              <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Eligibility</p>
               <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">{eligibility}</p>
             </div>
           )}
 
-          {/* Confidence */}
-          {bounty.confidenceScore != null && (
-            <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-              <Shield className="w-3.5 h-3.5 text-blue-400" />
-              Data confidence: <span className="text-blue-400">{bounty.confidenceScore}%</span>
-              <span className="ml-1">· added {timeAgo(bounty.createdAt)}</span>
-            </div>
-          )}
+          {/* Confidence + timestamp */}
+          <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground pt-1 border-t border-border">
+            <Shield className={`w-3.5 h-3.5 ${lowConfidence ? "text-yellow-400" : "text-blue-400"}`} />
+            <span>Data confidence:</span>
+            <span className={lowConfidence ? "text-yellow-400" : "text-blue-400"}>{bounty.confidenceScore ?? "?"}%</span>
+            <span className="ml-auto">added {timeAgo(bounty.createdAt)}</span>
+          </div>
         </div>
 
         {/* Action footer */}
-        <div className="p-4 border-t border-border flex gap-3">
+        <div className="px-5 py-4 border-t border-border flex gap-3">
           <a
             href={bounty.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-wider border border-border rounded-sm py-2.5 text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            className={`flex-1 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-wider border rounded-sm py-2.5 transition-colors ${lowConfidence ? "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10" : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"}`}
           >
-            <ExternalLink className="w-3.5 h-3.5" /> Visit Source
+            <ExternalLink className="w-3.5 h-3.5" /> {lowConfidence ? "View Full Details" : "Visit Source"}
           </a>
           <Button
             onClick={onClaim}
