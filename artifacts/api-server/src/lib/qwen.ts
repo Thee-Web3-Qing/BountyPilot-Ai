@@ -21,10 +21,10 @@ async function callQwen(systemPrompt: string, userPrompt: string): Promise<strin
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 1024,
+      max_tokens: 4096,
       temperature: 0.7,
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(90000),
   });
 
   if (!resp.ok) {
@@ -46,6 +46,7 @@ export interface ResearchBriefContent {
   keyPoints: string;
   targetAudience: string;
   competitorAnalysis: string;
+  fullContent?: string;
 }
 
 export interface ProductionPlanContent {
@@ -218,37 +219,78 @@ export async function generateResearchBrief(scraped: ScrapedBounty): Promise<Res
   }
 
   try {
-    const text = await callQwen(
-      `You are BountyPilot, helping content creators research and win crypto bounties. Generate actionable, specific research briefs.`,
-      `Generate a research brief for this bounty as JSON only:
-{
-  "summary": "<2-3 sentence overview of what this bounty needs and the opportunity>",
-  "contentAngles": "<4 numbered content angles/approaches the creator could take>",
-  "keyPoints": "<5 bullet points of key facts to research and include>",
-  "targetAudience": "<who the content should be aimed at>",
-  "competitorAnalysis": "<brief note on existing coverage and how to differentiate>"
-}
+    const fullContent = await callQwen(
+      `You are a senior Web3 researcher and content strategist. You write comprehensive, deeply researched creator briefs that give content creators everything they need to produce winning content without any additional research. Be specific, insightful, and actionable. Use clear markdown headings.`,
+      `Conduct comprehensive research on ${scraped.projectName || scraped.title} and produce a complete content creator brief.
 
-Bounty:
-- Title: ${scraped.title}
+Bounty context:
 - Platform: ${scraped.platform}
-- Project: ${scraped.projectName}
+- Title: ${scraped.title}
 - Format: ${scraped.contentFormat}
-- Requirements: ${scraped.submissionRequirements?.slice(0, 400)}
-- Description: ${scraped.description?.slice(0, 500)}`
+- Reward: ${scraped.rewardAmount || "TBD"} ${scraped.rewardCurrency || ""}
+- Requirements: ${scraped.submissionRequirements?.slice(0, 500) || "See listing"}
+- Description: ${scraped.description?.slice(0, 600) || ""}
+
+Write the full brief using these exact sections:
+
+## 1. Executive Summary
+- What is the project?
+- What problem does it solve?
+- Why should people care?
+
+## 2. Beginner-Friendly Explanation
+Explain the project as if speaking to someone completely new to Web3.
+
+## 3. Detailed Product Breakdown
+- How does the product work?
+- What are its major features?
+- What makes it unique?
+
+## 4. Team and Background
+Founders, team, investors, funding rounds.
+
+## 5. Market Positioning
+Competitors, advantages, disadvantages, market opportunity.
+
+## 6. Community and Growth
+X/Twitter following, community size, engagement quality, recent growth indicators.
+
+## 7. Latest Updates
+Partnerships, product launches, announcements, major milestones.
+
+## 8. Important Statistics
+User numbers, volume, revenue, TVL, downloads, transactions, any relevant metrics.
+
+## 9. Strong Content Angles
+Generate at least 20 content ideas across: beginner angles, contrarian angles, educational angles, storytelling angles, viral angles.
+
+## 10. Hooks
+Generate at least 20 video hooks and 20 thread hooks.
+
+## 11. Visual Ideas
+B-roll ideas, motion graphics ideas, visual metaphors, screen recording opportunities, comic ideas.
+
+## 12. Frequently Misunderstood Concepts
+List common misconceptions and explain them.
+
+## 13. Key Talking Points
+Generate the 20 most important points a creator should mention.
+
+## 14. Sources
+Website, documentation, X account, GitHub, blog, and any official resources.
+
+Write in a professional report style. Use bullet points and sub-headings throughout. Be specific to ${scraped.projectName || scraped.title} — do not give generic answers.`
     );
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        summary: parsed.summary || templateResearchBrief(scraped).summary,
-        contentAngles: parsed.contentAngles || templateResearchBrief(scraped).contentAngles,
-        keyPoints: parsed.keyPoints || templateResearchBrief(scraped).keyPoints,
-        targetAudience: parsed.targetAudience || templateResearchBrief(scraped).targetAudience,
-        competitorAnalysis: parsed.competitorAnalysis || templateResearchBrief(scraped).competitorAnalysis,
-      };
-    }
+    const fallback = templateResearchBrief(scraped);
+    return {
+      summary: fallback.summary,
+      contentAngles: fallback.contentAngles,
+      keyPoints: fallback.keyPoints,
+      targetAudience: fallback.targetAudience,
+      competitorAnalysis: fallback.competitorAnalysis,
+      fullContent,
+    };
   } catch (e) {
     // Fall through to template
   }

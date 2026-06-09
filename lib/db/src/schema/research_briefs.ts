@@ -10,6 +10,7 @@ export const researchBriefsTable = pgTable("research_briefs", {
   keyPoints: text("key_points"),
   targetAudience: text("target_audience"),
   competitorAnalysis: text("competitor_analysis"),
+  fullContent: text("full_content"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

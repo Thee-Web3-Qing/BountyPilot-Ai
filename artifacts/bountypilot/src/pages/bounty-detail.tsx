@@ -1,4 +1,6 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useParams, useLocation } from "wouter";
 import {
   useGetBounty,
@@ -446,18 +448,22 @@ export function BountyDetail() {
                 : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
             </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 text-sm">
+          <CardContent className="text-sm">
             {brief ? (
-              <>
-                <Field label="Summary" value={brief.summary} />
-                <Field label="Content Angles" value={brief.contentAngles} />
-                <Field label="Key Points" value={brief.keyPoints} />
-                <Field label="Target Audience" value={brief.targetAudience} />
-                <Field label="Competitor Analysis" value={brief.competitorAnalysis} />
-              </>
+              brief.fullContent ? (
+                <BriefMarkdown content={brief.fullContent} />
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <Field label="Summary" value={brief.summary} />
+                  <Field label="Content Angles" value={brief.contentAngles} />
+                  <Field label="Key Points" value={brief.keyPoints} />
+                  <Field label="Target Audience" value={brief.targetAudience} />
+                  <Field label="Competitor Analysis" value={brief.competitorAnalysis} />
+                </div>
+              )
             ) : (
-              <p className="text-sm text-muted-foreground font-mono">
-                {generatingBrief ? "AI is generating your research brief…" : "No research brief yet. Click Generate with AI to create one."}
+              <p className="text-sm text-muted-foreground font-mono py-2">
+                {generatingBrief ? "AI is generating your research brief… This may take up to 60 seconds." : "No research brief yet. Click Generate with AI to create one."}
               </p>
             )}
           </CardContent>
@@ -504,6 +510,72 @@ export function BountyDetail() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function BriefMarkdown({ content }: { content: string }) {
+  return (
+    <div className="brief-markdown">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h2: ({ children }) => (
+            <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground mt-6 mb-2 pt-4 border-t border-border first:mt-0 first:pt-0 first:border-t-0">
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="font-sans font-bold text-sm uppercase tracking-tight mt-3 mb-1.5 text-foreground">
+              {children}
+            </h3>
+          ),
+          p: ({ children }) => (
+            <p className="text-sm leading-relaxed mb-2 text-foreground/90">{children}</p>
+          ),
+          ul: ({ children }) => (
+            <ul className="flex flex-col gap-1.5 mb-3">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="flex flex-col gap-1.5 mb-3 list-none">{children}</ol>
+          ),
+          li: ({ children, ...props }) => {
+            const ordered = (props as any).ordered;
+            return (
+              <li className="flex gap-2 text-sm leading-relaxed">
+                <span className="text-primary font-mono flex-shrink-0 mt-0.5">{ordered ? "→" : "→"}</span>
+                <span className="text-foreground/90">{children}</span>
+              </li>
+            );
+          },
+          strong: ({ children }) => (
+            <strong className="font-bold text-foreground">{children}</strong>
+          ),
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+            >
+              {children}
+            </a>
+          ),
+          code: ({ children }) => (
+            <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-primary">
+              {children}
+            </code>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-primary/40 pl-3 italic text-muted-foreground text-sm my-2">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="border-border my-4" />,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
