@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   useGetBounty,
@@ -7,14 +8,18 @@ import {
   useGetProductionPlanByBounty,
   getGetProductionPlanByBountyQueryKey,
   useUpdateBounty,
+  useCreateSubmission,
   getListBountiesQueryKey,
   getGetDashboardSummaryQueryKey,
+  getListSubmissionsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -45,6 +50,7 @@ export function BountyDetail() {
   const bountyId = parseInt(id ?? "0");
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { token } = useAuth();
 
   const { data: bounty, isLoading: loadingBounty } = useGetBounty(bountyId, {
     query: { enabled: !!bountyId, queryKey: getGetBountyQueryKey(bountyId) },
@@ -57,6 +63,16 @@ export function BountyDetail() {
   });
 
   const updateMutation = useUpdateBounty();
+  const createSubmission = useCreateSubmission();
+
+  // Submit form state
+  const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [submitUrl, setSubmitUrl] = useState("");
+  const [submitDate, setSubmitDate] = useState(new Date().toISOString().slice(0, 10));
+
+  // Rescrape state
+  const [rescraping, setRescraping] = useState(false);
+  const [rescrapeResult, setRescrapeResult] = useState<{ prevConfidence: number; newConfidence: number } | null>(null);
 
   const handleStatusChange = (status: string) => {
     updateMutation.mutate(
@@ -69,6 +85,50 @@ export function BountyDetail() {
         },
       }
     );
+  };
+
+  const handleMarkSubmitted = (e: React.FormEvent) => {
+    e.preventDefault();
+    createSubmission.mutate(
+      {
+        data: {
+          bountyId,
+          submissionUrl: submitUrl || undefined,
+          submittedAt: new Date(submitDate).toISOString(),
+          notes: undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          setShowSubmitForm(false);
+          setSubmitUrl("");
+          queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
+          queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListSubmissionsQueryKey() });
+        },
+      }
+    );
+  };
+
+  const handleRescrape = async () => {
+    if (!token || rescraping) return;
+    setRescraping(true);
+    setRescrapeResult(null);
+    try {
+      const resp = await fetch(`/api/bounties/${bountyId}/rescrape`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setRescrapeResult({ prevConfidence: data.prevConfidence, newConfidence: data.newConfidence });
+        queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
+        queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+      }
+    } finally {
+      setRescraping(false);
+    }
   };
 
   if (loadingBounty) {
@@ -92,6 +152,9 @@ export function BountyDetail() {
     );
   }
 
+  const confidencePct = Math.round((bounty.confidenceScore ?? 0) * 100);
+  const lowConfidence = (bounty.confidenceScore ?? 1) < 0.55;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
@@ -112,6 +175,11 @@ export function BountyDetail() {
             {bounty.platform && (
               <span className="text-xs font-mono px-2 py-0.5 rounded border border-border bg-secondary text-muted-foreground">
                 {bounty.platform}
+              </span>
+            )}
+            {bounty.confidenceScore != null && (
+              <span className={`text-xs font-mono px-2 py-0.5 rounded border ${lowConfidence ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400" : "border-border text-muted-foreground"}`}>
+                {confidencePct}% confidence
               </span>
             )}
           </div>
@@ -137,6 +205,42 @@ export function BountyDetail() {
           <CardContent className="p-4">
             <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">Score Explanation</p>
             <p className="text-sm">{bounty.scoreExplanation}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Agentic Retry Extraction */}
+      {(lowConfidence || rescrapeResult) && (
+        <Card className={`border ${lowConfidence && !rescrapeResult ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-card"}`}>
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${lowConfidence && !rescrapeResult ? "text-yellow-400" : "text-muted-foreground"}`} />
+              <div className="flex-1">
+                {rescrapeResult ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span className="font-mono text-xs text-green-400">
+                      Extraction retry complete — confidence {Math.round(rescrapeResult.prevConfidence * 100)}% → {Math.round(rescrapeResult.newConfidence * 100)}%
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-mono text-xs text-yellow-400 uppercase tracking-wider">Low extraction confidence ({confidencePct}%)</p>
+                    <p className="text-xs text-muted-foreground mt-1">Some fields may be missing or inaccurate. The agent can retry extraction to improve the data.</p>
+                  </>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRescrape}
+                disabled={rescraping}
+                className="font-mono text-xs uppercase tracking-wider border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 flex-shrink-0"
+              >
+                {rescraping ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                {rescraping ? "Retrying..." : "Retry Extraction"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -181,7 +285,7 @@ export function BountyDetail() {
           <CardHeader>
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Update Status</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               {WORKFLOW_STATUSES.map((s) => (
                 <Button
@@ -195,14 +299,93 @@ export function BountyDetail() {
                   {s.replace(/_/g, " ")}
                 </Button>
               ))}
+              {bounty.status !== "submitted" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-mono uppercase text-xs border-teal-500/30 text-teal-400 hover:bg-teal-500/10"
+                  onClick={() => setShowSubmitForm(!showSubmitForm)}
+                  disabled={updateMutation.isPending}
+                >
+                  ✓ Mark as Submitted
+                </Button>
+              )}
+            </div>
+
+            {showSubmitForm && (
+              <form onSubmit={handleMarkSubmitted} className="border border-teal-500/20 rounded-sm p-4 bg-teal-500/5 flex flex-col gap-3">
+                <p className="font-mono text-xs uppercase tracking-wider text-teal-400">Log Submission</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-1">Submission URL</label>
+                    <Input
+                      value={submitUrl}
+                      onChange={(e) => setSubmitUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="font-mono text-sm bg-background border-border"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-1">Date Submitted</label>
+                    <Input
+                      type="date"
+                      value={submitDate}
+                      onChange={(e) => setSubmitDate(e.target.value)}
+                      className="font-mono text-sm bg-background border-border"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={createSubmission.isPending}
+                    className="font-mono uppercase text-xs bg-teal-600 hover:bg-teal-500 text-white border-0"
+                  >
+                    {createSubmission.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                    Confirm Submission
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="font-mono uppercase text-xs"
+                    onClick={() => setShowSubmitForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Won / Lost result update */}
+      {bounty.status === "submitted" && (
+        <Card className="bg-card border-teal-500/20">
+          <CardHeader>
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Record Result</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="font-mono uppercase text-xs border-green-500/30 text-green-400 hover:bg-green-500/10"
+                onClick={() => handleStatusChange("won")}
+                disabled={updateMutation.isPending}
+              >
+                🏆 Won
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
                 className="font-mono uppercase text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
-                onClick={() => handleStatusChange("submitted")}
+                onClick={() => handleStatusChange("lost")}
                 disabled={updateMutation.isPending}
               >
-                submitted
+                ✗ Lost
               </Button>
             </div>
           </CardContent>

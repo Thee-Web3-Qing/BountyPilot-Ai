@@ -193,7 +193,7 @@ export function Earnings() {
                 {earnings.map((earning) => (
                   <tr key={earning.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-sm">{earning.platform ?? "—"}</td>
-                    <td className="px-4 py-3 font-bold font-mono text-primary">${earning.amount.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-bold font-mono text-primary">${(earning.amount ?? 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{earning.currency}</td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
                       {earning.receivedAt ? new Date(earning.receivedAt).toLocaleDateString() : "—"}

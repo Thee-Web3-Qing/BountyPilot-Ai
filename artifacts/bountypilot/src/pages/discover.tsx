@@ -472,7 +472,12 @@ export function Discover() {
         <div>
           <h1 className="text-2xl font-bold font-sans uppercase tracking-tight">Discover</h1>
           <p className="text-muted-foreground font-mono text-xs mt-0.5">
-            Auto-fetched from 20 platforms · refreshes every hour
+            Monitoring {crawlerStatus?.lastResults?.length ?? 20} platforms · refreshes every hour
+            {!!crawlerStatus?.lastResults?.length && crawlerStatus.lastResults.filter(r => (r as PlatformResult & { found?: number }).found ?? 0 > 0).length > 0 && (
+              <span className="text-primary ml-1">
+                · {crawlerStatus.lastResults.filter(r => (r as PlatformResult & { found?: number }).found ?? 0 > 0).length} live
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -516,9 +521,9 @@ export function Discover() {
       )}
 
       {/* Last crawl per-platform results */}
-      {crawlerStatus?.lastResults?.length > 0 && (
+      {(crawlerStatus?.lastResults?.length ?? 0) > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {crawlerStatus.lastResults.map((r) => (
+          {crawlerStatus!.lastResults.map((r) => (
             <div
               key={r.platform}
               className={`flex items-center gap-1.5 px-2 py-1 rounded-sm border font-mono text-[10px] ${r.error ? "border-red-500/30 text-red-400" : r.added > 0 ? "border-green-500/30 text-green-400" : "border-border text-muted-foreground"}`}

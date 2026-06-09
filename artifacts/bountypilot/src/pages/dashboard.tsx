@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useGetDashboardSummary, useGetRecentBounties, useGetPlatformBreakdown } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,8 +7,26 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Zap, Database } from "lucide-react";
+import { Loader2, Zap, Database, Activity, RefreshCw } from "lucide-react";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
+
+interface CrawlerStatus {
+  isRunning: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  totalAddedLastRun: number;
+  totalCrawledBounties: number;
+  lastResults: { platform: string; found: number; added: number }[];
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "never";
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 export function Dashboard() {
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
@@ -18,7 +36,41 @@ export function Dashboard() {
   const queryClient = useQueryClient();
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [demoLoaded, setDemoLoaded] = useState(false);
-  const [llmMock, setLlmMock] = useState<boolean | null>(null);
+  const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
+  const [triggeringCrawl, setTriggeringCrawl] = useState(false);
+  const [, setTick] = useState(0);
+
+  const fetchStatus = useCallback(async () => {
+    if (!token) return;
+    try {
+      const resp = await fetch("/api/discover/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) setCrawlerStatus(await resp.json());
+    } catch {}
+  }, [token]);
+
+  useEffect(() => {
+    fetchStatus();
+    const iv = setInterval(fetchStatus, 15000);
+    // tick every 30s to re-render relative times
+    const tick = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => { clearInterval(iv); clearInterval(tick); };
+  }, [fetchStatus]);
+
+  const triggerCrawl = async () => {
+    if (!token) return;
+    setTriggeringCrawl(true);
+    try {
+      await fetch("/api/discover/trigger", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTimeout(fetchStatus, 2000);
+    } finally {
+      setTriggeringCrawl(false);
+    }
+  };
 
   const loadDemo = async () => {
     setLoadingDemo(true);
@@ -39,6 +91,8 @@ export function Dashboard() {
     }
   };
 
+  const activePlatforms = crawlerStatus?.lastResults?.filter((r) => r.found > 0) ?? [];
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -58,6 +112,71 @@ export function Dashboard() {
           </span>
         )}
       </div>
+
+      {/* Crawler Status */}
+      <Card className={`border ${crawlerStatus?.isRunning ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              {crawlerStatus?.isRunning ? (
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              ) : (
+                <Activity className="w-4 h-4 text-primary" />
+              )}
+              Autonomous Crawler
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={triggerCrawl}
+              disabled={triggeringCrawl || crawlerStatus?.isRunning}
+              className="h-7 font-mono text-xs text-muted-foreground hover:text-foreground"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${triggeringCrawl ? "animate-spin" : ""}`} />
+              Run now
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Status</p>
+              <p className={`font-mono text-sm font-bold mt-1 ${crawlerStatus?.isRunning ? "text-primary" : "text-green-400"}`}>
+                {crawlerStatus?.isRunning ? "● Crawling..." : "● Idle"}
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Last Run</p>
+              <p className="font-mono text-sm font-bold mt-1">{timeAgo(crawlerStatus?.lastRunAt ?? null)}</p>
+            </div>
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Added Last Run</p>
+              <p className={`font-mono text-sm font-bold mt-1 ${(crawlerStatus?.totalAddedLastRun ?? 0) > 0 ? "text-primary" : ""}`}>
+                {crawlerStatus?.totalAddedLastRun ?? 0} new bounties
+              </p>
+            </div>
+            <div>
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Total Indexed</p>
+              <p className="font-mono text-sm font-bold mt-1">{crawlerStatus?.totalCrawledBounties ?? 0}</p>
+            </div>
+          </div>
+          {activePlatforms.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider mb-2">Live platforms last run</p>
+              <div className="flex flex-wrap gap-2">
+                {crawlerStatus?.lastResults?.map((r) => (
+                  <span
+                    key={r.platform}
+                    className={`font-mono text-[10px] px-2 py-0.5 rounded-sm border ${r.found > 0 ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+                  >
+                    {r.platform} {r.found > 0 ? `· ${r.found}` : "· 0"}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Earnings" value={summary?.totalEarnings ? `$${summary.totalEarnings}` : "$0"} loading={loadingSummary} highlight />

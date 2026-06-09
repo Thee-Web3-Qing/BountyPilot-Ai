@@ -209,6 +209,53 @@ bountiesRouter.post("/:id/reject", async (req: AuthRequest, res) => {
   }
 });
 
+// POST /bounties/:id/rescrape — re-fetch the URL and update extracted fields
+bountiesRouter.post("/:id/rescrape", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const id = parseInt(req.params.id);
+
+    const [existing] = await db
+      .select()
+      .from(bountiesTable)
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
+    if (!existing) return res.status(404).json({ error: "Not found" });
+
+    const prevConfidence = existing.confidenceScore ?? 0;
+    logger.info({ bountyId: id, url: existing.url }, "Rescraping bounty");
+    const scraped = await scrapeBounty(existing.url);
+
+    const updates: Record<string, unknown> = {
+      confidenceScore: scraped.confidenceScore,
+    };
+    // Merge: only fill in fields that were missing or improve them
+    if (scraped.title && scraped.title.length > (existing.title?.length ?? 0)) updates.title = scraped.title;
+    if (scraped.deadline && !existing.deadline) updates.deadline = scraped.deadline;
+    if (scraped.rewardAmount && !existing.rewardAmount) updates.rewardAmount = scraped.rewardAmount;
+    if (scraped.submissionRequirements) updates.submissionRequirements = scraped.submissionRequirements;
+    if (scraped.deliverables) updates.deliverables = scraped.deliverables;
+    if (scraped.eligibilityRules) updates.eligibilityRules = scraped.eligibilityRules;
+    if (scraped.importantNotes) updates.importantNotes = scraped.importantNotes;
+
+    // Re-score with fresher data
+    const analysis = await analyzeBounty(scraped);
+    updates.opportunityScore = analysis.opportunityScore;
+    updates.scoreExplanation = analysis.scoreExplanation;
+
+    const [bounty] = await db
+      .update(bountiesTable)
+      .set(updates)
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
+      .returning();
+
+    logger.info({ bountyId: id, prevConfidence, newConfidence: scraped.confidenceScore }, "Rescrape complete");
+    res.json({ bounty, prevConfidence, newConfidence: scraped.confidenceScore });
+  } catch (err) {
+    logger.error(err, "Error rescraping bounty");
+    res.status(500).json({ error: "Failed to rescrape bounty" });
+  }
+});
+
 // POST /bounties/:id/save-later
 bountiesRouter.post("/:id/save-later", async (req: AuthRequest, res) => {
   try {
