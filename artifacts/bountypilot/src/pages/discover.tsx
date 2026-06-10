@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Loader2, RefreshCw, Globe, Plus, CheckCircle,
   Clock, Search, Zap, Shield, ExternalLink, X,
-  Sparkles, AlertCircle,
+  Sparkles, AlertCircle, Building2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBountiesQueryKey } from "@workspace/api-client-react";
@@ -152,12 +152,17 @@ function DetailDrawer({
         {/* Header */}
         <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-border gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap">
+            {/* Platform (listing venue) + Sponsor (paying project) + content format */}
+            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+              {/* Platform = where this is listed */}
+              <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap flex items-center gap-1">
+                <Globe className="w-2.5 h-2.5 shrink-0" />
                 {bounty.platform || "Unknown"}
               </span>
+              {/* Sponsor = the project paying for the content */}
               {bounty.projectName && (
-                <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                <span className="font-mono text-[10px] border border-border bg-card px-1.5 py-0.5 rounded-sm flex items-center gap-1 whitespace-nowrap text-foreground/70">
+                  <Building2 className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
                   {bounty.projectName}
                 </span>
               )}
@@ -306,13 +311,17 @@ function BountyCard({
       onClick={onExpand}
       className="bg-card border border-border hover:border-primary/40 active:border-primary/60 rounded-sm p-4 cursor-pointer transition-colors"
     >
-      {/* Row 1: platform + time */}
+      {/* Row 1: platform + sponsor + time */}
       <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap leading-tight">
+        {/* Platform = where the bounty is listed */}
+        <span className="font-mono text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-sm whitespace-nowrap leading-tight flex items-center gap-1">
+          <Globe className="w-2.5 h-2.5 shrink-0" />
           {bounty.platform || "Unknown"}
         </span>
+        {/* Sponsor = the project/protocol paying for the content */}
         {bounty.projectName && (
-          <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
+          <span className="font-mono text-[10px] text-muted-foreground border border-border/50 px-1.5 py-0.5 rounded-sm flex items-center gap-1 whitespace-nowrap max-w-[150px] truncate">
+            <Building2 className="w-2.5 h-2.5 shrink-0" />
             {bounty.projectName}
           </span>
         )}
