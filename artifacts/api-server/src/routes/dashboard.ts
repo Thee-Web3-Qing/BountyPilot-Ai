@@ -23,9 +23,17 @@ dashboardRouter.get("/summary", async (req: AuthRequest, res) => {
       ["approved", "researching", "scripting", "recording", "editing"].includes(b.status)
     ).length;
     const wonBounties = bounties.filter((b) => b.status === "won").length;
+    const lostBounties = bounties.filter((b) => b.status === "lost").length;
+    const decidedBounties = wonBounties + lostBounties;
+    const winRate = decidedBounties > 0 ? Math.round((wonBounties / decidedBounties) * 100) : 0;
     const pipelineValue = bounties
       .filter((b) => ["approved", "researching", "scripting", "recording", "editing"].includes(b.status))
       .reduce((sum, b) => sum + parseFloat(b.rewardAmount ?? "0"), 0);
+    const totalPipelineValue = bounties
+      .filter((b) => !["discovered", "rejected", "lost"].includes(b.status))
+      .reduce((sum, b) => sum + parseFloat(b.rewardAmount ?? "0"), 0);
+    const totalHoursSaved = bounties.reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const totalClaimed = bounties.filter((b) => b.status !== "discovered").length;
 
     const scores = bounties.filter((b) => b.opportunityScore != null).map((b) => b.opportunityScore!);
     const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
@@ -41,7 +49,12 @@ dashboardRouter.get("/summary", async (req: AuthRequest, res) => {
       totalEarnings,
       activeBounties,
       wonBounties,
+      lostBounties,
+      winRate,
       pipelineValue,
+      totalPipelineValue,
+      totalHoursSaved,
+      totalClaimed,
       averageScore,
       statusBreakdown,
     });

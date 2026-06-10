@@ -116,6 +116,7 @@ bountiesRouter.patch("/:id", async (req: AuthRequest, res) => {
     if (parsed.data.title !== undefined) updates.title = parsed.data.title;
     if (parsed.data.rewardAmount !== undefined) updates.rewardAmount = parsed.data.rewardAmount;
     if (parsed.data.deadline !== undefined) updates.deadline = parsed.data.deadline;
+    if (parsed.data.hoursSaved !== undefined) updates.hoursSaved = parsed.data.hoursSaved;
 
     const [bounty] = await db
       .update(bountiesTable)

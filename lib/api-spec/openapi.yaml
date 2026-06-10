@@ -458,6 +458,8 @@ components:
         status:
           type: string
           enum: [discovered, saved_for_later, approved, rejected, researching, scripting, recording, editing, submitted, won, lost]
+        hoursSaved:
+          type: ["integer", "null"]
         createdAt:
           type: string
         updatedAt:
@@ -481,6 +483,8 @@ components:
           type: string
         deadline:
           type: string
+        hoursSaved:
+          type: integer
 
     ResearchBrief:
       type: object
@@ -611,7 +615,7 @@ components:
 
     DashboardSummary:
       type: object
-      required: [totalBounties, totalEarnings, activeBounties, wonBounties, pipelineValue]
+      required: [totalBounties, totalEarnings, activeBounties, wonBounties, pipelineValue, winRate, totalPipelineValue, totalHoursSaved, totalClaimed]
       properties:
         totalBounties:
           type: integer
@@ -621,8 +625,18 @@ components:
           type: integer
         wonBounties:
           type: integer
+        lostBounties:
+          type: integer
+        winRate:
+          type: integer
         pipelineValue:
           type: number
+        totalPipelineValue:
+          type: number
+        totalHoursSaved:
+          type: integer
+        totalClaimed:
+          type: integer
         averageScore:
           type: ["number", "null"]
         statusBreakdown:

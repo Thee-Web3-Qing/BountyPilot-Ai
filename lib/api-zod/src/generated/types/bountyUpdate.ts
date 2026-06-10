@@ -11,4 +11,5 @@ export interface BountyUpdate {
   title?: string;
   rewardAmount?: string;
   deadline?: string;
+  hoursSaved?: number;
 }

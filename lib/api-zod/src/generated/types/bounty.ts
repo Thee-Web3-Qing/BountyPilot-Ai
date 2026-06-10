@@ -39,6 +39,8 @@ export interface Bounty {
   /** @nullable */
   scoreExplanation?: string | null;
   status: BountyStatus;
+  /** @nullable */
+  hoursSaved?: number | null;
   createdAt: string;
   /** @nullable */
   updatedAt?: string | null;

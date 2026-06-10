@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, waitlistTable } from "@workspace/db";
-import { eq, count, desc } from "drizzle-orm";
+import { usersTable, waitlistTable, bountiesTable, earningsTable } from "@workspace/db";
+import { eq, count, desc, gte, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
+
+function hoursAgo(hours: number): Date {
+  return new Date(Date.now() - hours * 60 * 60 * 1000);
+}
 
 export const adminRouter = Router();
 
@@ -183,5 +187,136 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
   } catch (err) {
     logger.error(err, "Admin set-plan error");
     res.status(500).json({ error: "Failed to update plan" });
+  }
+});
+
+// GET /admin/report — product-level aggregate analytics for admin progress reports
+adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const now = new Date();
+    const h24 = hoursAgo(24);
+    const h48 = hoursAgo(48);
+    const d7 = hoursAgo(24 * 7);
+    const d30 = hoursAgo(24 * 30);
+
+    const [allUsers, allBounties, allEarnings] = await Promise.all([
+      db.select().from(usersTable),
+      db.select().from(bountiesTable),
+      db.select().from(earningsTable),
+    ]);
+
+    // Time-bucketed counts
+    const usersLast24h = allUsers.filter(u => new Date(u.createdAt) >= h24).length;
+    const usersLast48h = allUsers.filter(u => new Date(u.createdAt) >= h48).length;
+    const usersLast7d = allUsers.filter(u => new Date(u.createdAt) >= d7).length;
+    const usersLast30d = allUsers.filter(u => new Date(u.createdAt) >= d30).length;
+
+    const bountiesLast24h = allBounties.filter(b => new Date(b.createdAt) >= h24).length;
+    const bountiesLast48h = allBounties.filter(b => new Date(b.createdAt) >= h48).length;
+    const bountiesLast7d = allBounties.filter(b => new Date(b.createdAt) >= d7).length;
+    const bountiesLast30d = allBounties.filter(b => new Date(b.createdAt) >= d30).length;
+
+    const earningsLast24h = allEarnings.filter(e => new Date(e.createdAt) >= h24).reduce((s, e) => s + (e.amount ?? 0), 0);
+    const earningsLast48h = allEarnings.filter(e => new Date(e.createdAt) >= h48).reduce((s, e) => s + (e.amount ?? 0), 0);
+    const earningsLast7d = allEarnings.filter(e => new Date(e.createdAt) >= d7).reduce((s, e) => s + (e.amount ?? 0), 0);
+    const earningsLast30d = allEarnings.filter(e => new Date(e.createdAt) >= d30).reduce((s, e) => s + (e.amount ?? 0), 0);
+
+    const totalHoursSaved = allBounties.reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const hoursSavedLast24h = allBounties
+      .filter(b => b.hoursSaved && new Date(b.createdAt) >= h24)
+      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const hoursSavedLast48h = allBounties
+      .filter(b => b.hoursSaved && new Date(b.createdAt) >= h48)
+      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const hoursSavedLast7d = allBounties
+      .filter(b => b.hoursSaved && new Date(b.createdAt) >= d7)
+      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const hoursSavedLast30d = allBounties
+      .filter(b => b.hoursSaved && new Date(b.createdAt) >= d30)
+      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+
+    // Totals
+    const totalUsers = allUsers.length;
+    const totalBounties = allBounties.length;
+    const totalEarnings = allEarnings.reduce((s, e) => s + (e.amount ?? 0), 0);
+    const totalClaimed = allBounties.filter(b => b.status !== "discovered").length;
+    const totalWon = allBounties.filter(b => b.status === "won").length;
+    const totalLost = allBounties.filter(b => b.status === "lost").length;
+    const decided = totalWon + totalLost;
+    const winRate = decided > 0 ? Math.round((totalWon / decided) * 100) : 0;
+
+    // Top platforms
+    const platformMap: Record<string, { count: number; reward: number }> = {};
+    for (const b of allBounties) {
+      const p = b.platform ?? "Unknown";
+      if (!platformMap[p]) platformMap[p] = { count: 0, reward: 0 };
+      platformMap[p].count++;
+      platformMap[p].reward += parseFloat(b.rewardAmount ?? "0");
+    }
+    const platformBreakdown = Object.entries(platformMap)
+      .map(([platform, d]) => ({ platform, count: d.count, totalReward: d.reward }))
+      .sort((a, b) => b.count - a.count);
+
+    // Top earners
+    const userEarnings: Record<number, number> = {};
+    for (const e of allEarnings) {
+      if (e.userId) userEarnings[e.userId] = (userEarnings[e.userId] ?? 0) + (e.amount ?? 0);
+    }
+    const topEarners = Object.entries(userEarnings)
+      .map(([userId, amount]) => {
+        const u = allUsers.find(u => u.id === Number(userId));
+        return { username: u?.username ?? "unknown", amount };
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    // Active users (have claimed a bounty in last 7d)
+    const activeUserIds = new Set(
+      allBounties
+        .filter(b => b.status !== "discovered" && new Date(b.createdAt) >= d7)
+        .map(b => b.userId)
+    ).size;
+
+    res.json({
+      generatedAt: now.toISOString(),
+      users: {
+        total: totalUsers,
+        last24h: usersLast24h,
+        last48h: usersLast48h,
+        last7d: usersLast7d,
+        last30d: usersLast30d,
+        activeLast7d: activeUserIds,
+      },
+      bounties: {
+        total: totalBounties,
+        claimed: totalClaimed,
+        won: totalWon,
+        lost: totalLost,
+        winRate,
+        last24h: bountiesLast24h,
+        last48h: bountiesLast48h,
+        last7d: bountiesLast7d,
+        last30d: bountiesLast30d,
+      },
+      earnings: {
+        total: totalEarnings,
+        last24h: earningsLast24h,
+        last48h: earningsLast48h,
+        last7d: earningsLast7d,
+        last30d: earningsLast30d,
+      },
+      hoursSaved: {
+        total: totalHoursSaved,
+        last24h: hoursSavedLast24h,
+        last48h: hoursSavedLast48h,
+        last7d: hoursSavedLast7d,
+        last30d: hoursSavedLast30d,
+      },
+      platformBreakdown,
+      topEarners,
+    });
+  } catch (err) {
+    logger.error(err, "Admin report error");
+    res.status(500).json({ error: "Failed to get report" });
   }
 });

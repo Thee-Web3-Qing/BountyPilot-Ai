@@ -42,6 +42,7 @@ export const ListBountiesResponseItem = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })
@@ -81,6 +82,7 @@ export const GetBountyResponse = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })
@@ -97,7 +99,8 @@ export const UpdateBountyBody = zod.object({
   "status": zod.string().optional(),
   "title": zod.string().optional(),
   "rewardAmount": zod.string().optional(),
-  "deadline": zod.string().optional()
+  "deadline": zod.string().optional(),
+  "hoursSaved": zod.number().optional()
 })
 
 export const UpdateBountyResponse = zod.object({
@@ -118,6 +121,7 @@ export const UpdateBountyResponse = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })
@@ -156,6 +160,7 @@ export const ApproveBountyResponse = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })
@@ -186,6 +191,7 @@ export const RejectBountyResponse = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })
@@ -216,6 +222,7 @@ export const SaveBountyForLaterResponse = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })
@@ -400,7 +407,12 @@ export const GetDashboardSummaryResponse = zod.object({
   "totalEarnings": zod.number(),
   "activeBounties": zod.number(),
   "wonBounties": zod.number(),
+  "lostBounties": zod.number().optional(),
+  "winRate": zod.number(),
   "pipelineValue": zod.number(),
+  "totalPipelineValue": zod.number(),
+  "totalHoursSaved": zod.number(),
+  "totalClaimed": zod.number(),
   "averageScore": zod.number().nullish(),
   "statusBreakdown": zod.array(zod.object({
   "status": zod.string(),
@@ -430,6 +442,7 @@ export const GetRecentBountiesResponseItem = zod.object({
   "opportunityScore": zod.number().nullish(),
   "scoreExplanation": zod.string().nullish(),
   "status": zod.enum(['discovered', 'saved_for_later', 'approved', 'rejected', 'researching', 'scripting', 'recording', 'editing', 'submitted', 'won', 'lost']),
+  "hoursSaved": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish()
 })

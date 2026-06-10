@@ -12,7 +12,12 @@ export interface DashboardSummary {
   totalEarnings: number;
   activeBounties: number;
   wonBounties: number;
+  lostBounties?: number;
+  winRate: number;
   pipelineValue: number;
+  totalPipelineValue: number;
+  totalHoursSaved: number;
+  totalClaimed: number;
   /** @nullable */
   averageScore?: number | null;
   statusBreakdown?: StatusCount[];

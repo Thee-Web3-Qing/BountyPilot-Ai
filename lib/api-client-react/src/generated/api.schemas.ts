@@ -57,9 +57,9 @@ export interface Bounty {
   opportunityScore?: number | null;
   /** @nullable */
   scoreExplanation?: string | null;
-  /** @nullable */
-  confidenceScore?: number | null;
   status: BountyStatus;
+  /** @nullable */
+  hoursSaved?: number | null;
   createdAt: string;
   /** @nullable */
   updatedAt?: string | null;
@@ -74,6 +74,7 @@ export interface BountyUpdate {
   title?: string;
   rewardAmount?: string;
   deadline?: string;
+  hoursSaved?: number;
 }
 
 export interface ResearchBrief {
@@ -184,7 +185,12 @@ export interface DashboardSummary {
   totalEarnings: number;
   activeBounties: number;
   wonBounties: number;
+  lostBounties?: number;
+  winRate: number;
   pipelineValue: number;
+  totalPipelineValue: number;
+  totalHoursSaved: number;
+  totalClaimed: number;
   /** @nullable */
   averageScore?: number | null;
   statusBreakdown?: StatusCount[];
