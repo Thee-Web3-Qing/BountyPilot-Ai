@@ -5,6 +5,7 @@ import { usersTable, userProfilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { getTrialDays, trialEndsAt, getPlanStatus } from "../lib/access.js";
 
 export const authRouter = Router();
 
@@ -36,17 +37,27 @@ authRouter.post("/signup", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const launchDate = process.env.LAUNCH_DATE ? new Date(process.env.LAUNCH_DATE) : null;
+    let plan = "pending";
+    let trialEnd: Date | null = null;
+
+    if (launchDate && launchDate <= new Date()) {
+      const days = getTrialDays();
+      plan = "trial";
+      trialEnd = trialEndsAt(days);
+    }
+
     const [user] = await db
       .insert(usersTable)
-      .values({ email: email.toLowerCase(), username, passwordHash })
+      .values({ email: email.toLowerCase(), username, passwordHash, plan, trialEndsAt: trialEnd })
       .returning();
 
     // Create empty profile
     await db.insert(userProfilesTable).values({ userId: user.id });
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
-    logger.info({ userId: user.id }, "User signed up");
-    res.status(201).json({ token, user: { id: user.id, email: user.email, username: user.username } });
+    logger.info({ userId: user.id, plan }, "User signed up");
+    res.status(201).json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, isAdmin: user.isAdmin } });
   } catch (err) {
     logger.error(err, "Signup error");
     res.status(500).json({ error: "Signup failed" });
@@ -76,7 +87,7 @@ authRouter.post("/login", async (req, res) => {
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
     logger.info({ userId: user.id }, "User logged in");
-    res.json({ token, user: { id: user.id, email: user.email, username: user.username } });
+    res.json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, isAdmin: user.isAdmin } });
   } catch (err) {
     logger.error(err, "Login error");
     res.status(500).json({ error: "Login failed" });
@@ -87,7 +98,7 @@ authRouter.post("/login", async (req, res) => {
 authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
   try {
     const [user] = await db
-      .select({ id: usersTable.id, email: usersTable.email, username: usersTable.username, createdAt: usersTable.createdAt })
+      .select({ id: usersTable.id, email: usersTable.email, username: usersTable.username, createdAt: usersTable.createdAt, plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt, isAdmin: usersTable.isAdmin })
       .from(usersTable)
       .where(eq(usersTable.id, req.user!.userId));
     if (!user) return res.status(404).json({ error: "User not found" });

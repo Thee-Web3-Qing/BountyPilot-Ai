@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
-  User, Settings2, LogOut, Globe, Menu, X, ChevronDown, ChevronUp,
+  User, Settings2, LogOut, Globe, Menu, X, ChevronDown, ChevronUp, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
+import { TrialBanner } from "./trial-banner";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -150,6 +151,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       Settings
                     </div>
                   </Link>
+                  {user?.isAdmin && (
+                    <Link href="/admin" onClick={close}>
+                      <div className={cn(
+                        "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
+                        location === "/admin"
+                          ? "text-primary font-bold"
+                          : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                      )}>
+                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                        Admin
+                      </div>
+                    </Link>
+                  )}
                   <button
                     onClick={() => { logout(); close(); }}
                     className="flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors text-muted-foreground hover:bg-red-500/10 hover:text-red-400 w-full text-left"
@@ -163,6 +177,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+
+      {/* ── Trial banner ────────────────────────────────────── */}
+      <TrialBanner />
 
       {/* ── Page content ────────────────────────────────────── */}
       <main className="flex-1 overflow-auto">

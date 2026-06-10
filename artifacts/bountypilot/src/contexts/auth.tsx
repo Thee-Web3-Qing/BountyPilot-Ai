@@ -1,10 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 
+export type Plan = "beta" | "pending" | "trial" | "expired";
+
 interface User {
   id: number;
   email: string;
   username: string;
+  plan: Plan;
+  trialEndsAt: string | null;
+  isAdmin: boolean;
 }
 
 interface AuthContextType {
@@ -15,6 +20,10 @@ interface AuthContextType {
   signup: (email: string, username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  canAccessAI: boolean;
+  trialDaysLeft: number | null;
+  planStatus: Plan | null;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -22,6 +31,23 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const TOKEN_KEY = "bountypilot_token";
 const USER_KEY = "bountypilot_user";
 const API_BASE = "/api";
+
+function computePlanStatus(user: User | null): Plan | null {
+  if (!user) return null;
+  if (user.plan === "beta") return "beta";
+  if (user.plan === "pending") return "pending";
+  if (user.plan === "trial") {
+    if (!user.trialEndsAt) return "trial";
+    return new Date(user.trialEndsAt) > new Date() ? "trial" : "expired";
+  }
+  return "expired";
+}
+
+function computeTrialDaysLeft(user: User | null): number | null {
+  if (!user?.trialEndsAt) return null;
+  const ms = new Date(user.trialEndsAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -32,6 +58,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const t = localStorage.getItem(TOKEN_KEY);
+    if (!t) return;
+    try {
+      const resp = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${t}` } });
+      if (resp.ok) {
+        const data = await resp.json();
+        const updated: User = {
+          id: data.id,
+          email: data.email,
+          username: data.username,
+          plan: data.plan ?? "pending",
+          trialEndsAt: data.trialEndsAt ?? null,
+          isAdmin: data.isAdmin ?? false,
+        };
+        localStorage.setItem(USER_KEY, JSON.stringify(updated));
+        setUser(updated);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -47,10 +94,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || "Login failed");
       }
       const data = await resp.json();
+      const u: User = {
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
+        plan: data.user.plan ?? "pending",
+        trialEndsAt: data.user.trialEndsAt ?? null,
+        isAdmin: data.user.isAdmin ?? false,
+      };
       localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
       setToken(data.token);
-      setUser(data.user);
+      setUser(u);
     } finally {
       setIsLoading(false);
     }
@@ -69,10 +124,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || "Signup failed");
       }
       const data = await resp.json();
+      const u: User = {
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
+        plan: data.user.plan ?? "pending",
+        trialEndsAt: data.user.trialEndsAt ?? null,
+        isAdmin: data.user.isAdmin ?? false,
+      };
       localStorage.setItem(TOKEN_KEY, data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
       setToken(data.token);
-      setUser(data.user);
+      setUser(u);
     } finally {
       setIsLoading(false);
     }
@@ -86,11 +149,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthTokenGetter(null);
   }, []);
 
+  const planStatus = computePlanStatus(user);
+  const trialDaysLeft = computeTrialDaysLeft(user);
+  const canAccessAI = planStatus === "beta" || planStatus === "trial";
+
   return (
     <AuthContext.Provider value={{
       user, token, isLoading,
       login, signup, logout,
       isAuthenticated: !!user && !!token,
+      canAccessAI,
+      trialDaysLeft,
+      planStatus,
+      refreshUser,
     }}>
       {children}
     </AuthContext.Provider>

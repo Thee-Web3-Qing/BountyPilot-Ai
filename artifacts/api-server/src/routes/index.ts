@@ -10,6 +10,8 @@ import { dashboardRouter } from "./dashboard";
 import { demoRouter } from "./demo";
 import { settingsRouter } from "./settings";
 import { discoverRouter } from "./discover";
+import { waitlistRouter } from "./waitlist";
+import { adminRouter } from "./admin";
 
 const router: IRouter = Router();
 
@@ -24,5 +26,7 @@ router.use("/dashboard", dashboardRouter);
 router.use("/demo", demoRouter);
 router.use("/settings", settingsRouter);
 router.use("/discover", discoverRouter);
+router.use("/waitlist", waitlistRouter);
+router.use("/admin", adminRouter);
 
 export default router;

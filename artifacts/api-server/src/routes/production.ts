@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { generateProductionPlan } from "../lib/qwen.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { requireActivePlan } from "../lib/access.js";
 
 export const productionRouter = Router();
 
@@ -29,7 +30,7 @@ productionRouter.get("/bounty/:bountyId", async (req, res) => {
 });
 
 // POST /production-plans/bounty/:bountyId/generate — (re)generate with AI
-productionRouter.post("/bounty/:bountyId/generate", requireAuth, async (req: AuthRequest, res) => {
+productionRouter.post("/bounty/:bountyId/generate", requireAuth, requireActivePlan, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const bountyId = parseInt(req.params.bountyId);

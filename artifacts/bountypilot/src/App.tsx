@@ -18,6 +18,8 @@ import { Profile } from "./pages/profile";
 import { Settings } from "./pages/settings";
 import { Discover } from "./pages/discover";
 import { Landing } from "./pages/landing";
+import { Waitlist } from "./pages/waitlist";
+import { Admin } from "./pages/admin";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +40,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/waitlist" component={Waitlist} />
       <Route path="/" nest>
         {isAuthenticated ? (
           <Layout>
@@ -51,6 +54,7 @@ function Router() {
               <Route path="/earnings" component={Earnings} />
               <Route path="/profile" component={Profile} />
               <Route path="/settings" component={Settings} />
+              <Route path="/admin" component={Admin} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

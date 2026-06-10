@@ -35,10 +35,10 @@ export function Landing() {
           </button>
           <Button
             size="sm"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/waitlist")}
             className="font-mono text-xs uppercase tracking-wider"
           >
-            Get Started
+            Join Waitlist
           </Button>
         </div>
       </header>
@@ -63,10 +63,10 @@ export function Landing() {
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <Button
             size="lg"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/waitlist")}
             className="font-mono uppercase tracking-wider text-sm w-full sm:w-auto"
           >
-            Start for Free <ArrowRight className="w-4 h-4 ml-2" />
+            Request Early Access <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
           <button
             onClick={() => navigate("/login")}
