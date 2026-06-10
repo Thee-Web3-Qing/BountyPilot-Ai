@@ -6,12 +6,28 @@ import { eq } from "drizzle-orm";
 
 export type Plan = "beta" | "pending" | "trial" | "expired";
 
+const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
+const GRACE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in ms
+const GRACE_END = new Date(HACKATHON_DEADLINE.getTime() + GRACE_MS); // Aug 10
+
+// Pre-hackathon users (trialEndsAt == Aug 7) get a 3-day grace period after Aug 7.
+// Post-hackathon users have their own trialEndsAt (now + 7 days at signup).
+function effectiveTrialEnd(trialEndsAt: Date | null): Date | null {
+  if (!trialEndsAt) return null;
+  const endsAt = new Date(trialEndsAt);
+  const now = new Date();
+  if (endsAt.getTime() <= HACKATHON_DEADLINE.getTime() + 60_000 && now > HACKATHON_DEADLINE) {
+    return GRACE_END;
+  }
+  return endsAt;
+}
+
 export function getPlanStatus(plan: string, trialEndsAt: Date | null): Plan {
   if (plan === "beta") return "beta";
-  if (plan === "pending") return "pending";
-  if (plan === "trial" || plan === "active") {
-    if (!trialEndsAt) return "trial";
-    return trialEndsAt > new Date() ? "trial" : "expired";
+  if (plan === "trial" || plan === "pending") {
+    const effEnd = effectiveTrialEnd(trialEndsAt);
+    if (!effEnd) return "trial";
+    return effEnd > new Date() ? "trial" : "expired";
   }
   return "expired";
 }
@@ -38,12 +54,7 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
   }
 
   if (!canAccessAI(user.plan, user.trialEndsAt)) {
-    const status = getPlanStatus(user.plan, user.trialEndsAt);
-    if (status === "pending") {
-      res.status(403).json({ error: "waitlist_pending", message: "You're on the waitlist — we'll notify you when your access is approved." });
-    } else {
-      res.status(403).json({ error: "trial_expired", message: "Your trial has ended. Upgrade to continue using AI features." });
-    }
+    res.status(403).json({ error: "trial_expired", message: "Your trial has ended. Subscription coming soon." });
     return;
   }
 
@@ -51,12 +62,7 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
 }
 
 export function getTrialDays(): number {
-  const launchDate = process.env.LAUNCH_DATE ? new Date(process.env.LAUNCH_DATE) : null;
-  if (!launchDate) return 14;
-  const now = new Date();
-  const monthsPostLaunch = (now.getTime() - launchDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
-  if (monthsPostLaunch <= 3) return 7;
-  return 3;
+  return 7;
 }
 
 export function trialEndsAt(days: number): Date {

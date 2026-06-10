@@ -37,9 +37,13 @@ authRouter.post("/signup", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    // All signups get full trial access until hackathon judging closes
     const plan = "trial";
-    const trialEnd = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
+    const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z");
+    const now = new Date();
+    // Before Aug 7: open access until hackathon closes. After Aug 7: 7-day trial.
+    const trialEnd = now < HACKATHON_DEADLINE
+      ? HACKATHON_DEADLINE
+      : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const [user] = await db
       .insert(usersTable)

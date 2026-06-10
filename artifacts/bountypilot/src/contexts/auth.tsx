@@ -33,19 +33,35 @@ const USER_KEY = "bountypilot_user";
 const API_BASE = "/api";
 
 const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
+const GRACE_END = new Date(HACKATHON_DEADLINE.getTime() + 3 * 24 * 60 * 60 * 1000); // Aug 10
+
+// Pre-hackathon users (trialEndsAt == Aug 7) get a 3-day grace period after Aug 7.
+function effectiveTrialEnd(user: User | null): Date | null {
+  if (!user?.trialEndsAt) return null;
+  const endsAt = new Date(user.trialEndsAt);
+  const now = new Date();
+  if (endsAt.getTime() <= HACKATHON_DEADLINE.getTime() + 60_000 && now > HACKATHON_DEADLINE) {
+    return GRACE_END;
+  }
+  return endsAt;
+}
 
 function computePlanStatus(user: User | null): Plan | null {
   if (!user) return null;
   if (user.plan === "beta") return "beta";
   if (user.plan === "trial" || user.plan === "pending") {
-    return HACKATHON_DEADLINE > new Date() ? "trial" : "expired";
+    const effEnd = effectiveTrialEnd(user);
+    if (!effEnd) return "trial";
+    return effEnd > new Date() ? "trial" : "expired";
   }
   return "expired";
 }
 
 function computeTrialDaysLeft(user: User | null): number | null {
-  if (!user) return null;
-  const ms = HACKATHON_DEADLINE.getTime() - Date.now();
+  if (!user || user.plan === "beta") return null;
+  const effEnd = effectiveTrialEnd(user);
+  if (!effEnd) return null;
+  const ms = effEnd.getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
