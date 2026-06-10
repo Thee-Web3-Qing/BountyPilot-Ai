@@ -49,6 +49,7 @@ interface PlatformBountyHint {
   deadline?: string;
   projectName?: string;
   description?: string;
+  type?: string;
 }
 
 interface PlatformConfig {
@@ -62,6 +63,7 @@ interface PlatformConfig {
 const BOUNTY_PATH_PATTERNS = [
   /\/listing\/[^"'\s>?#]+/gi,
   /\/bounty\/[^"'\s>?#]+/gi,
+  /\/bug-bounty\/[^"'\s>?#]+/gi,
   /\/earn\/[^"'\s>?#]+/gi,
   /\/task\/[^"'\s>?#]+/gi,
   /\/quest\/[^"'\s>?#]+/gi,
@@ -70,6 +72,15 @@ const BOUNTY_PATH_PATTERNS = [
   /\/campaign\/[^"'\s>?#]+/gi,
   /\/challenge\/[^"'\s>?#]+/gi,
   /\/program\/[^"'\s>?#]+/gi,
+  /\/job\/[^"'\s>?#]+/gi,
+  /\/jobs\/[^"'\s>?#]+/gi,
+  /\/contest\/[^"'\s>?#]+/gi,
+  /\/competition\/[^"'\s>?#]+/gi,
+  /\/hackathon\/[^"'\s>?#]+/gi,
+  /\/grants\/[^"'\s>?#]+/gi,
+  /\/position\/[^"'\s>?#]+/gi,
+  /\/role\/[^"'\s>?#]+/gi,
+  /\/work\/[^"'\s>?#]+/gi,
   /\/bounties\/[a-z0-9-]{8,}/gi,
 ];
 
@@ -148,13 +159,19 @@ const NAV_PAGES = new Set([
   "safelist","blocklist","allowlist","denylist",
 ]);
 
+const VALID_BOUNTY_SEGMENTS = new Set(["information", "scope", "resources", "submit", "apply", "details"]);
+
 function isValidSlug(url: string): boolean {
   try {
     const u = new URL(url);
-    const lastSegment = u.pathname.split("/").filter(Boolean).pop() || "";
+    const segments = u.pathname.split("/").filter(Boolean);
+    const lastSegment = segments.pop() || "";
     if (BAD_SLUGS.test(lastSegment)) return false;
     if (lastSegment.length < GOOD_SLUG_MIN) return false;
-    if (NAV_PAGES.has(lastSegment.toLowerCase())) return false;
+    if (NAV_PAGES.has(lastSegment.toLowerCase())) {
+      // Allow known valid bounty sub-paths (e.g. /bug-bounty/ethena/information/)
+      if (!VALID_BOUNTY_SEGMENTS.has(lastSegment.toLowerCase())) return false;
+    }
     return true;
   } catch {
     return false;
@@ -208,10 +225,11 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
     const data = await resp.json() as Array<Record<string, unknown>>;
     const items = Array.isArray(data) ? data : (data as Record<string, unknown[]>).bounties || [];
     return (items as Array<Record<string, unknown>>)
-      .filter((b) => b.type !== "hackathon" && b.status === "OPEN")
-      .slice(0, 8)
+      .filter((b) => b.status === "OPEN")
+      .slice(0, 10)
       .map((b) => {
         const sponsor = b.sponsor as Record<string, unknown> | undefined;
+        const listingType = b.type as string | undefined;
         return {
           url: `https://earn.superteam.fun/listing/${b.slug}`,
           title: b.title as string | undefined,
@@ -219,6 +237,7 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
           rewardCurrency: (b.token as string | undefined) || "USDC",
           deadline: b.deadline as string | undefined,
           projectName: (sponsor?.name as string | undefined) || (b.sponsorName as string | undefined),
+          type: listingType === "project" ? "Job" : undefined,
         };
       });
   } catch (e) {
@@ -230,14 +249,14 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
 // ─── First Dollar — public JSON API ─────────────────────────
 async function fetchFirstDollar(): Promise<PlatformBountyHint[]> {
   try {
-    const resp = await fetch("https://app.firstdollar.money/api/bounties?limit=12&status=open", {
+    const resp = await fetch("https://app.firstdollar.money/api/bounties?limit=12", {
       headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json() as { success?: boolean; data?: Array<Record<string, unknown>> };
-    const items = (data.data || []).filter((b) => b.status !== "completed").slice(0, 8);
+    const items = (data.data || []).filter((b) => b.status === "published").slice(0, 8);
 
     // Enrich with individual bounty data for reward/deadline
     const hints: PlatformBountyHint[] = await Promise.all(
@@ -292,44 +311,21 @@ async function fetchFirstDollar(): Promise<PlatformBountyHint[]> {
 
 // ─── Gitcoin Grants — public rounds API ─────────────────────
 async function fetchGitcoin(): Promise<PlatformBountyHint[]> {
-  try {
-    // Gitcoin pivoted to Grants Stack — fetch active rounds
-    const resp = await fetch(
-      "https://grants-stack-indexer-v2.gitcoin.co/api/v1/rounds?first=6&orderBy=createdAtBlock&orderDirection=desc&chainId=1",
-      {
-        headers: { Accept: "application/json", "User-Agent": "BountyPilot/1.0" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(12000),
-      }
-    );
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json() as { rounds?: Array<Record<string, unknown>> };
-    return (data.rounds || []).slice(0, 5).map((r) => ({
-      url: `https://explorer.gitcoin.co/#/round/${r.chainId}/${r.id}`,
-      title: r.roundMetadata ? (r.roundMetadata as Record<string, unknown>).name as string : (r.id as string),
-      projectName: "Gitcoin Grants",
-      description: r.roundMetadata ? (r.roundMetadata as Record<string, unknown>).description as string : undefined,
-    }));
-  } catch (e) {
-    logger.warn({ err: e }, "Gitcoin Grants API fetch failed");
-    return [];
-  }
+  // Gitcoin's grants API is no longer publicly available; rely on generic HTML scraper
+  return [];
 }
 
 // ─── Galxe — GraphQL campaigns API ─────────────────────────
 async function fetchGalxe(): Promise<PlatformBountyHint[]> {
   try {
     const query = `query {
-      campaigns(input: { forAdmin: false, status: Active, types: [Content], first: 8 }) {
+      campaigns(input: { forAdmin: false, status: Active, first: 8 }) {
         list {
           id
           name
           description
-          thumbnail
           space { name }
           endTime
-          rewardType
-          tokenReward { token { symbol } tokenAmount }
         }
       }
     }`;
@@ -340,20 +336,20 @@ async function fetchGalxe(): Promise<PlatformBountyHint[]> {
       signal: AbortSignal.timeout(12000),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json() as { data?: { campaigns?: { list?: Array<Record<string, unknown>> } } };
+    const data = await resp.json() as { data?: { campaigns?: { list?: Array<Record<string, unknown>> } }; errors?: Array<unknown> };
+    if (data.errors) {
+      logger.warn({ errors: data.errors }, "Galxe GraphQL errors");
+      return [];
+    }
     const list = data?.data?.campaigns?.list || [];
     return list.slice(0, 8).map((c) => {
       const space = c.space as Record<string, unknown> | undefined;
-      const tokenReward = c.tokenReward as Record<string, unknown> | undefined;
-      const token = tokenReward?.token as Record<string, unknown> | undefined;
       const endTime = c.endTime ? new Date(Number(c.endTime) * 1000).toISOString().split("T")[0] : undefined;
       return {
-        url: `https://galxe.com/quest/${c.id}`,
+        url: `https://galxe.com/campaign/${c.id}`,
         title: c.name as string | undefined,
         projectName: space?.name as string | undefined,
         description: c.description as string | undefined,
-        rewardAmount: tokenReward?.tokenAmount != null ? String(tokenReward.tokenAmount) : undefined,
-        rewardCurrency: token?.symbol as string | undefined,
         deadline: endTime,
       };
     });
@@ -690,18 +686,6 @@ const PLATFORMS: PlatformConfig[] = [
     maxBounties: 5,
   },
   {
-    name: "Scouts",
-    listingUrl: "https://scouts.yutori.com",
-    fetchLinks: genericLinkExtractor,
-    maxBounties: 5,
-  },
-  {
-    name: "Anthum AI",
-    listingUrl: "https://anthum.ai",
-    fetchLinks: genericLinkExtractor,
-    maxBounties: 5,
-  },
-  {
     name: "Layer3",
     listingUrl: "https://layer3.xyz/quests",
     fetchLinks: (html, base) => {
@@ -713,12 +697,6 @@ const PLATFORMS: PlatformConfig[] = [
   {
     name: "Dework",
     listingUrl: "https://app.dework.xyz/bounties",
-    fetchLinks: genericLinkExtractor,
-    maxBounties: 5,
-  },
-  {
-    name: "Whop",
-    listingUrl: "https://whop.com/discover",
     fetchLinks: genericLinkExtractor,
     maxBounties: 5,
   },
@@ -742,7 +720,7 @@ const PLATFORMS: PlatformConfig[] = [
     listingUrl: "https://galxe.com/quests",
     fetchLinks: (html, base) => {
       const hints = genericLinkExtractor(html, base);
-      return hints.filter((h) => h.url.includes("/quest/")).slice(0, 8);
+      return hints.filter((h) => h.url.includes("/quest/") || h.url.includes("/campaign/")).slice(0, 8);
     },
     maxBounties: 8,
   },
@@ -751,6 +729,43 @@ const PLATFORMS: PlatformConfig[] = [
     listingUrl: "https://zealy.io/explore",
     fetchLinks: genericLinkExtractor,
     maxBounties: 6,
+  },
+  // ─── Jobs, Grants, Contests, Hackathons ─────────────────────
+  {
+    name: "Web3 Careers",
+    listingUrl: "https://web3.careers",
+    fetchLinks: (html, base) => {
+      const hints = genericLinkExtractor(html, base);
+      return hints.filter((h) => h.url.includes("/job/")).slice(0, 6);
+    },
+    maxBounties: 6,
+  },
+  {
+    name: "Crypto Jobs",
+    listingUrl: "https://crypto.jobs",
+    fetchLinks: (html, base) => {
+      const hints = genericLinkExtractor(html, base);
+      return hints.filter((h) => h.url.includes("/c/") || h.url.includes("/job/")).slice(0, 6);
+    },
+    maxBounties: 6,
+  },
+  {
+    name: "Devpost",
+    listingUrl: "https://devpost.com/hackathons",
+    fetchLinks: (html, base) => {
+      const hints = genericLinkExtractor(html, base);
+      return hints.filter((h) => h.url.includes("/hackathon/")).slice(0, 6);
+    },
+    maxBounties: 6,
+  },
+  {
+    name: "Gitcoin Grants",
+    listingUrl: "https://explorer.gitcoin.co",
+    fetchLinks: (html, base) => {
+      const hints = genericLinkExtractor(html, base);
+      return hints.filter((h) => h.url.includes("/round/")).slice(0, 5);
+    },
+    maxBounties: 5,
   },
 ];
 
@@ -772,7 +787,7 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
   }
 
   try {
-    const scraped = await scrapeBounty(hint.url);
+    const scraped = await scrapeBounty(hint.url, hint.type);
 
     // Merge API hint data over scraped data — API is authoritative for reward/deadline
     const merged = {
@@ -802,6 +817,7 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
       opportunityScore: analysis.opportunityScore,
       scoreExplanation: analysis.scoreExplanation,
       confidenceScore: scraped.confidenceScore,
+      opportunityType: scraped.opportunityType,
       status: "discovered",
     });
     return true;

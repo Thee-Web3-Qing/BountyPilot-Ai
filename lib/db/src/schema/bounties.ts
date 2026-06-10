@@ -21,6 +21,7 @@ export const bountiesTable = pgTable("bounties", {
   opportunityScore: integer("opportunity_score"),
   scoreExplanation: text("score_explanation"),
   confidenceScore: integer("confidence_score"),
+  opportunityType: text("opportunity_type").default("Bounty"),
   status: text("status").notNull().default("discovered"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

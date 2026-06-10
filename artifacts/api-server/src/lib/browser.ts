@@ -26,6 +26,7 @@ async function getBrowser(): Promise<Browser> {
       "/usr/bin/chromium",
       "/usr/bin/google-chrome",
       "/usr/bin/google-chrome-stable",
+      "/nix/store/kcvsxrmgwp3ffz5jijyy7wn9fcsjl4hz-playwright-browsers-1.55.0-with-cjk/chromium-1187/chrome-linux/chrome",
     ];
     for (const p of candidates) {
       try { execSync(`test -x ${p}`); executablePath = p; break; } catch {}

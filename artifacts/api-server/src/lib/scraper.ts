@@ -12,6 +12,7 @@ export interface ScrapedBounty {
   eligibilityRules: string;
   importantNotes: string;
   confidenceScore?: number;
+  opportunityType?: string;
 }
 
 function extractReward(text: string): { amount: string | null; currency: string | null } {
@@ -128,6 +129,28 @@ function detectPlatform(url: string): string {
   if (url.includes("questbook")) return "Questbook";
   if (url.includes("layer3")) return "Layer3";
   if (url.includes("dework")) return "Dework";
+  if (url.includes("immunefi")) return "Immunefi";
+  if (url.includes("wizzhq")) return "WIZZ";
+  if (url.includes("galxe")) return "Galxe";
+  if (url.includes("zealy")) return "Zealy";
+  if (url.includes("whop")) return "Whop";
+  if (url.includes("cre8core")) return "Cre8core";
+  if (url.includes("hashly")) return "Hashly";
+  if (url.includes("klout")) return "Klout";
+  if (url.includes("arena.social")) return "Arena Social";
+  if (url.includes("duelduck")) return "Duel Duck";
+  if (url.includes("wpl") || url.includes("wp1")) return "WPL Earn";
+  if (url.includes("rova")) return "Rova";
+  if (url.includes("mindo")) return "MindoAI";
+  if (url.includes("scribble")) return "Scribble";
+  if (url.includes("elevenlabs")) return "ElevenLabs Creative";
+  if (url.includes("scouts")) return "Scouts";
+  if (url.includes("anthum")) return "Anthum AI";
+  if (url.includes("dework")) return "Dework";
+  if (url.includes("job")) return "Job Board";
+  if (url.includes("contest")) return "Contest";
+  if (url.includes("competition")) return "Competition";
+  if (url.includes("hackathon")) return "Hackathon";
   return "Unknown Platform";
 }
 
@@ -201,7 +224,8 @@ async function trySupeteamAPI(url: string): Promise<Partial<ScrapedBounty> | nul
 }
 
 export async function scrapeBounty(
-  url: string
+  url: string,
+  type?: string,
 ): Promise<ScrapedBounty & { platform: string; rawText: string }> {
   const platform = detectPlatform(url);
 
@@ -330,7 +354,22 @@ export async function scrapeBounty(
     eligibilityRules: "Open to all creators — check platform listing for specific eligibility.",
     importantNotes: notesArr.join(". "),
     platform,
+    opportunityType: type || detectOpportunityType(url, searchText),
     rawText: searchText.slice(0, 4000),
     confidenceScore,
   };
+}
+
+function detectOpportunityType(url: string, text: string): string {
+  const u = url.toLowerCase();
+  const t = text.toLowerCase();
+  if (u.includes("/job/") || u.includes("/jobs/") || u.includes("/careers/") || t.includes("full-time") || t.includes("part-time") || t.includes("hire")) return "Job";
+  if (u.includes("/contest/") || u.includes("/competition/") || t.includes("contest") || t.includes("competition") || t.includes("winners")) return "Contest";
+  if (u.includes("/hackathon/") || t.includes("hackathon")) return "Hackathon";
+  if (u.includes("/grant/") || u.includes("/grants/") || t.includes("grant")) return "Grant";
+  if (u.includes("/task/") || u.includes("/mission/") || t.includes("task") || t.includes("mission")) return "Task";
+  if (u.includes("/campaign/") || u.includes("/quest/") || t.includes("campaign") || t.includes("quest")) return "Campaign";
+  if (u.includes("/bug-bounty/") || u.includes("/bug/") || t.includes("bug bounty") || t.includes("security")) return "Bug Bounty";
+  if (u.includes("/bounty/") || u.includes("/bounties/") || t.includes("bounty")) return "Bounty";
+  return "Bounty";
 }

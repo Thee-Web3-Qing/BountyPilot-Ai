@@ -28,6 +28,7 @@ interface DiscoveredBounty {
   opportunityScore: number | null;
   scoreExplanation: string | null;
   confidenceScore: number | null;
+  opportunityType: string | null;
   status: string;
   createdAt: string;
 }
@@ -169,6 +170,11 @@ function DetailDrawer({
               {bounty.contentFormat && (
                 <span className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
                   {bounty.contentFormat}
+                </span>
+              )}
+              {bounty.opportunityType && bounty.opportunityType !== "Bounty" && (
+                <span className="font-mono text-[10px] border border-amber-500/30 bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+                  {bounty.opportunityType}
                 </span>
               )}
             </div>
@@ -350,6 +356,11 @@ function BountyCard({
             {bounty.contentFormat.split("/")[0].trim()}
           </span>
         )}
+        {bounty.opportunityType && bounty.opportunityType !== "Bounty" && (
+          <span className="font-mono text-[10px] border border-amber-500/30 bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+            {bounty.opportunityType}
+          </span>
+        )}
 
         {dl !== null && (
           <span className={`font-mono text-[10px] flex items-center gap-1 whitespace-nowrap ${dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-muted-foreground"}`}>
@@ -395,6 +406,7 @@ export function Discover() {
   const [triggering, setTriggering] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPlatform, setFilterPlatform] = useState("");
+  const [filterType, setFilterType] = useState("");
   const [forYouMode, setForYouMode] = useState(false);
   const [selected, setSelected] = useState<DiscoveredBounty | null>(null);
   const [, navigate] = useLocation();
@@ -464,6 +476,7 @@ export function Discover() {
   };
 
   const platforms = [...new Set(bounties.map((b) => b.platform).filter(Boolean))] as string[];
+  const opportunityTypes = [...new Set(bounties.map((b) => b.opportunityType).filter(Boolean))] as string[];
 
   const hasProfileFilter = profile && (
     (profile.minimumReward && profile.minimumReward > 0) ||
@@ -478,12 +491,14 @@ export function Discover() {
     .filter((b) => {
       if (forYouMode && hasProfileFilter && !matchesProfile(b, profile!)) return false;
       if (filterPlatform && b.platform !== filterPlatform) return false;
+      if (filterType && b.opportunityType !== filterType) return false;
       if (search) {
         const q = search.toLowerCase();
         return (
           b.title?.toLowerCase().includes(q) ||
           b.platform?.toLowerCase().includes(q) ||
-          b.projectName?.toLowerCase().includes(q)
+          b.projectName?.toLowerCase().includes(q) ||
+          b.opportunityType?.toLowerCase().includes(q)
         );
       }
       return true;
@@ -574,7 +589,7 @@ export function Discover() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search bounties…"
+          placeholder="Search opportunities…"
           className="pl-9 font-mono text-sm bg-background"
         />
       </div>
@@ -601,21 +616,37 @@ export function Discover() {
         )}
 
         <button
-          onClick={() => { setFilterPlatform(""); setForYouMode(false); }}
-          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform && !forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+          onClick={() => { setFilterPlatform(""); setFilterType(""); setForYouMode(false); }}
+          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform && !filterType && !forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
         >
           All ({bounties.length})
         </button>
         {platforms.map((p) => (
           <button
             key={p}
-            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setForYouMode(false); }}
+            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setFilterType(""); setForYouMode(false); }}
             className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
           >
             {p} ({bounties.filter((b) => b.platform === p).length})
           </button>
         ))}
       </div>
+
+      {/* Opportunity type filter */}
+      {opportunityTypes.length > 0 && (
+        <div className="flex gap-1.5 flex-wrap">
+          <span className="font-mono text-[11px] text-muted-foreground/60 px-1 py-1">Type:</span>
+          {opportunityTypes.map((t) => (
+            <button
+              key={t}
+              onClick={() => { setFilterType(filterType === t ? "" : t); setFilterPlatform(""); setForYouMode(false); }}
+              className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterType === t ? "bg-amber-500 text-black border-amber-500" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              {t} ({bounties.filter((b) => b.opportunityType === t).length})
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* For You context banner */}
       {forYouMode && profile && (
@@ -641,7 +672,7 @@ export function Discover() {
           <Globe className="w-10 h-10 text-muted-foreground/30" />
           <div>
             <p className="font-mono text-sm text-muted-foreground">
-              {forYouMode ? "No bounties match your profile yet" : "No bounties yet"}
+              {forYouMode ? "No opportunities match your profile yet" : "No opportunities yet"}
             </p>
             <p className="font-mono text-xs text-muted-foreground/50 mt-1">
               {forYouMode
@@ -663,7 +694,7 @@ export function Discover() {
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          <p className="font-mono text-xs text-muted-foreground">{filtered.length} bounties{forYouMode ? " matching your profile" : ""}</p>
+          <p className="font-mono text-xs text-muted-foreground">{filtered.length} opportunities{forYouMode ? " matching your profile" : ""}</p>
           {filtered.map((bounty) => (
             <BountyCard
               key={bounty.id}
