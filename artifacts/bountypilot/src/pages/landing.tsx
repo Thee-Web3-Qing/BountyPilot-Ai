@@ -63,16 +63,16 @@ export function Landing() {
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <Button
             size="lg"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/waitlist")}
             className="font-mono uppercase tracking-wider text-sm w-full sm:w-auto"
           >
-            Create Free Account <ArrowRight className="w-4 h-4 ml-2" />
+            Join the Waitlist <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
           <button
             onClick={() => navigate("/login")}
             className="font-mono text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Already have an account →
+            Already have access? Sign In →
           </button>
         </div>
       </section>
@@ -165,14 +165,14 @@ export function Landing() {
             Ready to start<br />earning from bounties?
           </h2>
           <p className="font-mono text-sm text-muted-foreground">
-            Free to use. No credit card required.
+            Limited beta. 1000 spots. 14-day free trial.
           </p>
           <Button
             size="lg"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/waitlist")}
             className="font-mono uppercase tracking-wider text-sm"
           >
-            Create Your Account <ArrowRight className="w-4 h-4 ml-2" />
+            Join the Waitlist <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
       </section>

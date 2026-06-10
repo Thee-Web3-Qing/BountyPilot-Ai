@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
+import { AIFeatureGate } from "@/components/trial-gate";
 
 const STATUS_COLORS: Record<string, string> = {
   discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -436,17 +437,19 @@ export function BountyDetail() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Research Brief</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateBrief}
-              disabled={generatingBrief}
-              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
-            >
-              {generatingBrief
-                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
-                : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
-            </Button>
+            <AIFeatureGate>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateBrief}
+                disabled={generatingBrief}
+                className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+              >
+                {generatingBrief
+                  ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                  : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
+              </Button>
+            </AIFeatureGate>
           </CardHeader>
           <CardContent className="text-sm">
             {brief ? (
@@ -476,17 +479,19 @@ export function BountyDetail() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Production Plan</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGeneratePlan}
-              disabled={generatingPlan}
-              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
-            >
-              {generatingPlan
-                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
-                : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
-            </Button>
+            <AIFeatureGate>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGeneratePlan}
+                disabled={generatingPlan}
+                className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+              >
+                {generatingPlan
+                  ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                  : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
+              </Button>
+            </AIFeatureGate>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
             {plan ? (

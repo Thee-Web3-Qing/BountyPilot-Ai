@@ -20,6 +20,7 @@ import { Discover } from "./pages/discover";
 import { Landing } from "./pages/landing";
 
 import { Admin } from "./pages/admin";
+import { Waitlist } from "./pages/waitlist";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/waitlist" component={Waitlist} />
       <Route path="/" nest>
         {isAuthenticated ? (
           <Layout>
