@@ -273,7 +273,7 @@ bountiesRouter.post("/:id/report", async (req: AuthRequest, res) => {
     const [bounty] = await db
       .select()
       .from(bountiesTable)
-      .where(eq(bountiesTable.id, id));
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
     if (!bounty) return res.status(404).json({ error: "Not found" });
     // Check if user already reported this bounty
     const existing = await db
