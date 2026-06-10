@@ -154,3 +154,34 @@ adminRouter.post("/revoke/:userId", requireAuth, requireAdmin, async (req: AuthR
     res.status(500).json({ error: "Failed to revoke access" });
   }
 });
+
+adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const { plan } = req.body as { plan: string };
+    if (!["beta", "trial", "pending", "expired"].includes(plan)) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+    if (plan === "beta") {
+      const [betaCount] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.plan, "beta"));
+      if (Number(betaCount?.value ?? 0) >= 30) {
+        return res.status(400).json({ error: "Beta is full (30 creators max)" });
+      }
+    }
+    const updates: Record<string, any> = { plan };
+    if (plan === "trial") { updates.trialEndsAt = trialEndsAt(14); updates.approvedAt = new Date(); }
+    if (plan === "beta") { updates.trialEndsAt = null; updates.approvedAt = new Date(); }
+    if (plan === "pending" || plan === "expired") { updates.trialEndsAt = null; }
+    const [user] = await db
+      .update(usersTable)
+      .set(updates)
+      .where(eq(usersTable.id, userId))
+      .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    logger.info({ userId, plan }, "Admin set user plan");
+    res.json({ success: true, user });
+  } catch (err) {
+    logger.error(err, "Admin set-plan error");
+    res.status(500).json({ error: "Failed to update plan" });
+  }
+});
