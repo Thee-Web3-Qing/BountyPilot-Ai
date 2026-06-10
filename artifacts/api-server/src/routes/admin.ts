@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, bountiesTable, earningsTable } from "@workspace/db";
+import { usersTable, bountiesTable, earningsTable, bountyReportsTable } from "@workspace/db";
 import { eq, count, desc, gte, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -306,5 +306,80 @@ adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
   } catch (err) {
     logger.error(err, "Admin report error");
     res.status(500).json({ error: "Failed to get report" });
+  }
+});
+
+// GET /admin/bounty-reports
+adminRouter.get("/bounty-reports", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const reports = await db
+      .select()
+      .from(bountyReportsTable)
+      .where(eq(bountyReportsTable.status, "open"))
+      .orderBy(desc(bountyReportsTable.createdAt));
+    // Fetch bounty details for each
+    const allBounties = await db.select().from(bountiesTable);
+    const allUsers = await db.select({ id: usersTable.id, username: usersTable.username }).from(usersTable);
+    const enriched = reports.map(r => {
+      const b = allBounties.find(b => b.id === r.bountyId);
+      const u = allUsers.find(u => u.id === r.userId);
+      return {
+        ...r,
+        bounty: b ? { id: b.id, title: b.title, url: b.url, platform: b.platform, rewardAmount: b.rewardAmount } : null,
+        reportedBy: u?.username ?? "unknown",
+      };
+    });
+    res.json(enriched);
+  } catch (err) {
+    logger.error(err, "Admin bounty-reports error");
+    res.status(500).json({ error: "Failed to get reports" });
+  }
+});
+
+// POST /admin/bounty-reports/:id/resolve
+adminRouter.post("/bounty-reports/:id/resolve", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { resolution } = req.body as { resolution?: string };
+    const [report] = await db
+      .update(bountyReportsTable)
+      .set({ status: "resolved", resolvedAt: new Date(), resolvedBy: req.user!.userId, resolution: resolution || "resolved" })
+      .where(eq(bountyReportsTable.id, id))
+      .returning();
+    if (!report) return res.status(404).json({ error: "Report not found" });
+    logger.info({ reportId: id, resolution }, "Report resolved");
+    res.json({ success: true, report });
+  } catch (err) {
+    logger.error(err, "Admin resolve report error");
+    res.status(500).json({ error: "Failed to resolve" });
+  }
+});
+
+// DELETE /admin/bounty-reports/:id
+adminRouter.delete("/bounty-reports/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.delete(bountyReportsTable).where(eq(bountyReportsTable.id, id));
+    logger.info({ reportId: id }, "Report deleted");
+    res.status(204).send();
+  } catch (err) {
+    logger.error(err, "Admin delete report error");
+    res.status(500).json({ error: "Failed to delete" });
+  }
+});
+
+// DELETE /admin/bounty-reports/:id/remove-bounty
+adminRouter.delete("/bounty-reports/:id/remove-bounty", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [report] = await db.select().from(bountyReportsTable).where(eq(bountyReportsTable.id, id));
+    if (!report) return res.status(404).json({ error: "Report not found" });
+    await db.delete(bountiesTable).where(eq(bountiesTable.id, report.bountyId));
+    await db.delete(bountyReportsTable).where(eq(bountyReportsTable.bountyId, report.bountyId));
+    logger.info({ bountyId: report.bountyId, reportId: id }, "Bounty removed via report");
+    res.json({ success: true, bountyId: report.bountyId });
+  } catch (err) {
+    logger.error(err, "Admin remove bounty error");
+    res.status(500).json({ error: "Failed to remove" });
   }
 });

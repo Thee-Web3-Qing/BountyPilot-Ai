@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -89,7 +89,7 @@ const PLAN_LABEL: Record<string, string> = {
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);

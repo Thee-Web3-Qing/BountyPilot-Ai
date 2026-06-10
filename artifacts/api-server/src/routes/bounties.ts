@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   bountiesTable,
+  bountyReportsTable,
   researchBriefsTable,
   productionPlansTable,
   userProfilesTable,
@@ -256,6 +257,41 @@ bountiesRouter.post("/:id/rescrape", async (req: AuthRequest, res) => {
   } catch (err) {
     logger.error(err, "Error rescraping bounty");
     res.status(500).json({ error: "Failed to rescrape bounty" });
+  }
+});
+
+// POST /bounties/:id/report
+bountiesRouter.post("/:id/report", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const id = parseInt(req.params.id);
+    const { reason, note } = req.body as { reason?: string; note?: string };
+    const validReasons = ["broken_link", "wrong_info", "spam", "expired", "other"];
+    if (!reason || !validReasons.includes(reason)) {
+      return res.status(400).json({ error: "Invalid reason. Use: broken_link, wrong_info, spam, expired, other" });
+    }
+    const [bounty] = await db
+      .select()
+      .from(bountiesTable)
+      .where(eq(bountiesTable.id, id));
+    if (!bounty) return res.status(404).json({ error: "Not found" });
+    // Check if user already reported this bounty
+    const existing = await db
+      .select()
+      .from(bountyReportsTable)
+      .where(and(eq(bountyReportsTable.bountyId, id), eq(bountyReportsTable.userId, userId)));
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "You already reported this bounty" });
+    }
+    const [report] = await db
+      .insert(bountyReportsTable)
+      .values({ bountyId: id, userId, reason, note: note || null })
+      .returning();
+    logger.info({ bountyId: id, userId, reason }, "Bounty reported");
+    res.status(201).json(report);
+  } catch (err) {
+    logger.error(err, "Error reporting bounty");
+    res.status(500).json({ error: "Failed to report bounty" });
   }
 });
 

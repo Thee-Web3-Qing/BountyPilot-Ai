@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -80,6 +80,13 @@ export function BountyDetail() {
   // AI generation state
   const [generatingBrief, setGeneratingBrief] = useState(false);
   const [generatingPlan, setGeneratingPlan] = useState(false);
+
+  // Report state
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportNote, setReportNote] = useState("");
+  const [reporting, setReporting] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
 
   const handleStatusChange = (status: string) => {
     updateMutation.mutate(
@@ -170,6 +177,24 @@ export function BountyDetail() {
     }
   };
 
+  const handleReport = async () => {
+    if (!token || reporting || !reportReason) return;
+    setReporting(true);
+    try {
+      const resp = await fetch(`/api/bounties/${bountyId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: reportReason, note: reportNote || undefined }),
+      });
+      if (resp.ok) {
+        setReportSent(true);
+        setTimeout(() => { setShowReport(false); setReportSent(false); setReportReason(""); setReportNote(""); }, 2000);
+      }
+    } finally {
+      setReporting(false);
+    }
+  };
+
   if (loadingBounty) {
     return (
       <div className="flex flex-col gap-6">
@@ -223,7 +248,7 @@ export function BountyDetail() {
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-2">
           {bounty.opportunityScore != null && (
             <div className="flex items-baseline gap-1">
               <span className={`text-5xl font-bold font-mono ${SCORE_COLOR(bounty.opportunityScore)}`}>
@@ -236,6 +261,12 @@ export function BountyDetail() {
             {bounty.rewardAmount ? `$${bounty.rewardAmount}` : "TBD"}
             {bounty.rewardCurrency && <span className="text-sm ml-1 text-muted-foreground">{bounty.rewardCurrency}</span>}
           </span>
+          <button
+            onClick={() => setShowReport(true)}
+            className="text-[10px] font-mono text-muted-foreground hover:text-red-400 transition-colors flex items-center gap-1"
+          >
+            <Flag className="w-3 h-3" /> Report
+          </button>
         </div>
       </div>
 
@@ -515,6 +546,91 @@ export function BountyDetail() {
           </CardContent>
         </Card>
       )}
+
+      <ReportModal
+        show={showReport}
+        onClose={() => setShowReport(false)}
+        reason={reportReason}
+        setReason={setReportReason}
+        note={reportNote}
+        setNote={setReportNote}
+        onSubmit={handleReport}
+        sending={reporting}
+        sent={reportSent}
+      />
+    </div>
+  );
+}
+
+function ReportModal({ show, onClose, reason, setReason, note, setNote, onSubmit, sending, sent }: {
+  show: boolean; onClose: () => void; reason: string; setReason: (r: string) => void;
+  note: string; setNote: (n: string) => void; onSubmit: () => void; sending: boolean; sent: boolean;
+}) {
+  if (!show) return null;
+  const reasons = [
+    { key: "broken_link", label: "Broken link" },
+    { key: "wrong_info", label: "Wrong information" },
+    { key: "spam", label: "Spam / scam" },
+    { key: "expired", label: "Bounty expired" },
+    { key: "other", label: "Other" },
+  ];
+  return (
+    <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full bg-card border-t border-border rounded-t-2xl p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-mono font-bold text-base flex items-center gap-2"><Flag className="w-4 h-4 text-red-400" /> Report Bounty</p>
+            <p className="text-xs text-muted-foreground mt-1">Flag this opportunity so the admin can review it.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded"><X className="w-4 h-4" /></button>
+        </div>
+        {sent ? (
+          <div className="text-center py-6">
+            <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+            <p className="font-mono text-sm text-green-400">Report sent. Thanks for helping keep the platform clean.</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Reason</p>
+              <div className="grid grid-cols-2 gap-2">
+                {reasons.map(r => (
+                  <button
+                    key={r.key}
+                    onClick={() => setReason(r.key)}
+                    className={`text-left px-3 py-2 rounded-lg border text-xs font-mono transition-colors ${
+                      reason === r.key
+                        ? "bg-red-500/10 border-red-500/30 text-red-400"
+                        : "bg-card border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Note <span className="normal-case text-muted-foreground/50">(optional)</span></p>
+              <textarea
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="Describe the issue in more detail..."
+                rows={3}
+                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-red-400/50 transition-colors resize-none placeholder:text-muted-foreground/50"
+              />
+            </div>
+            <Button
+              onClick={onSubmit}
+              disabled={sending || !reason}
+              className="w-full font-mono uppercase tracking-wider bg-red-500 hover:bg-red-400 text-white"
+            >
+              {sending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {sending ? "Sending..." : "Send Report"}
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
