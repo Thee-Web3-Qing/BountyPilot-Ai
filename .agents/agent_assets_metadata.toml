@@ -6,3 +6,9 @@ id = "L2dntPalA3OxLGXTqVtHj"
 uri = "file://attached_assets/architecture.svg"
 type = "image"
 title = "BountyPilot AI — Architecture Diagram (Updated)"
+
+[[outputs]]
+id = "JxltjFlgILA7w53Wob04e"
+uri = "file://attached_assets/project_story.md"
+type = "text"
+title = "Project Story — Submission Text"
