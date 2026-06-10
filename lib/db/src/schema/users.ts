@@ -9,7 +9,6 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   plan: text("plan").notNull().default("pending"),
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
-  waitlistPosition: integer("waitlist_position"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   isAdmin: boolean("is_admin").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

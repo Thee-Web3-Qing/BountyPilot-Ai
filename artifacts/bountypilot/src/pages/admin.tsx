@@ -15,7 +15,6 @@ interface AdminUser {
 }
 
 interface Stats {
-  waitlistSignups: number;
   beta: number;
   pending: number;
   trial: number;
@@ -62,7 +61,7 @@ interface ReportData {
   topEarners: { username: string; amount: number }[];
 }
 
-const PLANS = ["beta", "trial", "pending", "expired"] as const;
+const PLANS = ["beta", "trial", "expired"] as const;
 type Plan = typeof PLANS[number];
 
 const API = "/api";
@@ -72,21 +71,18 @@ function authHeaders() { return { "Content-Type": "application/json", Authorizat
 const PLAN_STYLE: Record<string, string> = {
   beta:    "text-primary bg-primary/10 border-primary/30",
   trial:   "text-green-400 bg-green-500/10 border-green-500/30",
-  pending: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
   expired: "text-red-400 bg-red-500/10 border-red-500/30",
 };
 
 const PLAN_BTN: Record<string, string> = {
   beta:    "border-primary/40 text-primary hover:bg-primary/20 active:bg-primary/30",
   trial:   "border-green-500/40 text-green-400 hover:bg-green-500/20 active:bg-green-500/30",
-  pending: "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 active:bg-yellow-500/30",
   expired: "border-red-500/40 text-red-400 hover:bg-red-500/20 active:bg-red-500/30",
 };
 
 const PLAN_LABEL: Record<string, string> = {
   beta:    "Beta — full access, no expiry",
   trial:   "Trial — 14-day access",
-  pending: "Pending — waitlisted",
   expired: "Expired — access revoked",
 };
 
@@ -179,7 +175,7 @@ export function Admin() {
       {activeTab === "users" && (
         <>
           {stats && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { label: "Trial",      value: stats.trial,  sub: "active",   color: "text-green-400" },
                 { label: "Beta",       value: stats.beta,   sub: "/ 30 max", color: "text-primary" },

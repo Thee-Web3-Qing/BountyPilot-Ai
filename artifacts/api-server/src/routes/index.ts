@@ -9,7 +9,6 @@ import { earningsRouter } from "./earnings";
 import { dashboardRouter } from "./dashboard";
 import { settingsRouter } from "./settings";
 import { discoverRouter } from "./discover";
-import { waitlistRouter } from "./waitlist";
 import { adminRouter } from "./admin";
 import { mcpRouter } from "./mcp";
 
@@ -25,7 +24,6 @@ router.use("/earnings", earningsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/settings", settingsRouter);
 router.use("/discover", discoverRouter);
-router.use("/waitlist", waitlistRouter);
 router.use("/admin", adminRouter);
 router.use("/mcp", mcpRouter);
 

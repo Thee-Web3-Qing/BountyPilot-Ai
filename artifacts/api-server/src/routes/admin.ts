@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, waitlistTable, bountiesTable, earningsTable } from "@workspace/db";
+import { usersTable, bountiesTable, earningsTable } from "@workspace/db";
 import { eq, count, desc, gte, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -55,10 +55,8 @@ async function requireAdmin(req: AuthRequest, res: any, next: any) {
 
 adminRouter.get("/stats", requireAuth, requireAdmin, async (_req, res) => {
   try {
-    const [wlCount] = await db.select({ value: count() }).from(waitlistTable);
     const allUsers = await db.select({ plan: usersTable.plan }).from(usersTable);
     const stats = {
-      waitlistSignups: Number(wlCount?.value ?? 0),
       beta: allUsers.filter(u => u.plan === "beta").length,
       pending: allUsers.filter(u => u.plan === "pending").length,
       trial: allUsers.filter(u => u.plan === "trial").length,
@@ -91,16 +89,6 @@ adminRouter.get("/users", requireAuth, requireAdmin, async (_req, res) => {
   } catch (err) {
     logger.error(err, "Admin users error");
     res.status(500).json({ error: "Failed to get users" });
-  }
-});
-
-adminRouter.get("/waitlist", requireAuth, requireAdmin, async (_req, res) => {
-  try {
-    const entries = await db.select().from(waitlistTable).orderBy(waitlistTable.createdAt);
-    res.json(entries);
-  } catch (err) {
-    logger.error(err, "Admin waitlist error");
-    res.status(500).json({ error: "Failed to get waitlist" });
   }
 });
 
@@ -163,7 +151,7 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
   try {
     const userId = parseInt(req.params.userId);
     const { plan } = req.body as { plan: string };
-    if (!["beta", "trial", "pending", "expired"].includes(plan)) {
+    if (!["beta", "trial", "expired"].includes(plan)) {
       return res.status(400).json({ error: "Invalid plan" });
     }
     if (plan === "beta") {

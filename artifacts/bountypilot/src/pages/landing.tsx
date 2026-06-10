@@ -63,16 +63,16 @@ export function Landing() {
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <Button
             size="lg"
-            onClick={() => navigate("/waitlist")}
+            onClick={() => navigate("/signup")}
             className="font-mono uppercase tracking-wider text-sm w-full sm:w-auto"
           >
-            Join the Waitlist <ArrowRight className="w-4 h-4 ml-2" />
+            Start for Free <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
           <button
             onClick={() => navigate("/login")}
             className="font-mono text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Already have access? Sign In →
+            Already have an account? Sign In →
           </button>
         </div>
       </section>
@@ -169,10 +169,10 @@ export function Landing() {
           </p>
           <Button
             size="lg"
-            onClick={() => navigate("/waitlist")}
+            onClick={() => navigate("/signup")}
             className="font-mono uppercase tracking-wider text-sm"
           >
-            Join the Waitlist <ArrowRight className="w-4 h-4 ml-2" />
+            Start for Free <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
       </section>
