@@ -101,24 +101,32 @@ function templateExplanation(score: number, scraped: ScrapedBounty): string {
   return `Score ${score}/10: ${rewardPart}. ${deadlineNote}. Format: ${scraped.contentFormat || "open"}. ${verdict}`;
 }
 
+function getSubject(scraped: ScrapedBounty): string {
+  return scraped.projectName && scraped.projectName !== scraped.platform
+    ? scraped.projectName
+    : scraped.title;
+}
+
 function templateResearchBrief(scraped: ScrapedBounty): ResearchBriefContent {
+  const subject = getSubject(scraped);
   return {
-    summary: scraped.description || `This ${scraped.platform} bounty from ${scraped.projectName} asks creators to produce ${scraped.contentFormat} content. Focus on clear, accurate, and engaging delivery.`,
-    contentAngles: `1. Beginner explainer — break down complex concepts for a non-technical audience\n2. Comparison angle — how does ${scraped.projectName} differ from competitors?\n3. Use-case story — real people, real outcomes\n4. "Why it matters" narrative — connect to broader Web3 trends`,
-    keyPoints: `- Understand ${scraped.projectName}'s core value proposition\n- Research recent news and product updates\n- Identify common misconceptions to address\n- Gather supporting data points and statistics`,
-    targetAudience: `Crypto-curious users, existing ${scraped.platform} community members, developers considering the ecosystem, and general Web3 content consumers.`,
-    competitorAnalysis: `Search Twitter, YouTube, and Mirror for existing coverage of ${scraped.projectName}. Differentiate by going deeper, using demos, or targeting a specific sub-audience.`,
+    summary: scraped.description || `This bounty (hosted on ${scraped.platform}) asks creators to produce ${scraped.contentFormat} content about ${subject}. Focus on clear, accurate, and engaging delivery.`,
+    contentAngles: `1. Beginner explainer — break down complex concepts for a non-technical audience\n2. Comparison angle — how does ${subject} differ from competitors?\n3. Use-case story — real people, real outcomes\n4. "Why it matters" narrative — connect to broader Web3 trends`,
+    keyPoints: `- Understand ${subject}'s core value proposition\n- Research recent news and product updates\n- Identify common misconceptions to address\n- Gather supporting data points and statistics`,
+    targetAudience: `Crypto-curious users, developers considering ${subject}, and general Web3 content consumers.`,
+    competitorAnalysis: `Search Twitter, YouTube, and Mirror for existing coverage of ${subject}. Differentiate by going deeper, using demos, or targeting a specific sub-audience.`,
   };
 }
 
 function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
+  const subject = getSubject(scraped);
   const hasVideo = scraped.contentFormat.toLowerCase().includes("video");
   const hasThread = scraped.contentFormat.toLowerCase().includes("thread") || scraped.contentFormat.toLowerCase().includes("twitter");
   const hasArticle = scraped.contentFormat.toLowerCase().includes("article") || scraped.contentFormat.toLowerCase().includes("blog");
 
   const scriptOutline = hasVideo
-    ? `HOOK (0-30s): Open with a surprising stat or bold claim about ${scraped.projectName}\nSECTION 1 (30-90s): What is it and why does it exist?\nSECTION 2 (90-180s): How does it work — live demo if possible\nSECTION 3 (180-240s): Why should the viewer care?\nOUTRO (240-300s): CTA — link in bio, subscribe, submit before ${scraped.deadline || "deadline"}`
-    : `HOOK: Lead with a surprising angle about ${scraped.projectName}\nSECTION 1: Context and background\nSECTION 2: Core mechanics or value proposition\nSECTION 3: Real implications and use cases\nCLOSING: Call to action`;
+    ? `HOOK (0-30s): Open with a surprising stat or bold claim about ${subject}\nSECTION 1 (30-90s): What is it and why does it exist?\nSECTION 2 (90-180s): How does it work — live demo if possible\nSECTION 3 (180-240s): Why should the viewer care?\nOUTRO (240-300s): CTA — link in bio, subscribe, submit before ${scraped.deadline || "deadline"}`
+    : `HOOK: Lead with a surprising angle about ${subject}\nSECTION 1: Context and background\nSECTION 2: Core mechanics or value proposition\nSECTION 3: Real implications and use cases\nCLOSING: Call to action`;
 
   const shotList = hasVideo
     ? `1. Talking head intro — clean background, good lighting\n2. Screen recording — product/protocol walkthrough\n3. Graphic overlay — key stats and comparisons\n4. B-roll — community, ecosystem, relevant visuals\n5. Outro card — social links + submission URL`
@@ -126,7 +134,7 @@ function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
     ? `Tweet 1: Hook with bold statement\nTweets 2-5: Core explanation broken into digestible chunks\nTweets 6-8: Supporting evidence and examples\nTweet 9: Implications / what this means for you\nTweet 10: CTA + link to submission`
     : `Section 1: Intro + hook (200 words)\nSection 2: Background context (300 words)\nSection 3: Deep dive (400 words)\nSection 4: Practical takeaways (200 words)\nConclusion + CTA (100 words)`;
 
-  const captionDraft = `Breaking down ${scraped.projectName} for you — here's everything creators and builders need to know. ${hasThread ? "Thread 🧵" : hasVideo ? "Full video 👆" : "Full article linked."} #Web3 #${scraped.platform.replace(/\s/g, "")} #Crypto`;
+  const captionDraft = `Breaking down ${subject} for you — here's everything creators and builders need to know. ${hasThread ? "Thread 🧵" : hasVideo ? "Full video 👆" : "Full article linked."} #Web3 #${scraped.platform.replace(/\s/g, "")} #Crypto`;
 
   const checklist = [
     `[ ] Content published publicly (not draft/private)`,
@@ -227,13 +235,21 @@ export async function generateResearchBrief(scraped: ScrapedBounty): Promise<Res
   }
 
   try {
+    const subject = scraped.projectName && scraped.projectName !== scraped.platform
+      ? scraped.projectName
+      : scraped.title;
+
     const fullContent = await callQwen(
       `You are a senior Web3 researcher and content strategist. Write comprehensive, specific creator briefs. Use clear markdown headings. Be concise but complete — every section should be actionable.`,
-      `Research ${scraped.projectName || scraped.title} and write a content creator brief.
+      `Write a content creator research brief about: **${subject}**
+
+IMPORTANT: "${subject}" is the PRODUCT/PROJECT this content should be about.
+"${scraped.platform}" is just the bounty platform hosting this opportunity — do NOT research the platform itself. Focus entirely on ${subject}.
 
 Bounty context:
-- Platform: ${scraped.platform}
-- Format: ${scraped.contentFormat}
+- Product to research: ${subject}
+- Bounty hosted on: ${scraped.platform}
+- Content format required: ${scraped.contentFormat}
 - Reward: ${scraped.rewardAmount || "TBD"} ${scraped.rewardCurrency || ""}
 - Requirements: ${scraped.submissionRequirements?.slice(0, 400) || "See listing"}
 - Description: ${scraped.description?.slice(0, 500) || ""}
@@ -255,7 +271,7 @@ Cover all 14 sections concisely:
 ## 13. Key Talking Points (top 10)
 ## 14. Sources
 
-Be specific to ${scraped.projectName || scraped.title}. Use bullet points throughout.`,
+Be specific to ${subject}. Use bullet points throughout.`,
       { model: BRIEF_MODEL, maxTokens: 2000, timeout: 90000 }
     );
 

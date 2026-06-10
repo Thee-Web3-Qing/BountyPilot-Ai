@@ -54,7 +54,7 @@ researchRouter.post("/bounty/:bountyId/generate", requireAuth, async (req: AuthR
       rewardAmount: bounty.rewardAmount,
       rewardCurrency: bounty.rewardCurrency,
       deadline: bounty.deadline,
-      projectName: bounty.projectName || bounty.platform || "",
+      projectName: bounty.projectName || "",
       contentFormat: bounty.contentFormat || "Article / Thread",
       submissionRequirements: bounty.submissionRequirements || "",
       deliverables: bounty.deliverables || "",
