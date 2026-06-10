@@ -8,6 +8,40 @@ import { trialEndsAt } from "../lib/access.js";
 
 export const adminRouter = Router();
 
+// One-time bootstrap: sets first admin + upgrades all existing users to beta.
+// Safe to call multiple times — does nothing if an admin already exists.
+adminRouter.post("/bootstrap", async (_req, res) => {
+  try {
+    const admins = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.isAdmin, true));
+
+    if (admins.length > 0) {
+      res.status(200).json({ ok: false, message: "Already bootstrapped — admin exists." });
+      return;
+    }
+
+    // Set the owner account as admin + beta
+    await db
+      .update(usersTable)
+      .set({ isAdmin: true, plan: "beta" })
+      .where(eq(usersTable.username, "QingTheCreator_"));
+
+    // Upgrade all other existing users to beta (original testers)
+    await db
+      .update(usersTable)
+      .set({ plan: "beta" })
+      .where(eq(usersTable.isAdmin, false));
+
+    logger.info("Admin bootstrap complete");
+    res.json({ ok: true, message: "Bootstrap complete. QingTheCreator_ is now admin. All existing users set to beta." });
+  } catch (err) {
+    logger.error(err, "Bootstrap error");
+    res.status(500).json({ error: "Bootstrap failed" });
+  }
+});
+
 async function requireAdmin(req: AuthRequest, res: any, next: any) {
   if (!req.user) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [user] = await db.select({ isAdmin: usersTable.isAdmin }).from(usersTable).where(eq(usersTable.id, req.user.userId));
