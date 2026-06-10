@@ -12,3 +12,9 @@ id = "JxltjFlgILA7w53Wob04e"
 uri = "file://attached_assets/project_story.md"
 type = "text"
 title = "Project Story — Submission Text"
+
+[[outputs]]
+id = "26YLXkFHpoMJ_egU1iNf4"
+uri = "file://attached_assets/architecture_diagram.png"
+type = "image"
+title = "BountyPilot AI Architecture Diagram"
