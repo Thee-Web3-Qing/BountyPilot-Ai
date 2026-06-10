@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -417,6 +418,7 @@ export function Discover() {
 
   const handleClaim = async (bountyId: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    (e?.nativeEvent as Event | undefined)?.stopImmediatePropagation?.();
     setClaiming(bountyId);
     try {
       const resp = await fetch(`/api/discover/${bountyId}/claim`, {
@@ -666,15 +668,16 @@ export function Discover() {
         </div>
       )}
 
-      {/* Detail drawer */}
-      {selected && (
+      {/* Detail drawer — rendered via portal so it escapes overflow-auto on iOS */}
+      {selected && createPortal(
         <DetailDrawer
           bounty={selected}
           onClose={() => setSelected(null)}
           onClaim={() => handleClaim(selected.id)}
           isClaiming={claiming === selected.id}
           isClaimed={claimed.has(selected.id)}
-        />
+        />,
+        document.body
       )}
     </div>
   );

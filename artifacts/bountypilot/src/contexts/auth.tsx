@@ -56,8 +56,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [isLoading, setIsLoading] = useState(false);
 
+  // On mount: register auth token getter and silently refresh user from server
+  // so that plan / isAdmin fields are always current (handles stale localStorage cache)
   useEffect(() => {
     setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+    const t = localStorage.getItem(TOKEN_KEY);
+    if (!t) return;
+    fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${t}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const updated: User = {
+          id: data.id,
+          email: data.email,
+          username: data.username,
+          plan: data.plan ?? "pending",
+          trialEndsAt: data.trialEndsAt ?? null,
+          isAdmin: data.isAdmin ?? false,
+        };
+        localStorage.setItem(USER_KEY, JSON.stringify(updated));
+        setUser(updated);
+      })
+      .catch(() => {});
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -104,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
+      setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
     } finally {
@@ -134,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
+      setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
     } finally {
