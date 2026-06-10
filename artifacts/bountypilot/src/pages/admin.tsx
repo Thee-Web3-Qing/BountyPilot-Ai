@@ -99,10 +99,18 @@ export function Admin() {
   const [changing, setChanging] = useState<Plan | null>(null);
   const [error, setError] = useState("");
 
+  const [bountyReports, setBountyReports] = useState<any[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [reportAction, setReportAction] = useState<number | null>(null);
+
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "reports") loadReports();
+  }, [activeTab]);
 
   async function loadData() {
     setLoading(true);
@@ -117,6 +125,52 @@ export function Admin() {
       setReport(r);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadReports() {
+    setLoadingReports(true);
+    try {
+      const res = await fetch(`${API}/admin/bounty-reports`, { headers: authHeaders() });
+      const data = await res.json();
+      setBountyReports(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setBountyReports([]);
+    } finally {
+      setLoadingReports(false);
+    }
+  }
+
+  async function resolveReport(id: number, resolution: string) {
+    setReportAction(id);
+    try {
+      await fetch(`${API}/admin/bounty-reports/${id}/resolve`, {
+        method: "POST", headers: authHeaders(), body: JSON.stringify({ resolution }),
+      });
+      await loadReports();
+    } finally {
+      setReportAction(null);
+    }
+  }
+
+  async function deleteReport(id: number) {
+    setReportAction(id);
+    try {
+      await fetch(`${API}/admin/bounty-reports/${id}`, { method: "DELETE", headers: authHeaders() });
+      await loadReports();
+    } finally {
+      setReportAction(null);
+    }
+  }
+
+  async function removeBounty(id: number) {
+    if (!confirm("Delete the bounty and all its reports? This cannot be undone.")) return;
+    setReportAction(id);
+    try {
+      await fetch(`${API}/admin/bounty-reports/${id}/remove-bounty`, { method: "DELETE", headers: authHeaders() });
+      await loadReports();
+    } finally {
+      setReportAction(null);
     }
   }
 
@@ -157,6 +211,7 @@ export function Admin() {
         {[
           { key: "users" as const, label: "Users", icon: Users },
           { key: "report" as const, label: "Product Report", icon: BarChart3 },
+          { key: "reports" as const, label: "Flagged Bounties", icon: Flag },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -433,6 +488,85 @@ export function Admin() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "reports" && (
+        <div className="space-y-4">
+          {loadingReports ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : bountyReports.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Flag className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+              <p className="font-mono text-sm">No open bounty reports</p>
+              <p className="text-xs mt-1">Users can flag broken or unverifiable bounties from the bounty detail page.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {bountyReports.map(r => (
+                <div key={r.id} className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border text-red-400 bg-red-500/10 border-red-500/30 uppercase">
+                            {r.reason?.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(r.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="font-mono font-semibold text-sm mt-1 truncate">
+                          {r.bounty?.title ?? "Unknown Bounty"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Reported by @{r.reportedBy ?? "unknown"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <a href={r.bounty?.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-muted-foreground hover:text-primary transition-colors rounded" title="Open bounty URL">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                    {r.note && (
+                      <p className="text-xs text-muted-foreground bg-background/50 rounded p-2 border border-border/50">
+                        {r.note}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => resolveReport(r.id, "resolved")}
+                        disabled={reportAction === r.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-50"
+                      >
+                        {reportAction === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                        Resolve
+                      </button>
+                      <button
+                        onClick={() => deleteReport(r.id)}
+                        disabled={reportAction === r.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        {reportAction === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                        Dismiss
+                      </button>
+                      <button
+                        onClick={() => removeBounty(r.id)}
+                        disabled={reportAction === r.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 ml-auto"
+                      >
+                        {reportAction === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        Delete Bounty
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
