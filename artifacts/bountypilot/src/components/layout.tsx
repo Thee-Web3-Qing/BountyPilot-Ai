@@ -178,8 +178,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* ── Trial banner ────────────────────────────────────── */}
-      <TrialBanner />
+      {/* ── Trial banner — sticky below header ──────────────── */}
+      <div className="sticky top-14 z-20">
+        <TrialBanner />
+      </div>
 
       {/* ── Page content ────────────────────────────────────── */}
       <main className="flex-1 overflow-auto">
