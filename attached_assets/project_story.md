@@ -20,12 +20,37 @@ My first instinct was to use Qwen the way most people use LLMs: send a prompt, p
 
 The real unlock was **native function/tool calling**. When you hand Qwen a JSON Schema and tell it to call `submit_bounty_score`, the response is structured data with type guarantees — not a string you hope parses. This completely changed the reliability profile of the AI layer.
 
-The scoring model uses a hybrid approach. The rule-based component gives a baseline score of 5, then adjusts based on reward size and deadline proximity:
+The scoring model uses a hybrid approach. The rule-based component gives a baseline score starting at 5, then adjusts based on reward size and deadline proximity:
 
-- Reward adjustments: +2 if $5,000 or above, +1.5 if $1,500 or above, +0.5 if $500 or above, -1 if below $100
-- Deadline adjustments: -3 if already passed, -1 if under 3 days remain, +1 if over 14 days remain, +0.5 if over 7 days remain
+$$
+S_{\text{base}} = 5 + \Delta_{\text{reward}} + \Delta_{\text{deadline}}
+$$
 
-The score is clamped to a 1-10 range. Qwen then refines this with a personalized AI score that incorporates creator profile, format fit, and requirement clarity — dimensions the rule function can't see. The final score is the AI score clamped to 1-10, falling back to the rule-based baseline if the API is unavailable.
+where the reward adjustment is
+
+$$
+\Delta_{\text{reward}} = \begin{cases}
++2 & \text{reward} \geq \$5{,}000 \\
++1.5 & \text{reward} \geq \$1{,}500 \\
++0.5 & \text{reward} \geq \$500 \\
+-1 & \text{reward} < \$100
+\end{cases}
+$$
+
+and the deadline adjustment is
+
+$$
+\Delta_{\text{deadline}} = \begin{cases}
+-3 & \text{deadline passed} \\
+-1 & \text{days left} < 3 \\
++1 & \text{days left} > 14 \\
++0.5 & \text{days left} > 7
+\end{cases}
+$$
+
+The baseline is clamped to a 1–10 range: $\max(1, \min(10, S_{\text{base}}))$.
+
+Qwen then refines this with a personalized AI score $S_{\text{AI}} \in [1, 10]$ that incorporates creator profile, format fit, and requirement clarity — dimensions the rule function cannot see. The final score is $S = \text{clamp}(S_{\text{AI}}, 1, 10)$, falling back to $S_{\text{base}}$ if the API is unavailable.
 
 ### The Model Context Protocol
 
