@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Zap, Database, Activity, RefreshCw } from "lucide-react";
+import { Loader2, Activity, RefreshCw } from "lucide-react";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
 
 interface CrawlerStatus {
@@ -34,8 +34,6 @@ export function Dashboard() {
   const { data: platformStats, isLoading: loadingPlatform } = useGetPlatformBreakdown();
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
-  const [loadingDemo, setLoadingDemo] = useState(false);
-  const [demoLoaded, setDemoLoaded] = useState(false);
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
   const [triggeringCrawl, setTriggeringCrawl] = useState(false);
   const [, setTick] = useState(0);
@@ -72,25 +70,6 @@ export function Dashboard() {
     }
   };
 
-  const loadDemo = async () => {
-    setLoadingDemo(true);
-    try {
-      const resp = await fetch("/api/demo/load", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (resp.ok) {
-        setDemoLoaded(true);
-        queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetRecentBountiesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetPlatformBreakdownQueryKey() });
-      }
-    } finally {
-      setLoadingDemo(false);
-    }
-  };
-
   const activePlatforms = crawlerStatus?.lastResults?.filter((r) => r.found > 0) ?? [];
 
   return (
@@ -100,17 +79,6 @@ export function Dashboard() {
           <h1 className="text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
           <p className="text-muted-foreground font-mono mt-2">Welcome back, <span className="text-foreground font-bold">@{user?.username}</span></p>
         </div>
-        {summary && summary.totalBounties === 0 && !demoLoaded && (
-          <Button onClick={loadDemo} disabled={loadingDemo} variant="outline" className="font-mono text-xs uppercase tracking-wider border-primary/40 text-primary hover:bg-primary/10">
-            {loadingDemo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
-            Load Demo Data
-          </Button>
-        )}
-        {demoLoaded && (
-          <span className="font-mono text-xs text-green-400 flex items-center gap-2">
-            <Zap className="w-4 h-4" /> Demo data loaded
-          </span>
-        )}
       </div>
 
       {/* Crawler Status */}
