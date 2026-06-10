@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "L2dntPalA3OxLGXTqVtHj"
+uri = "file://attached_assets/architecture.svg"
+type = "image"
+title = "BountyPilot AI — Architecture Diagram"
