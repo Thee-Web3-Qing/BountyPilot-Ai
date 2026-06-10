@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, Zap, Settings2 } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/contexts/auth";
 
 interface LLMStatus {
   provider: string;
@@ -14,8 +15,30 @@ interface LLMStatus {
 }
 
 export function Settings() {
+  const { user, refreshUser } = useAuth();
   const [status, setStatus] = useState<LLMStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bootstrapState, setBootstrapState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [bootstrapMsg, setBootstrapMsg] = useState("");
+
+  async function runBootstrap() {
+    setBootstrapState("loading");
+    try {
+      const res = await fetch("/api/admin/bootstrap", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const data = await res.json();
+      if (data.ok) {
+        setBootstrapMsg(data.message || "Bootstrap complete! Sign out and back in to see the Admin panel.");
+        setBootstrapState("done");
+        await refreshUser();
+      } else {
+        setBootstrapMsg(data.message || "Already bootstrapped — sign out and back in.");
+        setBootstrapState("done");
+      }
+    } catch {
+      setBootstrapMsg("Request failed. Check the API is deployed.");
+      setBootstrapState("error");
+    }
+  }
 
   useEffect(() => {
     fetch("/api/settings/status", {
@@ -91,6 +114,33 @@ export function Settings() {
                 <p className="font-mono text-xs text-muted-foreground mt-1">
                   Optional: set <code className="bg-black/30 px-1 py-0.5 rounded">QWEN_MODEL</code> (default: qwen-plus-2025-07-28) and <code className="bg-black/30 px-1 py-0.5 rounded">QWEN_BASE_URL</code>.
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {user?.username === "QingTheCreator_" && (
+            <Card className="border-purple-500/30 bg-purple-500/5">
+              <CardContent className="p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <p className="font-mono text-xs uppercase tracking-wider text-purple-400">Owner Bootstrap</p>
+                </div>
+                <p className="font-mono text-xs text-muted-foreground">
+                  Run once to unlock the Admin panel for your account and upgrade all existing users to beta.
+                </p>
+                {bootstrapMsg && (
+                  <p className={`font-mono text-xs px-3 py-2 rounded-sm border ${bootstrapState === "error" ? "border-red-500/30 bg-red-500/10 text-red-400" : "border-green-500/30 bg-green-500/10 text-green-400"}`}>
+                    {bootstrapMsg}
+                  </p>
+                )}
+                <button
+                  onClick={runBootstrap}
+                  disabled={bootstrapState === "loading" || bootstrapState === "done"}
+                  className="flex items-center gap-2 self-start font-mono text-xs uppercase tracking-wider px-4 py-2 rounded-sm bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {bootstrapState === "loading" && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {bootstrapState === "loading" ? "Running..." : bootstrapState === "done" ? "Done ✓" : "Activate Admin Access"}
+                </button>
               </CardContent>
             </Card>
           )}
