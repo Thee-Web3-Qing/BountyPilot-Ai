@@ -3,43 +3,36 @@ import type { ScrapedBounty } from "./scraper.js";
 const QWEN_BASE_URL = process.env.QWEN_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
 const QWEN_API_URL = `${QWEN_BASE_URL.replace(/\/+$/, "")}/chat/completions`;
 
-// Use turbo (cheap) by default for briefs; override scoring/plan model separately
 const BRIEF_MODEL = process.env.QWEN_BRIEF_MODEL || "qwen-turbo";
 const FAST_MODEL = process.env.QWEN_MODEL || "qwen-turbo";
 
-function hasKey(): boolean {
+export function hasKey(): boolean {
   return !!(process.env.QWEN_API_KEY && process.env.QWEN_API_KEY.trim().length > 0);
 }
 
-async function callQwen(
-  systemPrompt: string,
-  userPrompt: string,
-  { model = FAST_MODEL, maxTokens = 400, timeout = 30000 }: { model?: string; maxTokens?: number; timeout?: number } = {}
-): Promise<string> {
-  const resp = await fetch(QWEN_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.QWEN_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    }),
-    signal: AbortSignal.timeout(timeout),
-  });
+// ── Types ─────────────────────────────────────────────────────
 
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Qwen API error ${resp.status}: ${err}`);
-  }
-  const data = (await resp.json()) as { choices: { message: { content: string } }[] };
-  return data.choices[0]?.message?.content || "";
+interface QwenTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+interface QwenToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+export interface QwenMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: QwenToolCall[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 export interface BountyAnalysis {
@@ -63,6 +56,121 @@ export interface ProductionPlanContent {
   submissionChecklist: string;
   estimatedHours: number;
 }
+
+// ── Core: plain text completion ────────────────────────────────
+
+export async function callQwen(
+  systemPrompt: string,
+  userPrompt: string,
+  { model = FAST_MODEL, maxTokens = 400, timeout = 30000 }: { model?: string; maxTokens?: number; timeout?: number } = {}
+): Promise<string> {
+  const resp = await fetch(QWEN_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.QWEN_API_KEY}` },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!resp.ok) throw new Error(`Qwen API error ${resp.status}: ${await resp.text()}`);
+  const data = (await resp.json()) as { choices: { message: { content: string } }[] };
+  return data.choices[0]?.message?.content || "";
+}
+
+// ── Core: native function/tool calling ────────────────────────
+// Uses the OpenAI-compatible tools parameter — no regex JSON parsing.
+
+export async function callQwenWithTool<T>(
+  messages: QwenMessage[],
+  tool: QwenTool,
+  { model = FAST_MODEL, maxTokens = 500, timeout = 30000 }: { model?: string; maxTokens?: number; timeout?: number } = {}
+): Promise<T | null> {
+  const resp = await fetch(QWEN_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.QWEN_API_KEY}` },
+    body: JSON.stringify({
+      model,
+      messages,
+      tools: [tool],
+      tool_choice: { type: "function", function: { name: tool.function.name } },
+      max_tokens: maxTokens,
+      temperature: 0.3,
+    }),
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!resp.ok) throw new Error(`Qwen tool-call error ${resp.status}: ${await resp.text()}`);
+  const data = (await resp.json()) as {
+    choices: Array<{ message: { tool_calls?: QwenToolCall[]; content?: string } }>;
+  };
+  const toolCall = data.choices[0]?.message?.tool_calls?.[0];
+  if (!toolCall) return null;
+  return JSON.parse(toolCall.function.arguments) as T;
+}
+
+// ── Core: multi-turn agent loop ────────────────────────────────
+// Runs a Qwen tool-calling loop until the model stops calling tools or max iterations.
+
+export interface AgentLoopResult {
+  messages: QwenMessage[];
+  toolCallLog: Array<{ tool: string; args: unknown; result: unknown }>;
+  finalContent: string | null;
+}
+
+export async function runQwenAgentLoop(
+  initialMessages: QwenMessage[],
+  tools: QwenTool[],
+  toolExecutor: (name: string, args: unknown) => Promise<unknown>,
+  { model = FAST_MODEL, maxTokens = 600, timeout = 45000, maxIterations = 6 }: {
+    model?: string; maxTokens?: number; timeout?: number; maxIterations?: number
+  } = {}
+): Promise<AgentLoopResult> {
+  const messages: QwenMessage[] = [...initialMessages];
+  const toolCallLog: AgentLoopResult["toolCallLog"] = [];
+
+  for (let i = 0; i < maxIterations; i++) {
+    const resp = await fetch(QWEN_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.QWEN_API_KEY}` },
+      body: JSON.stringify({ model, messages, tools, max_tokens: maxTokens, temperature: 0.4 }),
+      signal: AbortSignal.timeout(timeout),
+    });
+    if (!resp.ok) throw new Error(`Qwen agent loop error ${resp.status}: ${await resp.text()}`);
+
+    const data = (await resp.json()) as {
+      choices: Array<{ message: { role: string; content: string | null; tool_calls?: QwenToolCall[] }; finish_reason: string }>;
+    };
+    const choice = data.choices[0];
+    const msg = choice.message;
+
+    messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
+
+    if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      return { messages, toolCallLog, finalContent: msg.content };
+    }
+
+    for (const tc of msg.tool_calls) {
+      const args = JSON.parse(tc.function.arguments);
+      const result = await toolExecutor(tc.function.name, args);
+      toolCallLog.push({ tool: tc.function.name, args, result });
+      messages.push({
+        role: "tool",
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content: typeof result === "string" ? result : JSON.stringify(result),
+      });
+    }
+  }
+
+  return { messages, toolCallLog, finalContent: null };
+}
+
+// ── Rule-based scoring (fallback) ─────────────────────────────
 
 function ruleBasedScore(rewardAmount: string | null, deadline: string | null): number {
   let score = 5;
@@ -107,6 +215,8 @@ function getSubject(scraped: ScrapedBounty): string {
     : scraped.title;
 }
 
+// ── Template fallbacks ────────────────────────────────────────
+
 function templateResearchBrief(scraped: ScrapedBounty): ResearchBriefContent {
   const subject = getSubject(scraped);
   return {
@@ -149,14 +259,10 @@ function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
 
   const hours = hasVideo ? 10 : hasArticle && hasThread ? 6 : hasThread ? 3 : 5;
 
-  return {
-    scriptOutline,
-    shotList,
-    captionDraft,
-    submissionChecklist: checklist,
-    estimatedHours: hours,
-  };
+  return { scriptOutline, shotList, captionDraft, submissionChecklist: checklist, estimatedHours: hours };
 }
+
+// ── Public API ─────────────────────────────────────────────────
 
 export interface UserProfile {
   contentFormats?: string | null;
@@ -168,14 +274,12 @@ export interface UserProfile {
   creatorStrengths?: string | null;
 }
 
+// Score a bounty using native Qwen function calling (no regex fallback).
 export async function analyzeBounty(scraped: ScrapedBounty, profile?: UserProfile): Promise<BountyAnalysis> {
   const baseScore = ruleBasedScore(scraped.rewardAmount, scraped.deadline);
 
   if (!hasKey()) {
-    return {
-      opportunityScore: baseScore,
-      scoreExplanation: templateExplanation(baseScore, scraped),
-    };
+    return { opportunityScore: baseScore, scoreExplanation: templateExplanation(baseScore, scraped) };
   }
 
   const profileContext = profile ? `
@@ -188,17 +292,42 @@ Creator profile (personalise the score for THIS creator):
 - Minimum reward: $${profile.minimumReward || 0}
 - Strengths: ${profile.creatorStrengths || "not specified"}` : "";
 
-  try {
-    const text = await callQwen(
-      `You are BountyPilot, an AI assistant helping content creators evaluate crypto bounty opportunities. 
-Be concise, direct, and creator-focused. Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, format match, and creator-specific opportunity.`,
-      `Evaluate this bounty opportunity and respond with JSON only:
-{
-  "opportunityScore": <1-10 integer>,
-  "scoreExplanation": "<2-3 sentence explanation personalised to this creator, mentioning reward, timeline, format fit, and key reasons>"
-}
+  const scoringTool: QwenTool = {
+    type: "function",
+    function: {
+      name: "submit_bounty_score",
+      description: "Submit the evaluated opportunity score and personalised explanation for this bounty",
+      parameters: {
+        type: "object",
+        properties: {
+          opportunityScore: {
+            type: "integer",
+            description: "Score from 1 (very poor) to 10 (excellent) reflecting creator opportunity",
+            minimum: 1,
+            maximum: 10,
+          },
+          scoreExplanation: {
+            type: "string",
+            description: "2–3 sentence explanation personalised to this creator: reward, timeline, format fit, key reasons",
+          },
+        },
+        required: ["opportunityScore", "scoreExplanation"],
+      },
+    },
+  };
 
-Bounty details:
+  try {
+    const result = await callQwenWithTool<BountyAnalysis>(
+      [
+        {
+          role: "system",
+          content: `You are BountyPilot, an AI assistant helping Web3 content creators evaluate bounty opportunities.
+Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, format match, and creator fit.
+Call submit_bounty_score with your evaluation.`,
+        },
+        {
+          role: "user",
+          content: `Evaluate this bounty:
 - Platform: ${scraped.platform}
 - Project: ${scraped.projectName}
 - Title: ${scraped.title}
@@ -208,37 +337,31 @@ Bounty details:
 - Requirements: ${scraped.submissionRequirements?.slice(0, 300)}
 - Description: ${scraped.description?.slice(0, 400)}
 ${profileContext}`,
-      { maxTokens: 300 }
+        },
+      ],
+      scoringTool,
+      { maxTokens: 350 }
     );
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+    if (result) {
       return {
-        opportunityScore: Math.max(1, Math.min(10, parseInt(parsed.opportunityScore) || baseScore)),
-        scoreExplanation: parsed.scoreExplanation || templateExplanation(baseScore, scraped),
+        opportunityScore: Math.max(1, Math.min(10, parseInt(String(result.opportunityScore)) || baseScore)),
+        scoreExplanation: result.scoreExplanation || templateExplanation(baseScore, scraped),
       };
     }
-  } catch (e) {
+  } catch {
     // Fall through to template
   }
 
-  return {
-    opportunityScore: baseScore,
-    scoreExplanation: templateExplanation(baseScore, scraped),
-  };
+  return { opportunityScore: baseScore, scoreExplanation: templateExplanation(baseScore, scraped) };
 }
 
+// Generate research brief (markdown — uses plain callQwen, not tool calling).
 export async function generateResearchBrief(scraped: ScrapedBounty): Promise<ResearchBriefContent> {
-  if (!hasKey()) {
-    return templateResearchBrief(scraped);
-  }
+  if (!hasKey()) return templateResearchBrief(scraped);
 
   try {
-    const subject = scraped.projectName && scraped.projectName !== scraped.platform
-      ? scraped.projectName
-      : scraped.title;
-
+    const subject = getSubject(scraped);
     const fullContent = await callQwen(
       `You are a senior Web3 researcher and content strategist. Write comprehensive, specific creator briefs. Use clear markdown headings. Be concise but complete — every section should be actionable.`,
       `Write a content creator research brief about: **${subject}**
@@ -276,39 +399,63 @@ Be specific to ${subject}. Use bullet points throughout.`,
     );
 
     const fallback = templateResearchBrief(scraped);
-    return {
-      summary: fallback.summary,
-      contentAngles: fallback.contentAngles,
-      keyPoints: fallback.keyPoints,
-      targetAudience: fallback.targetAudience,
-      competitorAnalysis: fallback.competitorAnalysis,
-      fullContent,
-    };
-  } catch (e) {
+    return { ...fallback, fullContent };
+  } catch {
     // Fall through to template
   }
 
   return templateResearchBrief(scraped);
 }
 
+// Generate production plan using native Qwen function calling (no regex fallback).
 export async function generateProductionPlan(scraped: ScrapedBounty): Promise<ProductionPlanContent> {
-  if (!hasKey()) {
-    return templateProductionPlan(scraped);
-  }
+  if (!hasKey()) return templateProductionPlan(scraped);
+
+  const planTool: QwenTool = {
+    type: "function",
+    function: {
+      name: "submit_production_plan",
+      description: "Submit the complete production plan for this bounty",
+      parameters: {
+        type: "object",
+        properties: {
+          scriptOutline: {
+            type: "string",
+            description: "Detailed content outline with timing/sections appropriate for the format",
+          },
+          shotList: {
+            type: "string",
+            description: "Specific shot list (for video) or content structure (for threads/articles)",
+          },
+          captionDraft: {
+            type: "string",
+            description: "Ready-to-use caption/hook for social promotion of the submission",
+          },
+          submissionChecklist: {
+            type: "string",
+            description: "Checklist items with [ ] markers covering all submission requirements",
+          },
+          estimatedHours: {
+            type: "integer",
+            description: "Realistic hours to complete this bounty end-to-end",
+            minimum: 1,
+          },
+        },
+        required: ["scriptOutline", "shotList", "captionDraft", "submissionChecklist", "estimatedHours"],
+      },
+    },
+  };
 
   try {
-    const text = await callQwen(
-      `You are BountyPilot, helping content creators plan and produce winning crypto bounty submissions.`,
-      `Generate a production plan for this bounty as JSON only:
-{
-  "scriptOutline": "<detailed outline with timing/sections>",
-  "shotList": "<specific shot list or content structure>",
-  "captionDraft": "<ready-to-use caption/hook for social promotion>",
-  "submissionChecklist": "<checklist items with [ ] markers>",
-  "estimatedHours": <integer hours to complete>
-}
-
-Bounty:
+    const result = await callQwenWithTool<ProductionPlanContent>(
+      [
+        {
+          role: "system",
+          content: "You are BountyPilot, helping content creators plan and produce winning crypto bounty submissions. Call submit_production_plan with a complete, actionable plan tailored to the bounty format.",
+        },
+        {
+          role: "user",
+          content: `Generate a production plan for this bounty:
 - Title: ${scraped.title}
 - Platform: ${scraped.platform}
 - Project: ${scraped.projectName}
@@ -317,22 +464,23 @@ Bounty:
 - Deadline: ${scraped.deadline || "check listing"}
 - Submission link: ${scraped.submissionLink}
 - Requirements: ${scraped.submissionRequirements?.slice(0, 300)}`,
-      { maxTokens: 800 }
+        },
+      ],
+      planTool,
+      { maxTokens: 900 }
     );
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+    if (result) {
       const fallback = templateProductionPlan(scraped);
       return {
-        scriptOutline: parsed.scriptOutline || fallback.scriptOutline,
-        shotList: parsed.shotList || fallback.shotList,
-        captionDraft: parsed.captionDraft || fallback.captionDraft,
-        submissionChecklist: parsed.submissionChecklist || fallback.submissionChecklist,
-        estimatedHours: parseInt(parsed.estimatedHours) || fallback.estimatedHours,
+        scriptOutline: result.scriptOutline || fallback.scriptOutline,
+        shotList: result.shotList || fallback.shotList,
+        captionDraft: result.captionDraft || fallback.captionDraft,
+        submissionChecklist: result.submissionChecklist || fallback.submissionChecklist,
+        estimatedHours: parseInt(String(result.estimatedHours)) || fallback.estimatedHours,
       };
     }
-  } catch (e) {
+  } catch {
     // Fall through to template
   }
 

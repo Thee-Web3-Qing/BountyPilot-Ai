@@ -12,6 +12,7 @@ import { settingsRouter } from "./settings";
 import { discoverRouter } from "./discover";
 import { waitlistRouter } from "./waitlist";
 import { adminRouter } from "./admin";
+import { mcpRouter } from "./mcp";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use("/settings", settingsRouter);
 router.use("/discover", discoverRouter);
 router.use("/waitlist", waitlistRouter);
 router.use("/admin", adminRouter);
+router.use("/mcp", mcpRouter);
 
 export default router;

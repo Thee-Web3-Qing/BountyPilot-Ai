@@ -208,6 +208,88 @@ async function fetchGitcoin(): Promise<PlatformBountyHint[]> {
   }
 }
 
+// ─── Galxe — GraphQL campaigns API ─────────────────────────
+async function fetchGalxe(): Promise<PlatformBountyHint[]> {
+  try {
+    const query = `query {
+      campaigns(input: { forAdmin: false, status: Active, types: [Content], first: 8 }) {
+        list {
+          id
+          name
+          description
+          thumbnail
+          space { name }
+          endTime
+          rewardType
+          tokenReward { token { symbol } tokenAmount }
+        }
+      }
+    }`;
+    const resp = await fetch("https://graphigo.prd.galaxy.eco/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "BountyPilot/1.0" },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json() as { data?: { campaigns?: { list?: Array<Record<string, unknown>> } } };
+    const list = data?.data?.campaigns?.list || [];
+    return list.slice(0, 8).map((c) => {
+      const space = c.space as Record<string, unknown> | undefined;
+      const tokenReward = c.tokenReward as Record<string, unknown> | undefined;
+      const token = tokenReward?.token as Record<string, unknown> | undefined;
+      const endTime = c.endTime ? new Date(Number(c.endTime) * 1000).toISOString().split("T")[0] : undefined;
+      return {
+        url: `https://galxe.com/quest/${c.id}`,
+        title: c.name as string | undefined,
+        projectName: space?.name as string | undefined,
+        description: c.description as string | undefined,
+        rewardAmount: tokenReward?.tokenAmount != null ? String(tokenReward.tokenAmount) : undefined,
+        rewardCurrency: token?.symbol as string | undefined,
+        deadline: endTime,
+      };
+    });
+  } catch (e) {
+    logger.warn({ err: e }, "Galxe GraphQL fetch failed");
+    return [];
+  }
+}
+
+// ─── Zealy (formerly Crew3) — public quests API ─────────────
+async function fetchZealy(): Promise<PlatformBountyHint[]> {
+  try {
+    // Zealy public subdomain API — returns active content quests
+    const communities = ["superteam", "solana", "aptos", "sui", "base", "arbitrum"];
+    const hints: PlatformBountyHint[] = [];
+
+    for (const subdomain of communities.slice(0, 4)) {
+      try {
+        const resp = await fetch(`https://api.zealy.io/communities/${subdomain}/quests?status=published&limit=4`, {
+          headers: { "User-Agent": "BountyPilot/1.0", Accept: "application/json" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) continue;
+        const data = await resp.json() as { data?: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>> };
+        const quests = data.data || data.items || [];
+        for (const q of (quests as Array<Record<string, unknown>>).slice(0, 3)) {
+          const title = q.name as string | undefined;
+          if (!title) continue;
+          hints.push({
+            url: `https://zealy.io/cw/${subdomain}/questboard/${q.id}`,
+            title,
+            projectName: subdomain.charAt(0).toUpperCase() + subdomain.slice(1),
+            description: q.description as string | undefined,
+          });
+        }
+      } catch {}
+    }
+    return hints.slice(0, 8);
+  } catch (e) {
+    logger.warn({ err: e }, "Zealy fetch failed");
+    return [];
+  }
+}
+
 // ─── Generic HTML fetcher with Next.js data extraction ──────
 async function fetchGenericListing(config: PlatformConfig): Promise<PlatformBountyHint[]> {
   try {
@@ -547,6 +629,21 @@ const PLATFORMS: PlatformConfig[] = [
     fetchLinks: genericLinkExtractor,
     maxBounties: 6,
   },
+  {
+    name: "Galxe",
+    listingUrl: "https://galxe.com/quests",
+    fetchLinks: (html, base) => {
+      const hints = genericLinkExtractor(html, base);
+      return hints.filter((h) => h.url.includes("/quest/")).slice(0, 8);
+    },
+    maxBounties: 8,
+  },
+  {
+    name: "Zealy",
+    listingUrl: "https://zealy.io/explore",
+    fetchLinks: genericLinkExtractor,
+    maxBounties: 6,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -685,9 +782,27 @@ export async function crawlAll(): Promise<CrawlPlatformResult[]> {
     results.push(gitcoinResult);
     await sleep(2000);
 
+    const galxeHints = await fetchGalxe();
+    const galxeResult = await crawlPlatform(
+      PLATFORMS.find((p) => p.name === "Galxe")!,
+      existingUrls,
+      () => Promise.resolve(galxeHints)
+    );
+    results.push(galxeResult);
+    await sleep(2000);
+
+    const zealyHints = await fetchZealy();
+    const zealyResult = await crawlPlatform(
+      PLATFORMS.find((p) => p.name === "Zealy")!,
+      existingUrls,
+      () => Promise.resolve(zealyHints)
+    );
+    results.push(zealyResult);
+    await sleep(2000);
+
     // Generic HTML scrapers for remaining platforms
     const remainingPlatforms = PLATFORMS.filter(
-      (p) => p.name !== "Superteam Earn" && p.name !== "First Dollar" && p.name !== "Gitcoin"
+      (p) => !["Superteam Earn", "First Dollar", "Gitcoin", "Galxe", "Zealy"].includes(p.name)
     );
 
     for (const platform of remainingPlatforms) {
