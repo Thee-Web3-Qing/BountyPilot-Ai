@@ -1,18 +1,36 @@
-import { Clock, Zap } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 
+const DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
+
 export function TrialBanner() {
-  const { planStatus, trialDaysLeft } = useAuth();
+  const { user } = useAuth();
+  if (!user) return null;
 
-  if (planStatus === "beta") return null;
-  if (planStatus !== "trial") return null;
-  if (trialDaysLeft === null) return null;
+  const now = new Date();
+  const msLeft = DEADLINE.getTime() - now.getTime();
 
-  const urgent = trialDaysLeft <= 3;
-  const warning = trialDaysLeft <= 7;
+  if (msLeft <= 0) {
+    return (
+      <div className="w-full px-4 py-2 text-xs font-mono flex items-center gap-2 bg-red-500/15 text-red-400 border-b border-red-500/20">
+        <Clock className="w-3.5 h-3.5 shrink-0" />
+        <span>Hackathon access period has ended</span>
+      </div>
+    );
+  }
+
+  const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
+  const hoursLeft = Math.floor((msLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+  const urgent = daysLeft < 3;
+  const warning = daysLeft < 7;
+
+  const timeStr = daysLeft > 0
+    ? `${daysLeft}d ${hoursLeft}h remaining`
+    : `${hoursLeft}h remaining`;
 
   return (
-    <div className={`w-full px-4 py-2 text-xs font-medium flex items-center justify-between gap-2 ${
+    <div className={`w-full px-4 py-2 text-xs font-mono flex items-center justify-between gap-2 ${
       urgent
         ? "bg-red-500/15 text-red-400 border-b border-red-500/20"
         : warning
@@ -21,16 +39,9 @@ export function TrialBanner() {
     }`}>
       <div className="flex items-center gap-1.5">
         <Clock className="w-3.5 h-3.5 shrink-0" />
-        <span>
-          {trialDaysLeft === 0
-            ? "Your trial expires today"
-            : `${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left on your free trial`}
-        </span>
+        <span>Free access open until Aug 7, 10pm GMT+1</span>
       </div>
-      <div className="flex items-center gap-1 opacity-70">
-        <Zap className="w-3 h-3" />
-        <span>Full access active</span>
-      </div>
+      <span className="shrink-0 opacity-80">{timeStr}</span>
     </div>
   );
 }

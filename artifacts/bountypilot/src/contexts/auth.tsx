@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 
-export type Plan = "beta" | "pending" | "trial" | "expired";
+export type Plan = "beta" | "trial" | "expired" | "pending";
 
 interface User {
   id: number;
@@ -32,20 +32,20 @@ const TOKEN_KEY = "bountypilot_token";
 const USER_KEY = "bountypilot_user";
 const API_BASE = "/api";
 
+const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
+
 function computePlanStatus(user: User | null): Plan | null {
   if (!user) return null;
   if (user.plan === "beta") return "beta";
-  if (user.plan === "pending") return "pending";
-  if (user.plan === "trial") {
-    if (!user.trialEndsAt) return "trial";
-    return new Date(user.trialEndsAt) > new Date() ? "trial" : "expired";
+  if (user.plan === "trial" || user.plan === "pending") {
+    return HACKATHON_DEADLINE > new Date() ? "trial" : "expired";
   }
   return "expired";
 }
 
 function computeTrialDaysLeft(user: User | null): number | null {
-  if (!user?.trialEndsAt) return null;
-  const ms = new Date(user.trialEndsAt).getTime() - Date.now();
+  if (!user) return null;
+  const ms = HACKATHON_DEADLINE.getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.id,
           email: data.email,
           username: data.username,
-          plan: data.plan ?? "pending",
+          plan: data.plan ?? "trial",
           trialEndsAt: data.trialEndsAt ?? null,
           isAdmin: data.isAdmin ?? false,
         };
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.id,
           email: data.email,
           username: data.username,
-          plan: data.plan ?? "pending",
+          plan: data.plan ?? "trial",
           trialEndsAt: data.trialEndsAt ?? null,
           isAdmin: data.isAdmin ?? false,
         };

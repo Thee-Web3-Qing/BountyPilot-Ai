@@ -14,11 +14,6 @@ interface AdminUser {
   createdAt: string;
 }
 
-interface WaitlistEntry {
-  id: number;
-  email: string;
-  createdAt: string;
-}
 
 interface Stats {
   waitlistSignups: number;
@@ -62,9 +57,8 @@ export function Admin() {
   const [, navigate] = useLocation();
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"all" | Plan | "waitlist">("beta");
+  const [tab, setTab] = useState<"all" | Plan>("trial");
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [changing, setChanging] = useState<Plan | null>(null);
   const [error, setError] = useState("");
@@ -77,14 +71,12 @@ export function Admin() {
   async function loadData() {
     setLoading(true);
     try {
-      const [s, u, w] = await Promise.all([
+      const [s, u] = await Promise.all([
         fetch(`${API}/admin/stats`, { headers: authHeaders() }).then(r => r.json()),
         fetch(`${API}/admin/users`, { headers: authHeaders() }).then(r => r.json()),
-        fetch(`${API}/admin/waitlist`, { headers: authHeaders() }).then(r => r.json()),
       ]);
       setStats(s);
       setUsers(Array.isArray(u) ? u : []);
-      setWaitlist(Array.isArray(w) ? w : []);
     } finally {
       setLoading(false);
     }
@@ -125,12 +117,10 @@ export function Admin() {
       {stats && (
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: "Beta",       value: stats.beta,           sub: "/ 30 max",  color: "text-primary" },
-            { label: "Trial",      value: stats.trial,          sub: "active",    color: "text-green-400" },
-            { label: "Pending",    value: stats.pending,        sub: "waitlist",  color: "text-yellow-400" },
-            { label: "Expired",    value: stats.expired,        sub: "trials",    color: "text-red-400" },
-            { label: "Waitlist",   value: stats.waitlistSignups,sub: "/ 1000",    color: "text-muted-foreground" },
-            { label: "Total Users",value: stats.total,          sub: "accounts",  color: "text-foreground" },
+            { label: "Trial",      value: stats.trial,  sub: "active",   color: "text-green-400" },
+            { label: "Beta",       value: stats.beta,   sub: "/ 30 max", color: "text-primary" },
+            { label: "Expired",    value: stats.expired,sub: "ended",    color: "text-red-400" },
+            { label: "Total Users",value: stats.total,  sub: "accounts", color: "text-foreground" },
           ].map(({ label, value, sub, color }) => (
             <div key={label} className="bg-card border border-border rounded-lg p-3">
               <p className={`text-2xl font-bold font-mono ${color}`}>{value}</p>
@@ -142,7 +132,7 @@ export function Admin() {
       )}
 
       <div className="flex gap-1 overflow-x-auto pb-1">
-        {(["pending", "trial", "beta", "expired", "waitlist", "all"] as const).map(t => (
+        {(["trial", "beta", "expired", "all"] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -155,59 +145,40 @@ export function Admin() {
         ))}
       </div>
 
-      {tab === "waitlist" ? (
-        <div className="space-y-2">
-          {waitlist.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-10">No waitlist signups yet</p>
-          )}
-          {waitlist.map((entry, i) => (
-            <div key={entry.id} className="bg-card border border-border rounded-lg p-4 flex items-center justify-between gap-3">
+      <div className="space-y-2">
+        {filtered.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-10">No users in this category</p>
+        )}
+        {filtered.map(u => (
+          <button
+            key={u.id}
+            onClick={() => { setSelected(u); setError(""); }}
+            className="w-full bg-card border border-border rounded-lg p-4 text-left hover:border-primary/30 active:bg-primary/5 transition-colors"
+          >
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="font-mono text-sm truncate">{entry.email}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Signed up {new Date(entry.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <span className="font-mono text-[10px] text-muted-foreground/50 shrink-0">#{i + 1}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-10">No users in this category</p>
-          )}
-          {filtered.map(u => (
-            <button
-              key={u.id}
-              onClick={() => { setSelected(u); setError(""); }}
-              className="w-full bg-card border border-border rounded-lg p-4 text-left hover:border-primary/30 active:bg-primary/5 transition-colors"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-mono font-semibold text-sm">@{u.username}</p>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${PLAN_STYLE[u.plan] ?? "text-muted-foreground border-border"}`}>
-                      {u.plan}
-                    </span>
-                    {u.isAdmin && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border text-primary bg-primary/10 border-primary/20">admin</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{u.email}</p>
-                  {u.trialEndsAt && (
-                    <p className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      Trial ends {new Date(u.trialEndsAt).toLocaleDateString()}
-                    </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-mono font-semibold text-sm">@{u.username}</p>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${PLAN_STYLE[u.plan] ?? "text-muted-foreground border-border"}`}>
+                    {u.plan}
+                  </span>
+                  {u.isAdmin && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border text-primary bg-primary/10 border-primary/20">admin</span>
                   )}
                 </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{u.email}</p>
+                {u.trialEndsAt && (
+                  <p className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Ends {new Date(u.trialEndsAt).toLocaleDateString()}
+                  </p>
+                )}
               </div>
-            </button>
-          ))}
-        </div>
-      )}
+              <ChevronRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+            </div>
+          </button>
+        ))}
+      </div>
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-end" onClick={() => setSelected(null)}>
