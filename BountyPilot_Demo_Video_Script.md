@@ -79,7 +79,7 @@
 > Built by creators. For creators."
 
 **VOICEOVER:**
-> "If you've been hunting too long, this is for you. Link in bio."
+> "visit BountyPilot.xyz to start hunting... more efficiently this time"
 
 **[Visual: Fade to black. 2 seconds. End.]**
 
@@ -144,7 +144,7 @@
 > "I went from finding 2-3 bounties a week to having 11 verified ones in under a minute. Not because I got better at searching. Because I stopped needing to search at all."
 
 **[1:55] THE CLOSE:**
-> "If you've been hunting too long, this is for you. Built by creators. For creators. Link below."
+> "visit BountyPilot.xyz to start hunting... more efficiently this time"
 
 ---
 
