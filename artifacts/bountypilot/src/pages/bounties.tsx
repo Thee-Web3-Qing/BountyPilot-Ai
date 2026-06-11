@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Clock, Check } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
@@ -43,11 +43,13 @@ const PLATFORMS = ["Superteam Earn", "GibWork", "First Dollar", "DoraHacks", "Gi
 export function Bounties() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [platformFilter, setPlatformFilter] = useState<string>("");
+  const [activeOnly, setActiveOnly] = useState<boolean>(true);
   const queryClient = useQueryClient();
 
   const params = {
     ...(statusFilter ? { status: statusFilter } : {}),
     ...(platformFilter ? { platform: platformFilter } : {}),
+    ...(activeOnly ? { active: "true" } : {}),
   };
 
   const { data: bounties, isLoading } = useListBounties(params);
@@ -104,6 +106,13 @@ export function Bounties() {
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
+        <button
+          onClick={() => setActiveOnly(!activeOnly)}
+          className={`bg-card border border-border text-sm font-mono px-3 py-2 rounded-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary flex items-center gap-2 transition-colors ${activeOnly ? "border-primary/50 text-primary" : ""}`}
+        >
+          {activeOnly ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+          {activeOnly ? "Active Only" : "Include Expired"}
+        </button>
       </div>
 
       {isLoading ? (

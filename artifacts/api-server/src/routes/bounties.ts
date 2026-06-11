@@ -22,7 +22,7 @@ bountiesRouter.use(requireAuth);
 bountiesRouter.get("/", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const { status, platform } = req.query as { status?: string; platform?: string };
+    const { status, platform, active } = req.query as { status?: string; platform?: string; active?: string };
     const all = await db
       .select()
       .from(bountiesTable)
@@ -31,6 +31,14 @@ bountiesRouter.get("/", async (req: AuthRequest, res) => {
     let filtered = all;
     if (status) filtered = filtered.filter((b) => b.status === status);
     if (platform) filtered = filtered.filter((b) => b.platform === platform);
+    if (active === "true") {
+      const nowDate = new Date().toISOString().slice(0, 10);
+      filtered = filtered.filter((b) => {
+        if (!b.deadline) return true;
+        const deadlineDate = b.deadline.slice(0, 10);
+        return deadlineDate >= nowDate;
+      });
+    }
     res.json(filtered);
   } catch (err) {
     logger.error(err, "Error listing bounties");
