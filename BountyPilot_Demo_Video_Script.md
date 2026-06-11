@@ -79,7 +79,7 @@
 > Built by creators. For creators."
 
 **VOICEOVER:**
-> "visit BountyPilot.xyz to start hunting... more efficiently this time"
+> "visit BountyPilot.xyz to see the signs, sign up to see wonders."
 
 **[Visual: Fade to black. 2 seconds. End.]**
 
@@ -116,7 +116,7 @@
 
 **[0:12] TEXT:** "BountyPilot. Built by creators."
 
-**[0:14] TEXT:** "Link in bio."
+**[0:14] TEXT:** "visit BountyPilot.xyz to see the signs, sign up to see wonders."
 
 ---
 
@@ -144,7 +144,7 @@
 > "I went from finding 2-3 bounties a week to having 11 verified ones in under a minute. Not because I got better at searching. Because I stopped needing to search at all."
 
 **[1:55] THE CLOSE:**
-> "visit BountyPilot.xyz to start hunting... more efficiently this time"
+> "visit BountyPilot.xyz to see the signs, sign up to see wonders."
 
 ---
 
