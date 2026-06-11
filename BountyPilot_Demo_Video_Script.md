@@ -1,158 +1,112 @@
-# BountyPilot AI — Demo Video Script (Human Flow)
+# BountyPilot AI — Demo Video Script
 
-**Format:** 60-90 second social/demo video
+**Format:** 60-90 seconds
 **Platform:** Twitter/X, YouTube Shorts, TikTok, Product Hunt
-**Tone:** Raw, human, story-driven. Like you're talking to a friend over coffee.
-
----
-
-## THE FRAMEWORK (Why This Flows)
-
-Every demo video that hits follows this rhythm:
-
-| Second | Element | Purpose |
-|--------|---------|---------|
-| 0-3 | **The Truth** | Stop the scroll with something real |
-| 3-15 | **The Story** | "I've been there" |
-| 15-25 | **The Shift** | "So I built something" |
-| 25-50 | **The Demo** | Show the magic. Don't explain. |
-| 50-60 | **The Payoff** | The number that makes them say "wait, what?" |
-| 60-75 | **The CTA** | One clear thing to do |
-
-**The Golden Rule:** *Make them feel the problem before you show the solution.*
+**Tone:** Your voice. Like you're talking to a friend who gets it.
 
 ---
 
 ## SCRIPT
 
-### [0:00] THE TRUTH
+### [0:00] YOUR INTRO
 
-**[Visual: Black screen. Soft text fades in. No music. Just silence.]**
+**[Visual: Black screen. Soft text fades in. No music. Just you speaking.]**
 
-> **TEXT ON SCREEN:**
-> "Thousands of creators remain broke
-> because they lack access to opportunities."
-
-**[Pause. 2 seconds. Let it land.]**
-
-> **TEXT ON SCREEN:**
-> "This isn't due to laziness.
-> It's a system issue."
+**VOICEOVER:**
+> "Thousands of creators remain broke because they lack access to opportunities.
+>
+> This isn't due to laziness actually, I'd say it's a system issue.
+>
+> A lot of my creator friends had to manually hunt for bounties and opportunities, including myself, which actually inspired me to build BountyPilot."
 
 ---
 
-### [0:06] THE STORY
+### [0:15] THE REALITY
 
-**[Visual: Slow montage. Phone screen. Discord notifications. Twitter bookmarks. Google Sheet with 200 rows. A hand scrolling. It's 2am. The creator looks exhausted.]**
+**[Visual: Screen recording. You're scrolling through Discord. Old Twitter threads. A spreadsheet with 200 links. It's 2am. The cursor keeps clicking. Most links are dead.]**
 
-**VOICEOVER (warm, not salesy, like you're talking to a friend):**
+**VOICEOVER:**
+> "You'd be in Discord at 2am, scrolling through threads from three weeks ago. Copying links into a spreadsheet. Checking them one by one. And half the time? The bounty was already gone. Deadline passed. Someone else claimed it. Or the link just straight up 404s."
 
-> "A lot of my creator friends had to manually hunt for bounties and opportunities. Including myself."
+**[Visual: Click. 404 page. Pause. Let it sit there for a second.]**
 
-> "Discord at 2am. Twitter threads from last week. Spreadsheets that haven't been updated since last year."
-
-> "And when you finally find something good? Click. 404. Deadline passed three days ago."
-
-**[Visual: Screen recording. Click on a bounty link. 404 page. Dramatic zoom. Hold for 2 seconds.]**
-
-> "It felt like the system was built to keep us out."
+> "It was exhausting. And honestly? It felt like the platforms didn't really care if we found the work or not."
 
 ---
 
-### [0:22] THE SHIFT
+### [0:32] THE BUILD
 
-**[Visual: Cut to a clean desk. Morning light. Single screen. BountyPilot AI logo. The cursor moves. Clicks. The screen comes alive.]**
+**[Visual: Clean transition. Morning light. Your screen. You open BountyPilot. The interface is dark, calm, purposeful.]**
 
-**VOICEOVER (energy picks up, but still grounded):**
+**VOICEOVER:**
+> "So I built something that actually works for us."
 
-> "So I stopped waiting for the system to change. I built something that works for us instead."
+**[Visual: Click "Run Discovery". The crawler starts. You see Superteam Earn, First Dollar, GibWork, Gitcoin, DoraHacks — all flashing by. The counter ticks up. 3... 7... 11 bounties. A green check: "100% verified". Done in under a minute.]**
 
-> "This is BountyPilot."
-
-**[Visual: "Run Discovery" button. Click. The crawler starts. Platform names flash by. Superteam Earn. First Dollar. GibWork. Gitcoin. DoraHacks. A counter ticks up. 1... 3... 7... 11 bounties found. 100% verified.]**
-
----
-
-### [0:30] THE DEMO
-
-**[Visual: No voiceover for 15 seconds. Let the product speak. Smooth screen recording.]**
-
-**[Sequence: Click a bounty card. Detail drawer opens. Reward: $500. Deadline: 6 days. Content format: Video. AI score: 8.2/10. Click "Claim to Pipeline". Bounty moves to dashboard. Pipeline shows status: Discovered → Researching → Scripting → Recording → Editing → Submitted. Earnings tracker: $500 added. Win rate updates. Dashboard charts animate.]**
-
-**[Visual: Hold on the dashboard for 3 seconds. Let them breathe it in.]**
+> "One click. It crawls every platform. Only brings back what's actually live. It checks every URL before it hits your feed."
 
 ---
 
-### [0:45] THE PAYOFF
+### [0:45] THE DEMO
 
-**[Visual: Big number. Clean. Bold. No clutter.]**
+**[Visual: 15 seconds of silence. Just the screen recording. Let the product speak.]**
+
+**[Sequence: Click a bounty card. Shows the reward, the deadline, the content format, what they need from you. An AI score telling you how good the fit is. Click "Claim to Pipeline". Now it's in your workflow. You see it move: Discovered → Researching → Scripting → Recording → Editing → Submitted. Your dashboard tracks earnings, win rate, pipeline value. Everything in one place.]**
+
+---
+
+### [1:00] THE PAYOFF
+
+**[Visual: Big number. Clean. Simple.]**
 
 > **TEXT ON SCREEN:**
 > "11 verified bounties
-> in 47 seconds
-> 100% live links"
+> in 47 seconds"
 
-**VOICEOVER (quiet, almost to yourself):**
+**VOICEOVER:**
+> "That's what I mean when I say it's not a laziness problem. It's an access problem. And BountyPilot fixes that."
 
-> "No more dead links. No more expired deadlines. No more hunting at 2am."
-
-> "The crawler checks every URL before it ever reaches your feed. The AI scores each opportunity so you know exactly where to spend your time."
-
-> "And the best part? It's not just finding them. It's the whole pipeline. From discovery to submission to earnings. One flow."
+> "You don't need to hunt anymore. You just need to decide which ones you want to take."
 
 ---
 
-### [0:58] THE CTA
+### [1:12] THE CLOSE
 
-**[Visual: Clean screen. Logo. Simple text. Soft fade.]**
+**[Visual: Clean screen. Logo. Soft fade.]**
 
 > **TEXT ON SCREEN:**
 > "BountyPilot AI
 > Built by creators. For creators."
 
-**VOICEOVER (calm, confident, inviting):**
+**VOICEOVER:**
+> "If you've been hunting too long, this is for you. Link in bio."
 
-> "If you've been hunting too long, this is for you."
-
-> "Link in bio. First hunt's on us."
-
-**[Visual: Fade to black. 2 seconds of silence. End.]**
+**[Visual: Fade to black. 2 seconds. End.]**
 
 ---
 
 ## PRODUCTION NOTES
 
-### Visual Style
-- **Dark mode UI** — premium, modern, crypto-native
-- **Warm, human B-roll** — hands on keyboards, phone screens, late-night scrolling. Real moments.
-- **Screen recordings** — actual app. Real data. No mockups.
-- **Slow, intentional pacing** — especially in the story section. Let the pain land.
-- **No cheesy music** — ambient sound, clicks, subtle transitions. Human, not corporate.
+**Visual Style:**
+- Dark mode UI. It's the aesthetic. Clean, modern, crypto-native.
+- Real screen recordings. No mockups. Use your actual app.
+- Real moments. Your hands. Your screen. 2am scrolling.
 
-### Editing Rhythm
-- **0:00-0:06:** Slow, quiet. The truth needs space.
-- **0:06-0:22:** Slightly faster. The frustration builds. The cuts get quicker.
-- **0:22-0:30:** The click. The shift. The energy lifts.
-- **0:30-0:45:** Silent. Let the product work. No voiceover. Just the flow.
-- **0:45-0:58:** The payoff. Big numbers. The voiceover is quiet. Almost personal.
-- **0:58-1:05:** Soft landing. The CTA. No pressure. Just an invitation.
+**Editing Rhythm:**
+- 0:00-0:15: Slow. The truth needs room.
+- 0:15-0:32: Faster. The frustration builds.
+- 0:32-0:45: The lift. The crawler running. The energy picks up.
+- 0:45-1:00: Silent. Let the product breathe.
+- 1:00-1:12: The payoff. Calm. Confident.
+- 1:12-1:15: Soft landing. Just the invitation.
 
-### Voiceover Delivery
-- **Pacing:** Slow in the truth. Faster in the frustration. Peak energy at the crawler. Quiet in the payoff. Calm in the CTA.
-- **Tone:** Talk like you're telling a friend why you built this. Not a pitch. A story.
-- **Energy:** The emotional arc is: heavy → frustrated → hopeful → excited → calm → inviting.
-
-### What NOT To Do
-- ❌ Don't explain the tech. Nobody cares about the stack.
-- ❌ Don't list features. Show the workflow.
-- ❌ Don't use stock footage of "happy entrepreneurs." Use real hands, real screens.
-- ❌ Don't make it longer than 75 seconds. The story needs to stay tight.
+**Voiceover:**
+- Talk like you're explaining this to a friend over coffee. Not a pitch deck. Not a stage. Just a conversation.
+- The energy should move from: heavy → frustrated → hopeful → calm → sure.
 
 ---
 
-## ALTERNATIVE 15-SECOND SHORT VERSION
-
-**[For Twitter/X, TikTok, Reels]"
+## SHORT VERSION (15 seconds)
 
 **[0:00] TEXT:** "Thousands of creators stay broke because they can't find opportunities."
 
@@ -166,35 +120,30 @@ Every demo video that hits follows this rhythm:
 
 ---
 
-## ALTERNATIVE "STORY" VERSION (2 minutes)
+## STORY VERSION (2 minutes)
 
-**[For YouTube, longer-form, or landing page hero]"
+**[0:00] YOUR INTRO:**
+> "Thousands of creators remain broke because they lack access to opportunities.
+>
+> This isn't due to laziness actually, I'd say it's a system issue.
+>
+> A lot of my creator friends had to manually hunt for bounties and opportunities, including myself, which actually inspired me to build BountyPilot."
 
-**[0:00] THE TRUTH:**
-> "Thousands of creators remain broke because they lack access to opportunities. This isn't due to laziness. It's a system issue."
+**[0:15] THE MEMORY:**
+> "I remember being in Discord at 2am, scrolling through threads from weeks ago. I'd find a bounty that looked perfect. $500. Video content. Right in my niche. I'd click the link. And it was just... gone. Deadline passed two days earlier. I remember sitting there thinking, this can't be the only way to do this."
 
-**[0:10] THE PERSONAL STORY:**
-> "A lot of my creator friends had to manually hunt for bounties and opportunities. Including myself."
+**[0:35] THE SHIFT:**
+> "So I built an autonomous crawler. It checks every major platform — Superteam Earn, First Dollar, GibWork, Gitcoin, DoraHacks — and only brings back what's verified and live."
 
-> "I remember being in Discord at 2am, scrolling through threads from three weeks ago, trying to find something that was still live. I'd copy URLs into a spreadsheet. Check them one by one. Most were dead."
+**[0:45] THE DEMO:**
+> "This is what it looks like."
 
-**[0:25] THE BREAKING POINT:**
-> "One night, I found a $500 bounty. Perfect fit. I was so excited. I clicked the link. 404. Gone. The deadline had passed two days earlier."
+**[Visual: Full 60-second walkthrough — discovery, claim, pipeline, dashboard.]**
 
-> "I sat there staring at the screen thinking: this can't be the only way."
+**[1:45] THE CHANGE:**
+> "I went from finding 2-3 bounties a week to having 11 verified ones in under a minute. Not because I got better at searching. Because I stopped needing to search at all."
 
-**[0:40] THE BUILD:**
-> "So I stopped waiting. I built an autonomous crawler that checks every major platform — Superteam Earn, First Dollar, GibWork, Gitcoin, DoraHacks — and only brings back what's verified and live."
-
-**[0:55] THE REVEAL:**
-> "This is BountyPilot."
-
-**[1:00] THE DEMO:** (Full 45-second walkthrough — discovery, claim, pipeline, dashboard)
-
-**[1:45] THE RESULT:**
-> "In the first month, I went from finding 2-3 bounties a week to claiming 11 in under a minute. Not because I worked harder. Because I stopped wasting time on broken links."
-
-**[1:55] THE CTA:**
+**[1:55] THE CLOSE:**
 > "If you've been hunting too long, this is for you. Built by creators. For creators. Link below."
 
 ---
