@@ -1,6 +1,5 @@
 {
   "framework": "vite",
-  "buildCommand": "pnpm install && cd /home/runner/workspace && npx tsc --build && cd /home/runner/workspace/artifacts/bountypilot && pnpm run build",
   "outputDirectory": "dist/public",
   "routes": [
     { "handle": "filesystem" },
