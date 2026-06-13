@@ -24,7 +24,7 @@ export function Settings() {
   async function runBootstrap() {
     setBootstrapState("loading");
     try {
-      const res = await fetch("/api/admin/bootstrap", { method: "POST", headers: { "Content-Type": "application/json" } });
+      const res = await fetch(`${API_BASE}/admin/bootstrap`, { method: "POST", headers: { "Content-Type": "application/json" } });
       const data = await res.json();
       if (data.ok) {
         setBootstrapMsg(data.message || "Bootstrap complete! Sign out and back in to see the Admin panel.");
@@ -41,7 +41,7 @@ export function Settings() {
   }
 
   useEffect(() => {
-    fetch("/api/settings/status", {
+    fetch(`${API_BASE}/settings/status`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("bountypilot_token")}` },
     })
       .then((r) => r.json())

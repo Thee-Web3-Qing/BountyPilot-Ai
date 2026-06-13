@@ -41,7 +41,7 @@ export function Dashboard() {
   const fetchStatus = useCallback(async () => {
     if (!token) return;
     try {
-      const resp = await fetch("/api/discover/status", {
+      const resp = await fetch(`${API_BASE}/discover/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (resp.ok) setCrawlerStatus(await resp.json());
@@ -60,7 +60,7 @@ export function Dashboard() {
     if (!token) return;
     setTriggeringCrawl(true);
     try {
-      await fetch("/api/discover/trigger", {
+      await fetch(`${API_BASE}/discover/trigger`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });

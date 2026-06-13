@@ -446,9 +446,9 @@ export function Discover() {
   const fetchData = useCallback(async () => {
     try {
       const [bRes, sRes, meRes] = await Promise.all([
-        fetch("/api/discover", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/discover/status", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/discover`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/discover/status`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       if (bRes.ok) setBounties(await bRes.json());
       if (sRes.ok) setCrawlerStatus(await sRes.json());
@@ -495,7 +495,7 @@ export function Discover() {
   const handleTrigger = async () => {
     setTriggering(true);
     try {
-      await fetch("/api/discover/trigger", {
+      await fetch(`${API_BASE}/discover/trigger`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
