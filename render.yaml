@@ -10,8 +10,7 @@ services:
     branch: main
     rootDir: .
     buildCommand: |
-      cd /home/runner/workspace
-      npm install -g pnpm
+      npm install -g pnpm@10.26.1
       pnpm install --no-frozen-lockfile
       pnpm --filter @workspace/api-server run build
     startCommand: node artifacts/api-server/dist/index.mjs
