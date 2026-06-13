@@ -30,7 +30,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const TOKEN_KEY = "bountypilot_token";
 const USER_KEY = "bountypilot_user";
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
 const GRACE_END = new Date(HACKATHON_DEADLINE.getTime() + 3 * 24 * 60 * 60 * 1000); // Aug 10
