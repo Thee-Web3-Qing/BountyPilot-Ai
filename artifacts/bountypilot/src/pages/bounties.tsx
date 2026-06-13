@@ -160,7 +160,7 @@ export function Bounties() {
                   <div className="flex justify-between items-end mt-auto">
                     <div>
                       <div className="text-primary font-bold font-mono text-lg">
-                        {bounty.rewardAmount ? `$${bounty.rewardAmount}` : "?"}
+                        {bounty.rewardAmount ? (bounty.rewardAmount.includes("-") ? `${bounty.rewardAmount}` : `$${bounty.rewardAmount}`) : "?"}
                         {bounty.rewardCurrency && (
                           <span className="text-xs text-muted-foreground ml-1">{bounty.rewardCurrency}</span>
                         )}
@@ -174,7 +174,7 @@ export function Bounties() {
                         <div className={`text-2xl font-bold font-mono ${SCORE_COLOR(bounty.opportunityScore)}`}>
                           {bounty.opportunityScore}
                         </div>
-                        <div className="text-xs text-muted-foreground font-mono">/ 10</div>
+                        <div className="text-xs text-muted-foreground font-mono">/ 10 <span className="inline-block ml-0.5 px-1 bg-primary/10 rounded text-[8px] text-primary/70">AI</span></div>
                       </div>
                     )}
                   </div>

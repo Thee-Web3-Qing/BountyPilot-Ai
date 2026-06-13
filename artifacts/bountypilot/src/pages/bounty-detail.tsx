@@ -255,10 +255,11 @@ export function BountyDetail() {
                 {bounty.opportunityScore}
               </span>
               <span className="text-muted-foreground font-mono text-lg">/10</span>
+              <span className="inline-block ml-1 px-1.5 py-0 bg-primary/10 rounded text-xs text-primary/70 font-mono">AI</span>
             </div>
           )}
           <span className="text-primary font-bold font-mono text-xl">
-            {bounty.rewardAmount ? `$${bounty.rewardAmount}` : "TBD"}
+            {bounty.rewardAmount ? (bounty.rewardAmount.includes("-") ? bounty.rewardAmount : `$${bounty.rewardAmount}`) : "TBD"}
             {bounty.rewardCurrency && <span className="text-sm ml-1 text-muted-foreground">{bounty.rewardCurrency}</span>}
           </span>
           <button
@@ -273,7 +274,10 @@ export function BountyDetail() {
       {bounty.opportunityScore != null && bounty.scoreExplanation && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4">
-            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">Score Explanation</p>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
+              <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+            </div>
             <p className="text-sm">{bounty.scoreExplanation}</p>
           </CardContent>
         </Card>

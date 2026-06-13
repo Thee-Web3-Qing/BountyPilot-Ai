@@ -94,16 +94,20 @@ adminRouter.get("/users", requireAuth, requireAdmin, async (_req, res) => {
 
 adminRouter.post("/approve/:userId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     const ends = trialEndsAt(14);
     const [user] = await db
       .update(usersTable)
       .set({ plan: "trial", trialEndsAt: ends, approvedAt: new Date() })
       .where(eq(usersTable.id, userId))
       .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
     logger.info({ userId, trialEndsAt: ends }, "User approved for 14-day trial");
     res.json({ success: true, user });
+    return;
   } catch (err) {
     logger.error(err, "Admin approve error");
     res.status(500).json({ error: "Failed to approve user" });
@@ -112,19 +116,24 @@ adminRouter.post("/approve/:userId", requireAuth, requireAdmin, async (req: Auth
 
 adminRouter.post("/beta/:userId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     const [betaCount] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.plan, "beta"));
     if (Number(betaCount?.value ?? 0) >= 30) {
-      return res.status(400).json({ error: "Beta is full (30 creators max)" });
+      res.status(400).json({ error: "Beta is full (30 creators max)" });
+      return;
     }
     const [user] = await db
       .update(usersTable)
       .set({ plan: "beta", trialEndsAt: null, approvedAt: new Date() })
       .where(eq(usersTable.id, userId))
       .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
     logger.info({ userId }, "User promoted to beta");
     res.json({ success: true, user });
+    return;
   } catch (err) {
     logger.error(err, "Admin beta error");
     res.status(500).json({ error: "Failed to promote to beta" });
@@ -133,14 +142,18 @@ adminRouter.post("/beta/:userId", requireAuth, requireAdmin, async (req: AuthReq
 
 adminRouter.post("/revoke/:userId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     const [user] = await db
       .update(usersTable)
       .set({ plan: "expired" })
       .where(eq(usersTable.id, userId))
       .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
     res.json({ success: true, user });
+    return;
   } catch (err) {
     logger.error(err, "Admin revoke error");
     res.status(500).json({ error: "Failed to revoke access" });
@@ -149,15 +162,17 @@ adminRouter.post("/revoke/:userId", requireAuth, requireAdmin, async (req: AuthR
 
 adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(req.params.userId as string);
     const { plan } = req.body as { plan: string };
     if (!["beta", "trial", "expired"].includes(plan)) {
-      return res.status(400).json({ error: "Invalid plan" });
+      res.status(400).json({ error: "Invalid plan" });
+      return;
     }
     if (plan === "beta") {
       const [betaCount] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.plan, "beta"));
       if (Number(betaCount?.value ?? 0) >= 30) {
-        return res.status(400).json({ error: "Beta is full (30 creators max)" });
+        res.status(400).json({ error: "Beta is full (30 creators max)" });
+        return;
       }
     }
     const updates: Record<string, any> = { plan };
@@ -169,9 +184,13 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
       .set(updates)
       .where(eq(usersTable.id, userId))
       .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
     logger.info({ userId, plan }, "Admin set user plan");
     res.json({ success: true, user });
+    return;
   } catch (err) {
     logger.error(err, "Admin set-plan error");
     res.status(500).json({ error: "Failed to update plan" });
@@ -339,16 +358,20 @@ adminRouter.get("/bounty-reports", requireAuth, requireAdmin, async (_req, res) 
 // POST /admin/bounty-reports/:id/resolve
 adminRouter.post("/bounty-reports/:id/resolve", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { resolution } = req.body as { resolution?: string };
     const [report] = await db
       .update(bountyReportsTable)
       .set({ status: "resolved", resolvedAt: new Date(), resolvedBy: req.user!.userId, resolution: resolution || "resolved" })
       .where(eq(bountyReportsTable.id, id))
       .returning();
-    if (!report) return res.status(404).json({ error: "Report not found" });
+    if (!report) {
+      res.status(404).json({ error: "Report not found" });
+      return;
+    }
     logger.info({ reportId: id, resolution }, "Report resolved");
     res.json({ success: true, report });
+    return;
   } catch (err) {
     logger.error(err, "Admin resolve report error");
     res.status(500).json({ error: "Failed to resolve" });
@@ -358,10 +381,11 @@ adminRouter.post("/bounty-reports/:id/resolve", requireAuth, requireAdmin, async
 // DELETE /admin/bounty-reports/:id
 adminRouter.delete("/bounty-reports/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     await db.delete(bountyReportsTable).where(eq(bountyReportsTable.id, id));
     logger.info({ reportId: id }, "Report deleted");
     res.status(204).send();
+    return;
   } catch (err) {
     logger.error(err, "Admin delete report error");
     res.status(500).json({ error: "Failed to delete" });
@@ -371,13 +395,17 @@ adminRouter.delete("/bounty-reports/:id", requireAuth, requireAdmin, async (req:
 // DELETE /admin/bounty-reports/:id/remove-bounty
 adminRouter.delete("/bounty-reports/:id/remove-bounty", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [report] = await db.select().from(bountyReportsTable).where(eq(bountyReportsTable.id, id));
-    if (!report) return res.status(404).json({ error: "Report not found" });
+    if (!report) {
+      res.status(404).json({ error: "Report not found" });
+      return;
+    }
     await db.delete(bountiesTable).where(eq(bountiesTable.id, report.bountyId));
     await db.delete(bountyReportsTable).where(eq(bountyReportsTable.bountyId, report.bountyId));
     logger.info({ bountyId: report.bountyId, reportId: id }, "Bounty removed via report");
     res.json({ success: true, bountyId: report.bountyId });
+    return;
   } catch (err) {
     logger.error(err, "Admin remove bounty error");
     res.status(500).json({ error: "Failed to remove" });

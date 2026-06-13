@@ -34,7 +34,8 @@ discoverRouter.get("/status", (_req: AuthRequest, res) => {
 discoverRouter.post("/trigger", async (_req: AuthRequest, res) => {
   const status = getCrawlerStatus();
   if (status.isRunning) {
-    return res.status(409).json({ error: "Crawl already in progress" });
+    res.status(409).json({ error: "Crawl already in progress" });
+    return;
   }
   res.json({ message: "Crawl triggered — running in background" });
   // Non-blocking
@@ -45,14 +46,17 @@ discoverRouter.post("/trigger", async (_req: AuthRequest, res) => {
 discoverRouter.post("/:id/claim", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
 
     const [source] = await db
       .select()
       .from(bountiesTable)
       .where(and(eq(bountiesTable.id, id), isNull(bountiesTable.userId)));
 
-    if (!source) return res.status(404).json({ error: "Bounty not found in discover pool" });
+    if (!source) {
+      res.status(404).json({ error: "Bounty not found in discover pool" });
+      return;
+    }
 
     // Check user doesn't already have this URL
     const existing = await db
@@ -61,7 +65,8 @@ discoverRouter.post("/:id/claim", async (req: AuthRequest, res) => {
       .where(and(eq(bountiesTable.url, source.url), eq(bountiesTable.userId, userId)));
 
     if (existing.length > 0) {
-      return res.status(409).json({ error: "Already in your pipeline", bountyId: existing[0].id });
+      res.status(409).json({ error: "Already in your pipeline", bountyId: existing[0].id });
+      return;
     }
 
     const [claimed] = await db

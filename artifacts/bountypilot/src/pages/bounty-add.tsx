@@ -332,6 +332,7 @@ export function BountyAdd() {
                 {extracted.opportunityScore ?? "?"}
               </span>
               <span className="font-mono text-xs">/10</span>
+              <span className="inline-block ml-0.5 px-1 bg-primary/10 rounded text-[8px] text-primary/70 font-mono">AI</span>
             </div>
           </div>
 

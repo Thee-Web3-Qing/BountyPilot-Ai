@@ -97,6 +97,20 @@ function scoreColor(score: number): string {
   return "text-red-400";
 }
 
+// Helper: check if rewardAmount is valid (numeric or range like "1-3")
+function isValidReward(amount: string | null): boolean {
+  if (!amount) return false;
+  if (amount.includes("-")) return true;
+  return Number(amount) > 0;
+}
+
+// Helper: format reward display including ranges
+function formatReward(amount: string | null, currency: string | null): string {
+  if (!amount) return "See platform";
+  if (amount.includes("-")) return `${amount} ${currency || "USDC"}`;
+  return `${amount} ${currency || "USDC"}`;
+}
+
 function scoreBg(score: number): string {
   if (score >= 7) return "border-green-500/40 bg-green-500/10";
   if (score >= 5) return "border-yellow-500/40 bg-yellow-500/10";
@@ -107,8 +121,11 @@ function scoreBg(score: number): string {
 function matchesProfile(bounty: DiscoveredBounty, profile: UserProfile): boolean {
   // Minimum reward check
   if (profile.minimumReward && profile.minimumReward > 0) {
-    const reward = bounty.rewardAmount ? parseFloat(bounty.rewardAmount) : 0;
-    if (reward < profile.minimumReward) return false;
+    const amount = bounty.rewardAmount;
+    if (!amount) return false;
+    // For ranges like "1-3", use the max value for comparison
+    const reward = amount.includes("-") ? parseFloat(amount.split("-")[1]) : parseFloat(amount);
+    if (isNaN(reward) || reward < profile.minimumReward) return false;
   }
   // Content format check — match any overlapping keyword
   if (profile.contentFormats) {
@@ -192,8 +209,8 @@ function DetailDrawer({
             <div className="bg-card border border-border rounded-sm p-3 text-center">
               <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Reward</div>
               <div className="font-bold text-primary text-sm leading-tight">
-                {bounty.rewardAmount && Number(bounty.rewardAmount) > 0
-                  ? `${bounty.rewardAmount} ${bounty.rewardCurrency || "USDC"}`
+                {isValidReward(bounty.rewardAmount)
+                  ? formatReward(bounty.rewardAmount, bounty.rewardCurrency)
                   : <span className="text-muted-foreground text-xs">See platform</span>}
               </div>
             </div>
@@ -207,7 +224,7 @@ function DetailDrawer({
               </div>
             </div>
             <div className={`border rounded-sm p-3 text-center ${scoreBg(score)}`}>
-              <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Score</div>
+              <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Score <span className="inline-block ml-0.5 px-1 py-0 bg-primary/10 rounded text-[8px] text-primary/70">AI</span></div>
               <div className={`font-bold text-xl leading-tight ${scoreColor(score)}`}>{score}<span className="text-xs font-normal text-muted-foreground">/10</span></div>
             </div>
           </div>
@@ -228,7 +245,10 @@ function DetailDrawer({
           {/* Score explanation */}
           {bounty.scoreExplanation && (
             <div className="bg-card border border-border rounded-sm p-3.5">
-              <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-2">AI Analysis</p>
+              <div className="flex items-center gap-2 mb-2">
+                <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">AI Analysis</p>
+                <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+              </div>
               <p className="text-sm text-foreground/80 leading-relaxed">{bounty.scoreExplanation}</p>
             </div>
           )}
@@ -343,9 +363,9 @@ function BountyCard({
 
       {/* Row 3: metrics + score */}
       <div className="flex items-center gap-2 flex-wrap">
-        {bounty.rewardAmount && Number(bounty.rewardAmount) > 0 ? (
+        {isValidReward(bounty.rewardAmount) ? (
           <span className="font-mono text-sm font-bold text-primary whitespace-nowrap">
-            {bounty.rewardAmount} {bounty.rewardCurrency || "USDC"}
+            {formatReward(bounty.rewardAmount, bounty.rewardCurrency)}
           </span>
         ) : (
           <span className="font-mono text-xs text-muted-foreground/50">reward TBD</span>
@@ -372,6 +392,7 @@ function BountyCard({
         <div className={`ml-auto flex items-center gap-0.5 border px-2 py-1 rounded-sm shrink-0 ${scoreBg(score)}`}>
           <span className={`font-mono text-base font-bold leading-none ${scoreColor(score)}`}>{score}</span>
           <span className="font-mono text-[10px] text-muted-foreground">/10</span>
+          <span className="inline-block ml-0.5 px-0.5 py-0 bg-primary/10 rounded text-[8px] text-primary/70 font-mono">AI</span>
         </div>
       </div>
 

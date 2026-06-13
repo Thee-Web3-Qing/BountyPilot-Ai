@@ -14,10 +14,12 @@ authRouter.post("/signup", async (req, res) => {
   try {
     const { email, username, password } = req.body;
     if (!email || !username || !password) {
-      return res.status(400).json({ error: "email, username, and password are required" });
+      res.status(400).json({ error: "email, username, and password are required" });
+      return;
     }
     if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+      res.status(400).json({ error: "Password must be at least 6 characters" });
+      return;
     }
 
     const existing = await db
@@ -25,7 +27,8 @@ authRouter.post("/signup", async (req, res) => {
       .from(usersTable)
       .where(eq(usersTable.email, email.toLowerCase()));
     if (existing.length > 0) {
-      return res.status(409).json({ error: "Email already registered" });
+      res.status(409).json({ error: "Email already registered" });
+      return;
     }
 
     const existingUsername = await db
@@ -33,7 +36,8 @@ authRouter.post("/signup", async (req, res) => {
       .from(usersTable)
       .where(eq(usersTable.username, username));
     if (existingUsername.length > 0) {
-      return res.status(409).json({ error: "Username already taken" });
+      res.status(409).json({ error: "Username already taken" });
+      return;
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -67,7 +71,8 @@ authRouter.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: "email and password are required" });
+      res.status(400).json({ error: "email and password are required" });
+      return;
     }
 
     const [user] = await db
@@ -75,12 +80,14 @@ authRouter.post("/login", async (req, res) => {
       .from(usersTable)
       .where(eq(usersTable.email, email.toLowerCase()));
     if (!user) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Invalid email or password" });
+      return;
     }
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
@@ -99,7 +106,10 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
       .select({ id: usersTable.id, email: usersTable.email, username: usersTable.username, createdAt: usersTable.createdAt, plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt, isAdmin: usersTable.isAdmin })
       .from(usersTable)
       .where(eq(usersTable.id, req.user!.userId));
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
 
     const [profile] = await db
       .select()
@@ -107,6 +117,7 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
       .where(eq(userProfilesTable.userId, req.user!.userId));
 
     res.json({ ...user, profile: profile || null });
+    return;
   } catch (err) {
     logger.error(err, "Get me error");
     res.status(500).json({ error: "Failed to get user" });

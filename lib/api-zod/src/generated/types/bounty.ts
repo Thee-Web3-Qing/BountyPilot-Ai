@@ -38,6 +38,10 @@ export interface Bounty {
   opportunityScore?: number | null;
   /** @nullable */
   scoreExplanation?: string | null;
+  /** @nullable */
+  confidenceScore?: number | null;
+  /** @nullable */
+  opportunityType?: string | null;
   status: BountyStatus;
   /** @nullable */
   hoursSaved?: number | null;

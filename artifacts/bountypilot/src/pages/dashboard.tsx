@@ -194,7 +194,7 @@ export function Dashboard() {
                     <div className="group flex flex-col gap-1 p-3 rounded bg-secondary/50 hover:bg-secondary border border-transparent hover:border-border transition-all cursor-pointer">
                       <div className="flex justify-between items-start">
                         <span className="font-bold text-sm truncate">{bounty.title || 'Untitled'}</span>
-                        <span className="text-primary font-mono text-xs">{bounty.rewardAmount} {bounty.rewardCurrency}</span>
+                        <span className="text-primary font-mono text-xs">{bounty.rewardAmount ? (bounty.rewardAmount.includes("-") ? bounty.rewardAmount : `$${bounty.rewardAmount}`) : ""} {bounty.rewardCurrency}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs text-muted-foreground font-mono">
                         <span>{bounty.platform || 'Unknown'}</span>

@@ -27,7 +27,8 @@ submissionsRouter.post("/", async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const parsed = CreateSubmissionBody.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid input", details: parsed.error });
+      res.status(400).json({ error: "Invalid input", details: parsed.error });
+      return;
     }
     const { bountyId, submittedAt, submissionUrl, notes } = parsed.data;
 
@@ -58,7 +59,8 @@ submissionsRouter.patch("/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const parsed = UpdateSubmissionBody.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid input" });
+      res.status(400).json({ error: "Invalid input" });
+      return;
     }
     const updates: Record<string, unknown> = {};
     if (parsed.data.result !== undefined) updates.result = parsed.data.result;
@@ -72,7 +74,10 @@ submissionsRouter.patch("/:id", async (req, res) => {
       .where(eq(submissionsTable.id, id))
       .returning();
 
-    if (!submission) return res.status(404).json({ error: "Not found" });
+    if (!submission) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
 
     // Update bounty status based on result
     if (parsed.data.result === "won") {

@@ -40,6 +40,7 @@ bountiesRouter.get("/", async (req: AuthRequest, res) => {
       });
     }
     res.json(filtered);
+    return;
   } catch (err) {
     logger.error(err, "Error listing bounties");
     res.status(500).json({ error: "Failed to list bounties" });
@@ -52,7 +53,8 @@ bountiesRouter.post("/", async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const parsed = CreateBountyBody.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid input", details: parsed.error });
+      res.status(400).json({ error: "Invalid input", details: parsed.error });
+      return;
     }
     const { url } = parsed.data;
 
@@ -99,13 +101,17 @@ bountiesRouter.post("/", async (req: AuthRequest, res) => {
 bountiesRouter.get("/:id", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [bounty] = await db
       .select()
       .from(bountiesTable)
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
-    if (!bounty) return res.status(404).json({ error: "Not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(bounty);
+    return;
   } catch (err) {
     logger.error(err, "Error getting bounty");
     res.status(500).json({ error: "Failed to get bounty" });
@@ -116,9 +122,12 @@ bountiesRouter.get("/:id", async (req: AuthRequest, res) => {
 bountiesRouter.patch("/:id", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const parsed = UpdateBountyBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid input" });
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid input" });
+      return;
+    }
 
     const updates: Record<string, unknown> = {};
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
@@ -132,8 +141,12 @@ bountiesRouter.patch("/:id", async (req: AuthRequest, res) => {
       .set(updates)
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
-    if (!bounty) return res.status(404).json({ error: "Not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(bounty);
+    return;
   } catch (err) {
     logger.error(err, "Error updating bounty");
     res.status(500).json({ error: "Failed to update bounty" });
@@ -144,7 +157,7 @@ bountiesRouter.patch("/:id", async (req: AuthRequest, res) => {
 bountiesRouter.delete("/:id", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     await db.delete(bountiesTable).where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
     res.status(204).send();
   } catch (err) {
@@ -157,13 +170,16 @@ bountiesRouter.delete("/:id", async (req: AuthRequest, res) => {
 bountiesRouter.post("/:id/approve", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [bounty] = await db
       .update(bountiesTable)
       .set({ status: "approved" })
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
-    if (!bounty) return res.status(404).json({ error: "Not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
 
     const scrapedForGen = {
       title: bounty.title || "",
@@ -207,13 +223,16 @@ bountiesRouter.post("/:id/approve", async (req: AuthRequest, res) => {
 bountiesRouter.post("/:id/reject", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [bounty] = await db
       .update(bountiesTable)
       .set({ status: "rejected" })
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
-    if (!bounty) return res.status(404).json({ error: "Not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(bounty);
   } catch (err) {
     logger.error(err, "Error rejecting bounty");
@@ -225,13 +244,16 @@ bountiesRouter.post("/:id/reject", async (req: AuthRequest, res) => {
 bountiesRouter.post("/:id/rescrape", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
 
     const [existing] = await db
       .select()
       .from(bountiesTable)
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
-    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (!existing) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
 
     const prevConfidence = existing.confidenceScore ?? 0;
     logger.info({ bountyId: id, url: existing.url }, "Rescraping bounty");
@@ -272,24 +294,29 @@ bountiesRouter.post("/:id/rescrape", async (req: AuthRequest, res) => {
 bountiesRouter.post("/:id/report", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { reason, note } = req.body as { reason?: string; note?: string };
     const validReasons = ["broken_link", "wrong_info", "spam", "expired", "other"];
     if (!reason || !validReasons.includes(reason)) {
-      return res.status(400).json({ error: "Invalid reason. Use: broken_link, wrong_info, spam, expired, other" });
+      res.status(400).json({ error: "Invalid reason. Use: broken_link, wrong_info, spam, expired, other" });
+      return;
     }
     const [bounty] = await db
       .select()
       .from(bountiesTable)
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
-    if (!bounty) return res.status(404).json({ error: "Not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     // Check if user already reported this bounty
     const existing = await db
       .select()
       .from(bountyReportsTable)
       .where(and(eq(bountyReportsTable.bountyId, id), eq(bountyReportsTable.userId, userId)));
     if (existing.length > 0) {
-      return res.status(409).json({ error: "You already reported this bounty" });
+      res.status(409).json({ error: "You already reported this bounty" });
+      return;
     }
     const [report] = await db
       .insert(bountyReportsTable)
@@ -297,6 +324,7 @@ bountiesRouter.post("/:id/report", async (req: AuthRequest, res) => {
       .returning();
     logger.info({ bountyId: id, userId, reason }, "Bounty reported");
     res.status(201).json(report);
+    return;
   } catch (err) {
     logger.error(err, "Error reporting bounty");
     res.status(500).json({ error: "Failed to report bounty" });
@@ -307,13 +335,16 @@ bountiesRouter.post("/:id/report", async (req: AuthRequest, res) => {
 bountiesRouter.post("/:id/save-later", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const [bounty] = await db
       .update(bountiesTable)
       .set({ status: "saved_for_later" })
       .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)))
       .returning();
-    if (!bounty) return res.status(404).json({ error: "Not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(bounty);
   } catch (err) {
     logger.error(err, "Error saving bounty for later");

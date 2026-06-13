@@ -27,7 +27,8 @@ earningsRouter.post("/", async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const parsed = CreateEarningBody.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid input", details: parsed.error });
+      res.status(400).json({ error: "Invalid input", details: parsed.error });
+      return;
     }
     const { bountyId, platform, amount, currency, receivedAt, notes } = parsed.data;
 

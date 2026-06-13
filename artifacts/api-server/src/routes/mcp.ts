@@ -195,7 +195,7 @@ async function handleRunPipeline(args: { url: string }): Promise<unknown> {
   return {
     url: args.url,
     title: result.scraped.title,
-    platform: result.scraped.platform,
+    platform: ((result.scraped as unknown) as Record<string, unknown>).platform as string | undefined,
     opportunityScore: result.opportunityScore,
     scoreExplanation: result.scoreExplanation,
     agentDecision: result.agentDecision,

@@ -11,12 +11,15 @@ export interface ScrapedBounty {
   submissionLink: string;
   eligibilityRules: string;
   importantNotes: string;
+  platform: string | null;
   confidenceScore?: number;
   opportunityType?: string;
 }
 
 function extractReward(text: string): { amount: string | null; currency: string | null } {
   const patterns = [
+    // Range format first: 1-3, 1-10, 1 — 5
+    /(\d+)\s*[\u2013\u2014-]\s*(\d+)(?:\s*(USDC|USDT|USD|SOL|ETH))?/i,
     /\$\s*([\d,]+(?:\.\d+)?)\s*(USDC|USDT|USD)?/i,
     /([\d,]+(?:\.\d+)?)\s*(USDC|USDT|SOL|ETH|OP|ARB|MATIC|BTC)/i,
     /(?:reward|prize|bounty|total)[:\s]+([\d,]+(?:\.\d+)?)\s*(USDC|USDT|SOL|ETH|OP|USD)?/i,
@@ -25,6 +28,15 @@ function extractReward(text: string): { amount: string | null; currency: string 
   for (const pat of patterns) {
     const m = text.match(pat);
     if (m) {
+      // Range format: capture groups 1 and 2 are min-max, optional 3 is currency
+      if (pat.source.startsWith("(\\d+)")) {
+        const min = m[1].replace(/,/g, "");
+        const max = m[2].replace(/,/g, "");
+        return {
+          amount: `${min}-${max}`,
+          currency: (m[3] || "USDC").toUpperCase(),
+        };
+      }
       return {
         amount: m[1].replace(/,/g, ""),
         currency: (m[2] || "USDC").toUpperCase(),

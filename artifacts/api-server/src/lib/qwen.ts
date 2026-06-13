@@ -244,7 +244,7 @@ function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
     ? `Tweet 1: Hook with bold statement\nTweets 2-5: Core explanation broken into digestible chunks\nTweets 6-8: Supporting evidence and examples\nTweet 9: Implications / what this means for you\nTweet 10: CTA + link to submission`
     : `Section 1: Intro + hook (200 words)\nSection 2: Background context (300 words)\nSection 3: Deep dive (400 words)\nSection 4: Practical takeaways (200 words)\nConclusion + CTA (100 words)`;
 
-  const captionDraft = `Breaking down ${subject} for you — here's everything creators and builders need to know. ${hasThread ? "Thread 🧵" : hasVideo ? "Full video 👆" : "Full article linked."} #Web3 #${scraped.platform.replace(/\s/g, "")} #Crypto`;
+  const captionDraft = `Breaking down ${subject} for you — here's everything creators and builders need to know. ${hasThread ? "Thread 🧵" : hasVideo ? "Full video 👆" : "Full article linked."} #Web3 #${(scraped.platform || "").replace(/\s/g, "")} #Crypto`;
 
   const checklist = [
     `[ ] Content published publicly (not draft/private)`,

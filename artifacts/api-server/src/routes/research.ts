@@ -21,7 +21,10 @@ researchRouter.get("/", async (_req, res) => {
 researchRouter.get("/:id", async (req, res) => {
   try {
     const [brief] = await db.select().from(researchBriefsTable).where(eq(researchBriefsTable.id, parseInt(req.params.id)));
-    if (!brief) return res.status(404).json({ error: "Not found" });
+    if (!brief) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(brief);
   } catch (err) {
     logger.error(err, "Error getting research brief");
@@ -32,7 +35,10 @@ researchRouter.get("/:id", async (req, res) => {
 researchRouter.get("/bounty/:bountyId", async (req, res) => {
   try {
     const [brief] = await db.select().from(researchBriefsTable).where(eq(researchBriefsTable.bountyId, parseInt(req.params.bountyId)));
-    if (!brief) return res.status(404).json({ error: "Not found" });
+    if (!brief) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(brief);
   } catch (err) {
     logger.error(err, "Error getting research brief by bounty");
@@ -44,10 +50,13 @@ researchRouter.get("/bounty/:bountyId", async (req, res) => {
 researchRouter.post("/bounty/:bountyId/generate", requireAuth, requireActivePlan, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const bountyId = parseInt(req.params.bountyId);
+    const bountyId = parseInt(req.params.bountyId as string);
 
     const [bounty] = await db.select().from(bountiesTable).where(and(eq(bountiesTable.id, bountyId), eq(bountiesTable.userId, userId)));
-    if (!bounty) return res.status(404).json({ error: "Bounty not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Bounty not found" });
+      return;
+    }
 
     const scraped = {
       title: bounty.title || "",

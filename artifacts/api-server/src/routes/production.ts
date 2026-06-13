@@ -21,7 +21,10 @@ productionRouter.get("/", async (_req, res) => {
 productionRouter.get("/bounty/:bountyId", async (req, res) => {
   try {
     const [plan] = await db.select().from(productionPlansTable).where(eq(productionPlansTable.bountyId, parseInt(req.params.bountyId)));
-    if (!plan) return res.status(404).json({ error: "Not found" });
+    if (!plan) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     res.json(plan);
   } catch (err) {
     logger.error(err, "Error getting production plan by bounty");
@@ -33,10 +36,13 @@ productionRouter.get("/bounty/:bountyId", async (req, res) => {
 productionRouter.post("/bounty/:bountyId/generate", requireAuth, requireActivePlan, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const bountyId = parseInt(req.params.bountyId);
+    const bountyId = parseInt(req.params.bountyId as string);
 
     const [bounty] = await db.select().from(bountiesTable).where(and(eq(bountiesTable.id, bountyId), eq(bountiesTable.userId, userId)));
-    if (!bounty) return res.status(404).json({ error: "Bounty not found" });
+    if (!bounty) {
+      res.status(404).json({ error: "Bounty not found" });
+      return;
+    }
 
     const scraped = {
       title: bounty.title || "",

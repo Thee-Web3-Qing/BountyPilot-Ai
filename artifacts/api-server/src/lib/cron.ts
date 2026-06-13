@@ -1,8 +1,9 @@
 import cron from "node-cron";
+import type { ScheduledTask } from "node-cron";
 import { crawlAll, getCrawlerStatus } from "./crawler.js";
 import { logger } from "./logger.js";
 
-let cronTask: cron.ScheduledTask | null = null;
+let cronTask: ScheduledTask | null = null;
 
 function computeNextRun(): string {
   const next = new Date();
