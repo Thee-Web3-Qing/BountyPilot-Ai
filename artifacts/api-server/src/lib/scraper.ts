@@ -3,6 +3,7 @@ export interface ScrapedBounty {
   description: string;
   rewardAmount: string | null;
   rewardCurrency: string | null;
+  prizeRank: string | null;
   deadline: string | null;
   projectName: string;
   contentFormat: string;
@@ -44,6 +45,37 @@ function extractReward(text: string): { amount: string | null; currency: string 
     }
   }
   return { amount: null, currency: null };
+}
+
+function extractPrizeRank(text: string): string | null {
+  const patterns = [
+    /\b(1st|first)\b.*prize/i,
+    /\b(2nd|second)\b.*prize/i,
+    /\b(3rd|third)\b.*prize/i,
+    /\b(4th|fourth)\b.*prize/i,
+    /\b(5th|fifth)\b.*prize/i,
+    /\b(1st|first)\b.*place/i,
+    /\b(2nd|second)\b.*place/i,
+    /\b(3rd|third)\b.*place/i,
+    /\b(4th|fourth)\b.*place/i,
+    /\b(5th|fifth)\b.*place/i,
+    /\b(1st|first)\b.*winner/i,
+    /\b(2nd|second)\b.*winner/i,
+    /\b(3rd|third)\b.*winner/i,
+    /\b(1st|2nd|3rd|4th|5th)\b/i,
+    /\bposition\s*(\d+)\b/i,
+    /\btop\s*(\d+)\b/i,
+    /\b(\d+)(st|nd|rd|th)\b.*prize/i,
+    /\b(\d+)(st|nd|rd|th)\b.*place/i,
+  ];
+  for (const pat of patterns) {
+    const m = text.match(pat);
+    if (m) {
+      const rank = m[1] || m[0];
+      return rank.toLowerCase();
+    }
+  }
+  return null;
 }
 
 function extractDeadline(text: string): string | null {
@@ -292,6 +324,7 @@ export async function scrapeBounty(
   const searchText = `${rawTitle} ${rawDescription} ${plainText.slice(0, 5000)}`;
 
   const { amount: scrapedAmount, currency: scrapedCurrency } = extractReward(searchText);
+  const prizeRank = apiData?.prizeRank || extractPrizeRank(searchText) || null;
 
   const rewardAmount =
     apiData?.rewardAmount ||
@@ -357,6 +390,7 @@ export async function scrapeBounty(
     description,
     rewardAmount,
     rewardCurrency,
+    prizeRank,
     deadline,
     projectName,
     contentFormat,

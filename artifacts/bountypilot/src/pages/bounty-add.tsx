@@ -93,6 +93,7 @@ type BountyResult = {
   projectName: string | null;
   rewardAmount: string | null;
   rewardCurrency: string | null;
+  prizeRank: string | null;
   deadline: string | null;
   contentFormat: string | null;
   submissionRequirements: string | null;
@@ -109,6 +110,7 @@ type EditableFields = {
   projectName: string;
   rewardAmount: string;
   rewardCurrency: string;
+  prizeRank: string;
   deadline: string;
   contentFormat: string;
   deliverables: string;
@@ -123,6 +125,7 @@ function bountyToEditable(b: BountyResult): EditableFields {
     projectName: b.projectName || "",
     rewardAmount: b.rewardAmount || "",
     rewardCurrency: b.rewardCurrency || "USDC",
+    prizeRank: b.prizeRank || "",
     deadline: b.deadline || "",
     contentFormat: b.contentFormat || "",
     deliverables: b.deliverables || "",
@@ -180,6 +183,7 @@ export function BountyAdd() {
     const hasChanges =
       editFields.title !== (extracted.title ?? "") ||
       editFields.rewardAmount !== (extracted.rewardAmount ?? "") ||
+      editFields.prizeRank !== (extracted.prizeRank ?? "") ||
       editFields.deadline !== (extracted.deadline ?? "");
 
     if (!hasChanges) return true;
@@ -192,6 +196,7 @@ export function BountyAdd() {
           data: {
             title: editFields.title || undefined,
             rewardAmount: editFields.rewardAmount || undefined,
+            prizeRank: editFields.prizeRank || undefined,
             deadline: editFields.deadline || undefined,
           },
         },

@@ -19,6 +19,7 @@ interface DiscoveredBounty {
   projectName: string | null;
   rewardAmount: string | null;
   rewardCurrency: string | null;
+  prizeRank: string | null;
   deadline: string | null;
   contentFormat: string | null;
   submissionRequirements: string | null;
@@ -213,6 +214,9 @@ function DetailDrawer({
                   ? formatReward(bounty.rewardAmount, bounty.rewardCurrency)
                   : <span className="text-muted-foreground text-xs">See platform</span>}
               </div>
+              {bounty.prizeRank && (
+                <div className="text-[10px] text-primary/70 font-mono mt-0.5">{bounty.prizeRank}</div>
+              )}
             </div>
             <div className="bg-card border border-border rounded-sm p-3 text-center">
               <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Deadline</div>
@@ -369,6 +373,11 @@ function BountyCard({
           </span>
         ) : (
           <span className="font-mono text-xs text-muted-foreground/50">reward TBD</span>
+        )}
+        {bounty.prizeRank && (
+          <span className="font-mono text-[10px] border border-primary/30 px-1.5 py-0.5 rounded-sm text-primary/80 whitespace-nowrap">
+            {bounty.prizeRank}
+          </span>
         )}
 
         {bounty.contentFormat && (

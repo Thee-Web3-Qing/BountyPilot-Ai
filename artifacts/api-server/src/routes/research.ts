@@ -63,6 +63,7 @@ researchRouter.post("/bounty/:bountyId/generate", requireAuth, requireActivePlan
       description: bounty.submissionRequirements || "",
       rewardAmount: bounty.rewardAmount,
       rewardCurrency: bounty.rewardCurrency,
+      prizeRank: bounty.prizeRank,
       deadline: bounty.deadline,
       projectName: bounty.projectName || "",
       contentFormat: bounty.contentFormat || "Article / Thread",

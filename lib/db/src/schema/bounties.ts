@@ -11,6 +11,7 @@ export const bountiesTable = pgTable("bounties", {
   projectName: text("project_name"),
   rewardAmount: text("reward_amount"),
   rewardCurrency: text("reward_currency"),
+  prizeRank: text("prize_rank"),
   deadline: text("deadline"),
   contentFormat: text("content_format"),
   submissionRequirements: text("submission_requirements"),

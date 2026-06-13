@@ -261,6 +261,9 @@ export function BountyDetail() {
           <span className="text-primary font-bold font-mono text-xl">
             {bounty.rewardAmount ? (bounty.rewardAmount.includes("-") ? bounty.rewardAmount : `$${bounty.rewardAmount}`) : "TBD"}
             {bounty.rewardCurrency && <span className="text-sm ml-1 text-muted-foreground">{bounty.rewardCurrency}</span>}
+            {bounty.prizeRank && (
+              <span className="inline-block ml-2 px-2 py-0 bg-primary/10 border border-primary/30 rounded text-sm font-mono">{bounty.prizeRank}</span>
+            )}
           </span>
           <button
             onClick={() => setShowReport(true)}

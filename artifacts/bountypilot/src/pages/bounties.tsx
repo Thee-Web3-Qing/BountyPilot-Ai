@@ -164,6 +164,9 @@ export function Bounties() {
                         {bounty.rewardCurrency && (
                           <span className="text-xs text-muted-foreground ml-1">{bounty.rewardCurrency}</span>
                         )}
+                        {bounty.prizeRank && (
+                          <span className="inline-block ml-1 text-xs text-primary/70 border border-primary/30 px-1.5 py-0.5 rounded">{bounty.prizeRank}</span>
+                        )}
                       </div>
                       {bounty.deadline && (
                         <div className="text-xs text-muted-foreground font-mono">Due {bounty.deadline}</div>

@@ -21,6 +21,8 @@ export interface Bounty {
   /** @nullable */
   rewardCurrency?: string | null;
   /** @nullable */
+  prizeRank?: string | null;
+  /** @nullable */
   deadline?: string | null;
   /** @nullable */
   contentFormat?: string | null;
