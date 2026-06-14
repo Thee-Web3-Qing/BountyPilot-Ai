@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { bountiesTable } from "@workspace/db";
-import { isNull, eq, and, desc } from "drizzle-orm";
+import { isNull, eq, and, desc, or, gte } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { crawlAll } from "../lib/crawler.js";
@@ -10,13 +10,22 @@ import { getCrawlerStatus } from "../lib/cron.js";
 export const discoverRouter = Router();
 discoverRouter.use(requireAuth);
 
-// GET /discover — list all global (auto-fetched) bounties
+// GET /discover — list all global (auto-fetched) bounties (exclude expired)
 discoverRouter.get("/", async (_req: AuthRequest, res) => {
   try {
+    const nowDate = new Date().toISOString().slice(0, 10);
     const bounties = await db
       .select()
       .from(bountiesTable)
-      .where(isNull(bountiesTable.userId))
+      .where(
+        and(
+          isNull(bountiesTable.userId),
+          or(
+            isNull(bountiesTable.deadline),
+            gte(bountiesTable.deadline, nowDate)
+          )
+        )
+      )
       .orderBy(desc(bountiesTable.createdAt));
     res.json(bounties);
   } catch (err) {
