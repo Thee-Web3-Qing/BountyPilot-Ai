@@ -1,4 +1,4 @@
-import { getStripeSync } from "./stripeClient";
+import { getStripeSync, getUncachableStripeClient, getStripeCredentials } from "./stripeClient";
 import { handleStripeWebhook } from "./stripeWebhook";
 
 export class WebhookHandlers {
@@ -10,11 +10,15 @@ export class WebhookHandlers {
           "FIX: Ensure webhook route is registered BEFORE app.use(express.json())."
       );
     }
-    const sync = await getStripeSync();
-    const result = await sync.processWebhook(payload, signature);
-    // Run custom business logic after stripe-replit-sync processes the event
-    if (result?.event) {
-      await handleStripeWebhook(result.event as { type: string; data: { object: Record<string, unknown> } });
+    const stripe = await getUncachableStripeClient();
+    const { webhookSecret } = await getStripeCredentials();
+    if (!webhookSecret) {
+      throw new Error("STRIPE WEBHOOK ERROR: Missing webhook secret. Check Stripe integration.");
     }
+    const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+    const sync = await getStripeSync();
+    await sync.processEvent(event);
+    // Run custom business logic after stripe-replit-sync processes the event
+    await handleStripeWebhook(event as unknown as { type: string; data: { object: Record<string, unknown> } });
   }
 }

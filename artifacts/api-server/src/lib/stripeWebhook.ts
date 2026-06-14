@@ -20,7 +20,8 @@ export async function handleStripeWebhook(event: {
     if (status !== "complete") return;
 
     const customer = await stripeStorage.getCustomerById(customerId);
-    const userId = customer?.metadata?.userId as string | undefined;
+    const metadata = (customer?.metadata ?? {}) as Record<string, unknown>;
+    const userId = metadata.userId as string | undefined;
     if (!userId) {
       logger.warn({ customerId }, "No userId found on customer for checkout session");
       return;
@@ -42,7 +43,8 @@ export async function handleStripeWebhook(event: {
   if (type === "invoice.payment_succeeded" || type === "invoice.paid") {
     const customerId = object.customer as string;
     const customer = await stripeStorage.getCustomerById(customerId);
-    const userId = customer?.metadata?.userId as string | undefined;
+    const metadata = (customer?.metadata ?? {}) as Record<string, unknown>;
+    const userId = metadata.userId as string | undefined;
     if (!userId) return;
     const id = Number(userId);
     if (Number.isNaN(id)) return;
@@ -56,7 +58,8 @@ export async function handleStripeWebhook(event: {
   if (type === "customer.subscription.deleted" || type === "invoice.payment_failed") {
     const customerId = (object.customer as string) || object.customer_id as string;
     const customer = await stripeStorage.getCustomerById(customerId);
-    const userId = customer?.metadata?.userId as string | undefined;
+    const metadata = (customer?.metadata ?? {}) as Record<string, unknown>;
+    const userId = metadata.userId as string | undefined;
     if (!userId) return;
     const id = Number(userId);
     if (Number.isNaN(id)) return;
