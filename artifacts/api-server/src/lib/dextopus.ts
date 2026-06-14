@@ -66,7 +66,7 @@ async function dextopusFetch(path: string, options: RequestInit = {}) {
 }
 
 // ── Generate a static deposit address ─────────────────────────────────────
-export async function generateStaticAddress(req: DextopusDepositRequest): Promise<{ depositAddress: string; depositId: string }> {
+export async function generateStaticAddress(req: DextopusDepositRequest): Promise<{ depositAddress: string; depositId: string; requestId: string }> {
   const data = await dextopusFetch("/deposit/static/generate", {
     method: "POST",
     body: JSON.stringify(req),
@@ -75,6 +75,7 @@ export async function generateStaticAddress(req: DextopusDepositRequest): Promis
   return {
     depositAddress: (inner.depositAddress as string) || "",
     depositId: (inner.depositId as string) || "",
+    requestId: (inner.requestId as string) || "",
   };
 }
 

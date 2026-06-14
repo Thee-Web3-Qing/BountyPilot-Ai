@@ -32,6 +32,7 @@ interface Token {
 
 interface DepositResult {
   depositId: string;
+  requestId: string;
   depositAddress: string;
   tier: string;
   expectedAmount: string;

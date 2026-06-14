@@ -239,6 +239,7 @@ router.post("/checkout", async (req: AuthRequest, res) => {
       userId,
       tier,
       depositId: result.depositId,
+      requestId: result.requestId,
       originChainId: dextReq.originChainId,
       originAsset: dextReq.originAsset,
       settlementChainId: dextReq.settlementChainId,
@@ -253,6 +254,7 @@ router.post("/checkout", async (req: AuthRequest, res) => {
     res.json({
       data: {
         depositId: result.depositId,
+        requestId: result.requestId,
         depositAddress: result.depositAddress,
         tier,
         expectedAmount: TIER_AMOUNTS[tier],
