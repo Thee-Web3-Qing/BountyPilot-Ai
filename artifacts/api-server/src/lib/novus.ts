@@ -82,7 +82,6 @@ export async function callNovusLLM(
   userPrompt: string,
   { maxTokens = 400, timeout = 30000 }: { maxTokens?: number; timeout?: number } = {}
 ): Promise<string> {
-  // Try the generate_text tool if available
   try {
     const text = await callNovusTool("generate_text", {
       system: systemPrompt,
@@ -93,5 +92,104 @@ export async function callNovusLLM(
   } catch (e: any) {
     logger.warn({ err: e.message }, "Novus generate_text failed, falling back");
     throw e;
+  }
+}
+
+// ── Analytics: Dashboard insights for creators ──────────────────
+
+export async function analyzeDashboardInsights(data: {
+  totalBounties: number;
+  totalEarnings: number;
+  activeBounties: number;
+  wonBounties: number;
+  lostBounties: number;
+  winRate: number;
+  pipelineValue: number;
+  averageScore: number | null;
+  statusBreakdown: { status: string; count: number }[];
+}): Promise<string | null> {
+  if (!hasNovusKey()) return null;
+  try {
+    const prompt = `You are a senior Web3 creator strategist analyzing a creator's bounty pipeline.
+
+Here is the creator's current data:
+- Total bounties tracked: ${data.totalBounties}
+- Total earnings: $${data.totalEarnings}
+- Active bounties: ${data.activeBounties}
+- Won: ${data.wonBounties} | Lost: ${data.lostBounties} | Win rate: ${data.winRate}%
+- Pipeline value: $${data.pipelineValue}
+- Average opportunity score: ${data.averageScore?.toFixed(1) ?? "N/A"}
+- Status breakdown: ${data.statusBreakdown.map(s => `${s.status}: ${s.count}`).join(", ")}
+
+Give 3-4 concise, actionable insights. Be specific and motivational. Focus on:
+1. What they should prioritize next (based on pipeline + scores)
+2. Win rate analysis — what's working, what to improve
+3. If they have low activity, suggest how to find better bounties
+4. One concrete next step they should take today
+
+Return plain text with bullet points. Keep it under 250 words. No markdown headers.`;
+
+    return await callNovusLLM(
+      "You are a concise, direct Web3 creator coach. Give actionable advice based on numbers. No fluff.",
+      prompt,
+      { maxTokens: 500 }
+    );
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "Novus dashboard insights failed");
+    return null;
+  }
+}
+
+// ── Analytics: Admin product insights ─────────────────────────
+
+export async function analyzeAdminInsights(data: {
+  users: { total: number; last24h: number; last7d: number; last30d: number; activeLast7d: number };
+  bounties: { total: number; claimed: number; won: number; lost: number; winRate: number; last7d: number };
+  earnings: { total: number; last7d: number };
+  hoursSaved: { total: number; last7d: number };
+  platformBreakdown: { platform: string; count: number; totalReward: number }[];
+  topEarners: { username: string; amount: number }[];
+}): Promise<string | null> {
+  if (!hasNovusKey()) return null;
+  try {
+    const prompt = `You are a growth strategist for a Web3 creator tool called BountyPilot. Analyze the product metrics and give growth + marketing advice.
+
+Current metrics:
+Users:
+- Total: ${data.users.total}
+- New last 7d: ${data.users.last7d} | 30d: ${data.users.last30d}
+- Active (claimed bounty in 7d): ${data.users.activeLast7d}
+
+Bounties:
+- Total: ${data.bounties.total} | Claimed: ${data.bounties.claimed} | Won: ${data.bounties.won} | Lost: ${data.bounties.lost}
+- Win rate: ${data.bounties.winRate}% | New last 7d: ${data.bounties.last7d}
+
+Earnings:
+- Total: $${data.earnings.total} | Last 7d: $${data.earnings.last7d}
+
+Hours saved:
+- Total: ${data.hoursSaved.total} | Last 7d: ${data.hoursSaved.last7d}
+
+Top platforms: ${data.platformBreakdown.slice(0, 5).map(p => `${p.platform} (${p.count} bounties, $${p.totalReward})`).join(", ")}
+
+Top earners: ${data.topEarners.slice(0, 5).map(e => `@${e.username} ($${e.amount})`).join(", ")}
+
+Give 5 concise strategic recommendations covering:
+1. User acquisition — where to focus efforts based on growth trends
+2. Retention — what's working or failing based on active users
+3. Marketing channels — where to double down based on platform data
+4. Product improvements — what features would drive more value
+5. Revenue/growth — how to increase earnings and platform adoption
+
+Be direct and data-driven. No generic advice. Keep it under 350 words. Plain text bullet points.`;
+
+    return await callNovusLLM(
+      "You are a sharp product growth strategist. Give data-backed, specific recommendations. No generic fluff.",
+      prompt,
+      { maxTokens: 700 }
+    );
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "Novus admin insights failed");
+    return null;
   }
 }

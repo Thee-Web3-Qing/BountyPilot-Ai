@@ -5,6 +5,7 @@ import { eq, count, desc, gte, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
+import { analyzeAdminInsights } from "../lib/novus.js";
 
 function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -325,6 +326,83 @@ adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
   } catch (err) {
     logger.error(err, "Admin report error");
     res.status(500).json({ error: "Failed to get report" });
+  }
+});
+
+// GET /admin/insights — AI-powered growth + marketing insights via Novus
+// Feeds product-wide metrics to Novus for strategic recommendations.
+adminRouter.get("/insights", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const now = new Date();
+    const h24 = hoursAgo(24);
+    const h48 = hoursAgo(48);
+    const d7 = hoursAgo(24 * 7);
+    const d30 = hoursAgo(24 * 30);
+
+    const [allUsers, allBounties, allEarnings] = await Promise.all([
+      db.select().from(usersTable),
+      db.select().from(bountiesTable),
+      db.select().from(earningsTable),
+    ]);
+
+    const usersLast24h = allUsers.filter(u => new Date(u.createdAt) >= h24).length;
+    const usersLast7d = allUsers.filter(u => new Date(u.createdAt) >= d7).length;
+    const usersLast30d = allUsers.filter(u => new Date(u.createdAt) >= d30).length;
+    const activeUserIds = new Set(
+      allBounties.filter(b => b.status !== "discovered" && new Date(b.createdAt) >= d7).map(b => b.userId)
+    ).size;
+
+    const bountiesLast7d = allBounties.filter(b => new Date(b.createdAt) >= d7).length;
+    const totalWon = allBounties.filter(b => b.status === "won").length;
+    const totalLost = allBounties.filter(b => b.status === "lost").length;
+    const decided = totalWon + totalLost;
+    const winRate = decided > 0 ? Math.round((totalWon / decided) * 100) : 0;
+    const totalClaimed = allBounties.filter(b => b.status !== "discovered").length;
+
+    const earningsLast7d = allEarnings.filter(e => new Date(e.createdAt) >= d7).reduce((s, e) => s + (e.amount ?? 0), 0);
+    const totalEarnings = allEarnings.reduce((s, e) => s + (e.amount ?? 0), 0);
+
+    const totalHoursSaved = allBounties.reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const hoursSavedLast7d = allBounties
+      .filter(b => b.hoursSaved && new Date(b.createdAt) >= d7)
+      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+
+    const platformMap: Record<string, { count: number; reward: number }> = {};
+    for (const b of allBounties) {
+      const p = b.platform ?? "Unknown";
+      if (!platformMap[p]) platformMap[p] = { count: 0, reward: 0 };
+      platformMap[p].count++;
+      platformMap[p].reward += parseFloat(b.rewardAmount ?? "0");
+    }
+    const platformBreakdown = Object.entries(platformMap)
+      .map(([platform, d]) => ({ platform, count: d.count, totalReward: d.reward }))
+      .sort((a, b) => b.count - a.count);
+
+    const userEarnings: Record<number, number> = {};
+    for (const e of allEarnings) {
+      if (e.userId) userEarnings[e.userId] = (userEarnings[e.userId] ?? 0) + (e.amount ?? 0);
+    }
+    const topEarners = Object.entries(userEarnings)
+      .map(([userId, amount]) => {
+        const u = allUsers.find(u => u.id === Number(userId));
+        return { username: u?.username ?? "unknown", amount };
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+
+    const insights = await analyzeAdminInsights({
+      users: { total: allUsers.length, last24h: usersLast24h, last7d: usersLast7d, last30d: usersLast30d, activeLast7d: activeUserIds },
+      bounties: { total: allBounties.length, claimed: totalClaimed, won: totalWon, lost: totalLost, winRate, last7d: bountiesLast7d },
+      earnings: { total: totalEarnings, last7d: earningsLast7d },
+      hoursSaved: { total: totalHoursSaved, last7d: hoursSavedLast7d },
+      platformBreakdown,
+      topEarners,
+    });
+
+    res.json({ insights, hasNovus: !!insights });
+  } catch (err) {
+    logger.error(err, "Admin insights error");
+    res.status(500).json({ error: "Failed to get admin insights" });
   }
 });
 
