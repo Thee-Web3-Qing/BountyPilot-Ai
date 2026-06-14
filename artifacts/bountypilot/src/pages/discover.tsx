@@ -87,6 +87,20 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function timeLeft(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Expired";
+  const days = Math.floor(ms / 86400000);
+  const hrs = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  if (days > 0) return `${days}d ${hrs}h ${mins}m ${secs}s`;
+  if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+  return `${mins}m ${secs}s`;
+}
+
+// Keep old function name for backward compatibility in other places
 function daysLeft(deadline: string | null): number | null {
   if (!deadline) return null;
   return Math.round((new Date(deadline).getTime() - Date.now()) / 86400000);
@@ -154,6 +168,7 @@ function DetailDrawer({
   isClaimed: boolean;
 }) {
   const dl = daysLeft(bounty.deadline);
+  const tl = timeLeft(bounty.deadline);
   const score = bounty.opportunityScore ?? 0;
   const requirements = stripHtml(bounty.submissionRequirements);
   const deliverables = stripHtml(bounty.deliverables);
@@ -221,8 +236,8 @@ function DetailDrawer({
             <div className="bg-card border border-border rounded-sm p-3 text-center">
               <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Deadline</div>
               <div className={`font-mono text-xs font-bold leading-tight ${dl === null ? "text-muted-foreground" : dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-foreground"}`}>
-                {dl === null ? "Open" : dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d left`}
-                {deadlineDate && dl !== null && dl >= 0 && (
+                {tl !== null ? tl : "Open"}
+                {deadlineDate && tl !== null && tl !== "Expired" && (
                   <div className="text-muted-foreground font-normal mt-0.5" style={{ fontSize: "9px" }}>{deadlineDate}</div>
                 )}
               </div>

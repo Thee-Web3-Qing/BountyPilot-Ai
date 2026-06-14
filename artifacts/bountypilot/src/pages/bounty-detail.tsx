@@ -24,6 +24,24 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
 
+function timeLeft(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Expired";
+  const days = Math.floor(ms / 86400000);
+  const hrs = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  if (days > 0) return `${days}d ${hrs}h ${mins}m ${secs}s`;
+  if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+  return `${mins}m ${secs}s`;
+}
+
+function daysLeft(deadline: string | null): number | null {
+  if (!deadline) return null;
+  return Math.round((new Date(deadline).getTime() - Date.now()) / 86400000);
+}
+
 const STATUS_COLORS: Record<string, string> = {
   discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   saved_for_later: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
@@ -329,7 +347,7 @@ export function BountyDetail() {
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <Field label="Platform" value={bounty.platform} />
           <Field label="Project" value={bounty.projectName} />
-          <Field label="Deadline" value={bounty.deadline ? new Date(bounty.deadline).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : null} />
+          <Field label="Deadline" value={bounty.deadline ? `${timeLeft(bounty.deadline)} (${new Date(bounty.deadline).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })})` : null} />
           <Field label="Content Format" value={bounty.contentFormat} />
           <Field label="Deliverables" value={bounty.deliverables} className="md:col-span-2" />
           <Field label="Submission Requirements" value={bounty.submissionRequirements} className="md:col-span-2" />

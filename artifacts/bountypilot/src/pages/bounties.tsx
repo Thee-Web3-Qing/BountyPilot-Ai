@@ -12,6 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Clock, Check } from "lucide-react";
 
+function timeLeft(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Expired";
+  const days = Math.floor(ms / 86400000);
+  const hrs = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  if (days > 0) return `${days}d ${hrs}h ${mins}m ${secs}s`;
+  if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+  return `${mins}m ${secs}s`;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   saved_for_later: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
@@ -169,7 +182,7 @@ export function Bounties() {
                         )}
                       </div>
                       {bounty.deadline && (
-                        <div className="text-xs text-muted-foreground font-mono">Due {bounty.deadline}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{timeLeft(bounty.deadline)}</div>
                       )}
                     </div>
                     {bounty.opportunityScore != null && (
