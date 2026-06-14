@@ -262,7 +262,7 @@ function deepFind(obj: unknown, keys: string[]): string | null {
 }
 
 // Superteam Earn has a public API for listing details
-async function trySupeteamAPI(url: string): Promise<Partial<ScrapedBounty> | null> {
+async function trySuperteamAPI(url: string): Promise<Partial<ScrapedBounty> | null> {
   try {
     const slug = url.split("/listing/")[1]?.split("?")[0]?.replace(/\/$/, "");
     if (!slug) return null;
@@ -326,7 +326,7 @@ export async function scrapeBounty(
   // Try platform-specific APIs first
   let apiData: Partial<ScrapedBounty> | null = null;
   if (platform === "Superteam Earn") {
-    apiData = await trySupeteamAPI(url);
+    apiData = await trySuperteamAPI(url);
   }
 
   // Extract from __NEXT_DATA__ if present
