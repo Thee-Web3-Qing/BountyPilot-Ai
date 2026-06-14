@@ -87,9 +87,7 @@ export function Pricing() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [selectedChain, setSelectedChain] = useState<number | null>(null);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
-  const [settlementAddress, setSettlementAddress] = useState("");
   const [refundAddress, setRefundAddress] = useState("");
-  const [useSameAddress, setUseSameAddress] = useState(true);
   const [chainsLoading, setChainsLoading] = useState(false);
   const [tokensLoading, setTokensLoading] = useState(false);
 
@@ -170,13 +168,11 @@ export function Pricing() {
     setDeposit(null);
     setSelectedChain(null);
     setSelectedToken(null);
-    setSettlementAddress("");
     setRefundAddress("");
-    setUseSameAddress(true);
   };
 
   const handleGenerateDeposit = async () => {
-    if (!selectedChain || !selectedToken || !settlementAddress || !selectedTier) return;
+    if (!selectedChain || !selectedToken || !selectedTier) return;
 
     setLoading(selectedTier);
     try {
@@ -190,10 +186,7 @@ export function Pricing() {
           tier: selectedTier,
           originChainId: selectedChain,
           originAsset: selectedToken,
-          settlementChainId: 1, // Default to Ethereum for settlement
-          settlementAsset: "0xA0b86a33E6441e0A421e56E4773C3C0f0d8f6b0e", // USDC
-          settlementAddress: settlementAddress,
-          refundTo: useSameAddress ? settlementAddress : refundAddress,
+          refundTo: refundAddress || undefined,
         }),
       });
       const json = await res.json();

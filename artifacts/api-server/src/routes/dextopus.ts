@@ -200,19 +200,18 @@ const TIER_AMOUNTS: Record<string, string> = {
   lifetime: "250",
 };
 
+const TREASURY_WALLET = process.env.TREASURY_WALLET_ADDRESS || "";
+
 router.post("/checkout", async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
   const {
     tier,
     originChainId,
     originAsset,
-    settlementChainId,
-    settlementAsset,
-    settlementAddress,
     refundTo,
   } = req.body;
 
-  if (!tier || !originChainId || !originAsset || !settlementChainId || !settlementAsset || !settlementAddress) {
+  if (!tier || !originChainId || !originAsset) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
@@ -227,10 +226,8 @@ router.post("/checkout", async (req: AuthRequest, res) => {
       userId: String(userId),
       originChainId: Number(originChainId),
       originAsset: String(originAsset),
-      settlementChainId: Number(settlementChainId),
-      settlementAsset: String(settlementAsset),
-      settlementAddress: String(settlementAddress),
       refundTo: refundTo ? String(refundTo) : undefined,
+      // Settlement is configured in Dextopus dashboard — do not override
     };
 
     const result = await generateStaticAddress(dextReq);

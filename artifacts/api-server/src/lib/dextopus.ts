@@ -27,9 +27,9 @@ export interface DextopusDepositRequest {
   userId: string;
   originChainId: number;
   originAsset: string;
-  settlementChainId: number;
-  settlementAsset: string;
-  settlementAddress: string;
+  settlementChainId?: number;
+  settlementAsset?: string;
+  settlementAddress?: string;
   refundTo?: string;
 }
 
