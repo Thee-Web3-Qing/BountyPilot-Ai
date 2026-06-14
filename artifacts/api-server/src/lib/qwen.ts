@@ -35,9 +35,16 @@ export interface QwenMessage {
   name?: string;
 }
 
+export interface ScoreCriterion {
+  label: string;
+  score: number; // 1-10
+  note: string;
+}
+
 export interface BountyAnalysis {
   scoreExplanation: string;
   opportunityScore: number;
+  scoreBreakdown?: ScoreCriterion[];
 }
 
 export interface ResearchBriefContent {
@@ -296,7 +303,7 @@ Creator profile (personalise the score for THIS creator):
     type: "function",
     function: {
       name: "submit_bounty_score",
-      description: "Submit the evaluated opportunity score and personalised explanation for this bounty",
+      description: "Submit the evaluated opportunity score, breakdown, and personalised explanation for this bounty",
       parameters: {
         type: "object",
         properties: {
@@ -310,8 +317,21 @@ Creator profile (personalise the score for THIS creator):
             type: "string",
             description: "2–3 sentence explanation personalised to this creator: reward, timeline, format fit, key reasons",
           },
+          scoreBreakdown: {
+            type: "array",
+            description: "Breakdown of the 5 scoring criteria, each rated 1-10 with a short note",
+            items: {
+              type: "object",
+              properties: {
+                label: { type: "string", description: "Criterion name: Reward, Deadline, Requirements, Format Fit, or Creator Fit" },
+                score: { type: "integer", minimum: 1, maximum: 10, description: "Individual score for this criterion" },
+                note: { type: "string", description: "One-sentence note explaining this score" },
+              },
+              required: ["label", "score", "note"],
+            },
+          },
         },
-        required: ["opportunityScore", "scoreExplanation"],
+        required: ["opportunityScore", "scoreExplanation", "scoreBreakdown"],
       },
     },
   };
@@ -323,6 +343,14 @@ Creator profile (personalise the score for THIS creator):
           role: "system",
           content: `You are BountyPilot, an AI assistant helping Web3 content creators evaluate bounty opportunities.
 Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, format match, and creator fit.
+
+You MUST return scoreBreakdown as an array of exactly 5 criteria:
+1. Reward — how generous the reward is relative to the work required
+2. Deadline — how feasible the timeline is
+3. Requirements — how clear and reasonable the requirements are
+4. Format Fit — how well the content format matches typical creator workflows
+5. Creator Fit — how well this bounty matches the specific creator's profile
+
 Call submit_bounty_score with your evaluation.`,
         },
         {
@@ -347,6 +375,7 @@ ${profileContext}`,
       return {
         opportunityScore: Math.max(1, Math.min(10, parseInt(String(result.opportunityScore)) || baseScore)),
         scoreExplanation: result.scoreExplanation || templateExplanation(baseScore, scraped),
+        scoreBreakdown: result.scoreBreakdown,
       };
     }
   } catch {
@@ -366,12 +395,16 @@ export async function generateResearchBrief(scraped: ScrapedBounty): Promise<Res
       `You are a senior Web3 researcher and content strategist. Write comprehensive, specific creator briefs. Use clear markdown headings. Be concise but complete — every section should be actionable.`,
       `Write a content creator research brief about: **${subject}**
 
-IMPORTANT: "${subject}" is the PRODUCT/PROJECT this content should be about.
-"${scraped.platform}" is just the bounty platform hosting this opportunity — do NOT research the platform itself. Focus entirely on ${subject}.
+CRITICAL RULES — you MUST follow these:
+1. The topic is "${subject}" — this is the PRODUCT/PROJECT/PROTOCOL that content should be about.
+2. "${scraped.platform}" is ONLY the bounty platform (like a job board). NEVER write about ${scraped.platform} itself.
+3. If the description only says "${subject} is the global trading engine for every asset, fully on-chain on Solana" — you MUST still expand deeply on ${subject}, not the platform.
+4. Do NOT mention "Superteam", "Earn", "Bounty Platform", "Listing Site" or any platform name in the brief.
+5. Write every section as if the reader wants to know about ${subject} the product, nothing else.
 
 Bounty context:
 - Product to research: ${subject}
-- Bounty hosted on: ${scraped.platform}
+- Bounty hosted on: ${scraped.platform} (IGNORE THIS — write about ${subject} only)
 - Content format required: ${scraped.contentFormat}
 - Reward: ${scraped.rewardAmount || "TBD"} ${scraped.rewardCurrency || ""}
 - Requirements: ${scraped.submissionRequirements?.slice(0, 400) || "See listing"}
@@ -394,7 +427,7 @@ Cover all 14 sections concisely:
 ## 13. Key Talking Points (top 10)
 ## 14. Sources
 
-Be specific to ${subject}. Use bullet points throughout.`,
+Be specific to ${subject}. Use bullet points throughout. Do NOT write about ${scraped.platform}.`,
       { model: BRIEF_MODEL, maxTokens: 2000, timeout: 90000 }
     );
 

@@ -886,6 +886,7 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
       importantNotes: scraped.importantNotes,
       opportunityScore: analysis.opportunityScore,
       scoreExplanation: analysis.scoreExplanation,
+      scoreBreakdown: analysis.scoreBreakdown ? JSON.stringify(analysis.scoreBreakdown) : null,
       confidenceScore: scraped.confidenceScore,
       opportunityType: scraped.opportunityType,
       status: "discovered",

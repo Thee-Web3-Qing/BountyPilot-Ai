@@ -62,6 +62,8 @@ export interface Bounty {
   /** @nullable */
   scoreExplanation?: string | null;
   /** @nullable */
+  scoreBreakdown?: string | null;
+  /** @nullable */
   confidenceScore?: number | null;
   status: BountyStatus;
   /** @nullable */

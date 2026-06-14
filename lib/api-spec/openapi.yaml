@@ -459,6 +459,8 @@ components:
           type: ["integer", "null"]
         scoreExplanation:
           type: ["string", "null"]
+        scoreBreakdown:
+          type: ["string", "null"]
         confidenceScore:
           type: ["integer", "null"]
         status:

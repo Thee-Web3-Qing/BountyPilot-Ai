@@ -99,6 +99,7 @@ bountiesRouter.post("/", async (req: AuthRequest, res) => {
         importantNotes: scraped.importantNotes,
         opportunityScore: analysis.opportunityScore,
         scoreExplanation: analysis.scoreExplanation,
+        scoreBreakdown: analysis.scoreBreakdown ? JSON.stringify(analysis.scoreBreakdown) : null,
         confidenceScore: scraped.confidenceScore,
         status: "discovered",
       })
@@ -291,6 +292,7 @@ bountiesRouter.post("/:id/rescrape", async (req: AuthRequest, res) => {
     const analysis = await analyzeBounty(scraped);
     updates.opportunityScore = analysis.opportunityScore;
     updates.scoreExplanation = analysis.scoreExplanation;
+    updates.scoreBreakdown = analysis.scoreBreakdown ? JSON.stringify(analysis.scoreBreakdown) : null;
 
     const [bounty] = await db
       .update(bountiesTable)

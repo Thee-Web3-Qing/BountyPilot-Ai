@@ -22,6 +22,7 @@ export const bountiesTable = pgTable("bounties", {
   importantNotes: text("important_notes"),
   opportunityScore: integer("opportunity_score"),
   scoreExplanation: text("score_explanation"),
+  scoreBreakdown: text("score_breakdown"),
   confidenceScore: integer("confidence_score"),
   opportunityType: text("opportunity_type").default("Bounty"),
   status: text("status").notNull().default("discovered"),

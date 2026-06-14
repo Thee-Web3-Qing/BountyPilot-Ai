@@ -108,6 +108,7 @@ discoverRouter.post("/:id/claim", async (req: AuthRequest, res) => {
         importantNotes: source.importantNotes,
         opportunityScore: source.opportunityScore,
         scoreExplanation: source.scoreExplanation,
+        scoreBreakdown: source.scoreBreakdown,
         confidenceScore: source.confidenceScore,
         status: "discovered",
       })

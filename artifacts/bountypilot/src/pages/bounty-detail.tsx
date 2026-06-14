@@ -334,6 +334,33 @@ export function BountyDetail() {
                 <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
               </div>
               <p className="text-sm">{bounty.scoreExplanation}</p>
+
+              {/* Score Breakdown */}
+              {(() => {
+                if (!bounty.scoreBreakdown) return null;
+                try {
+                  const breakdown = JSON.parse(bounty.scoreBreakdown) as Array<{label: string; score: number; note: string}>;
+                  if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
+                  return (
+                    <div className="mt-3 space-y-2">
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
+                      {breakdown.map((c, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase">{c.label}</span>
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${(c.score / 10) * 100}%` }}
+                            />
+                          </div>
+                          <span className="w-6 font-mono text-xs font-bold text-right">{c.score}</span>
+                          <span className="flex-1 text-xs text-muted-foreground">{c.note}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
             </CardContent>
           </Card>
         </AIFeatureGate>
