@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 
-export type Plan = "beta" | "trial" | "expired" | "pending";
+export type Plan = "beta" | "trial" | "expired" | "pending" | "active" | "lifetime";
 
 interface User {
   id: number;
@@ -49,6 +49,7 @@ function effectiveTrialEnd(user: User | null): Date | null {
 function computePlanStatus(user: User | null): Plan | null {
   if (!user) return null;
   if (user.plan === "beta") return "beta";
+  if (user.plan === "active" || user.plan === "lifetime") return "active";
   if (user.plan === "trial" || user.plan === "pending") {
     const effEnd = effectiveTrialEnd(user);
     if (!effEnd) return "trial";
@@ -189,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const planStatus = computePlanStatus(user);
   const trialDaysLeft = computeTrialDaysLeft(user);
-  const canAccessAI = planStatus === "beta" || planStatus === "trial";
+  const canAccessAI = planStatus === "beta" || planStatus === "trial" || planStatus === "active";
 
   return (
     <AuthContext.Provider value={{

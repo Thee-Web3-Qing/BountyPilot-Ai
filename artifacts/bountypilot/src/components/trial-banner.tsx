@@ -15,7 +15,7 @@ function formatTimeLeft(ms: number): string {
 
 export function TrialBanner() {
   const { user } = useAuth();
-  if (!user || user.plan === "beta") return null;
+  if (!user || user.plan === "beta" || user.plan === "active" || user.plan === "lifetime") return null;
 
   const now = new Date();
   const trialEndsAt = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
