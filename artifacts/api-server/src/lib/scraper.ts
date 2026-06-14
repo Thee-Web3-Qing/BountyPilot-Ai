@@ -55,6 +55,9 @@ function extractPrizeRank(text: string): string | null {
     /\btop\s*(\d+)\s*(?:winners?|prizes?|places?|positions?)/i,
     /\b(\d+)\s*(?:winners?|prizes?|places?|positions?)\s*(?:total|available|up for grabs)/i,
     /\b(\d+)\s*(?:winners?|prizes?)\s*\(/i,
+    /\b(\d+)\s*(?:winners?|prizes?)\s*(?:will be|to be)\s*(?:selected|chosen|picked)/i,
+    /\breward\s*pool\b/i,
+    /\bprize\s*pool\b/i,
   ];
   for (const pat of rangePatterns) {
     const m = text.match(pat);
