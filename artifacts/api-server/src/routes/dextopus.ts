@@ -96,15 +96,23 @@ router.post("/webhook", async (req, res) => {
       let subscriptionEndsAt: Date | null = null;
 
       if (deposit.tier !== "lifetime") {
-        // Get the user's current trial end to extend from
+        // Get the user's current subscription/trial end to extend from
         const [user] = await db
-          .select({ trialEndsAt: usersTable.trialEndsAt })
+          .select({ trialEndsAt: usersTable.trialEndsAt, subscriptionEndsAt: usersTable.subscriptionEndsAt })
           .from(usersTable)
           .where(eq(usersTable.id, deposit.userId));
 
-        const baseDate = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date()
+        const now = new Date();
+
+        // Determine base date for extension:
+        // 1. If user has an active subscription in the future, extend from that
+        // 2. If trial is still running, extend from trial end
+        // 3. Otherwise, extend from today (post-launch or expired)
+        const baseDate = user?.subscriptionEndsAt && new Date(user.subscriptionEndsAt) > now
+          ? new Date(user.subscriptionEndsAt)
+          : user?.trialEndsAt && new Date(user.trialEndsAt) > now
           ? new Date(user.trialEndsAt)
-          : new Date();
+          : now;
 
         subscriptionEndsAt = new Date(baseDate);
         if (deposit.tier === "monthly") {
