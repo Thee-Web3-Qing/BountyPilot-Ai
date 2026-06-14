@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Search, Twitter, Globe } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
 
 // ── Team helpers ─────────────────────────────────────────────
