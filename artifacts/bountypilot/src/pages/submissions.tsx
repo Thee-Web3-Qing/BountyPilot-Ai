@@ -65,6 +65,7 @@ export function Submissions() {
   };
 
   const handleUpdateResult = (id: number) => {
+    const sub = submissions?.find((s) => s.id === id);
     updateMutation.mutate(
       {
         id,
@@ -75,6 +76,15 @@ export function Submissions() {
       },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("submission_result_updated", {
+              submissionId: id,
+              bountyId: sub?.bountyId ?? 0,
+              result: resultData.result,
+              rewardReceived: resultData.rewardReceived ? parseFloat(resultData.rewardReceived) : 0,
+              platform: getBountyPlatform(sub?.bountyId ?? 0),
+            });
+          }
           queryClient.invalidateQueries({ queryKey: getListSubmissionsQueryKey() });
           setEditingId(null);
           setResultData({ result: "won", rewardReceived: "" });

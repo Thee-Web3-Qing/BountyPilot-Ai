@@ -64,6 +64,28 @@ export function Profile() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(profile),
       });
+      if (typeof pendo !== "undefined") {
+        const fieldsFilledCount = [
+          profile.fullName, profile.creatorName, profile.mainPlatforms,
+          profile.contentFormats, profile.niche, profile.skillLevel,
+          profile.preferredBountyTypes, profile.minimumReward,
+          profile.weeklyContentCapacity, profile.targetMonthlyEarnings,
+          profile.creatorStrengths, profile.creatorWeaknesses,
+          profile.portfolioLinks, profile.notes,
+        ].filter((v) => v !== undefined && v !== null && v !== "" && v !== 0).length;
+        pendo.track("profile_saved", {
+          hasFullName: !!profile.fullName,
+          hasCreatorName: !!profile.creatorName,
+          mainPlatforms: profile.mainPlatforms || "",
+          contentFormats: profile.contentFormats || "",
+          niche: profile.niche || "",
+          skillLevel: profile.skillLevel || "",
+          minimumReward: profile.minimumReward ?? 0,
+          weeklyContentCapacity: profile.weeklyContentCapacity ?? 0,
+          targetMonthlyEarnings: profile.targetMonthlyEarnings ?? 0,
+          fieldsFilledCount: fieldsFilledCount,
+        });
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {

@@ -107,10 +107,30 @@ export function BountyDetail() {
   const [reportSent, setReportSent] = useState(false);
 
   const handleStatusChange = (status: string) => {
+    const previousStatus = bounty?.status || "";
     updateMutation.mutate(
       { id: bountyId, data: { status } },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("bounty_status_changed", {
+              bountyId: bountyId,
+              previousStatus: previousStatus,
+              newStatus: status,
+              platform: bounty?.platform || "",
+              rewardAmount: bounty?.rewardAmount || "",
+            });
+            if (status === "won" || status === "lost") {
+              pendo.track("bounty_result_recorded", {
+                bountyId: bountyId,
+                result: status,
+                platform: bounty?.platform || "",
+                rewardAmount: bounty?.rewardAmount || "",
+                rewardCurrency: bounty?.rewardCurrency || "",
+                opportunityScore: bounty?.opportunityScore ?? 0,
+              });
+            }
+          }
           queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
@@ -132,6 +152,15 @@ export function BountyDetail() {
       },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("submission_created", {
+              bountyId: bountyId,
+              hasSubmissionUrl: !!submitUrl,
+              submittedAt: new Date(submitDate).toISOString(),
+              platform: bounty?.platform || "",
+              source: "bounty_detail",
+            });
+          }
           setShowSubmitForm(false);
           setSubmitUrl("");
           queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
@@ -152,6 +181,14 @@ export function BountyDetail() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (resp.ok) {
+        if (typeof pendo !== "undefined") {
+          pendo.track("research_brief_generated", {
+            bountyId: bountyId,
+            platform: bounty?.platform || "",
+            isRegeneration: !!brief,
+            contentFormat: bounty?.contentFormat || "",
+          });
+        }
         queryClient.invalidateQueries({ queryKey: getGetResearchBriefByBountyQueryKey(bountyId) });
       }
     } finally {
@@ -168,6 +205,14 @@ export function BountyDetail() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (resp.ok) {
+        if (typeof pendo !== "undefined") {
+          pendo.track("production_plan_generated", {
+            bountyId: bountyId,
+            platform: bounty?.platform || "",
+            isRegeneration: !!plan,
+            contentFormat: bounty?.contentFormat || "",
+          });
+        }
         queryClient.invalidateQueries({ queryKey: getGetProductionPlanByBountyQueryKey(bountyId) });
       }
     } finally {
@@ -186,6 +231,14 @@ export function BountyDetail() {
       });
       if (resp.ok) {
         const data = await resp.json();
+        if (typeof pendo !== "undefined") {
+          pendo.track("bounty_rescrape_completed", {
+            bountyId: bountyId,
+            previousConfidence: data.prevConfidence,
+            newConfidence: data.newConfidence,
+            platform: bounty?.platform || "",
+          });
+        }
         setRescrapeResult({ prevConfidence: data.prevConfidence, newConfidence: data.newConfidence });
         queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
         queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
@@ -205,6 +258,14 @@ export function BountyDetail() {
         body: JSON.stringify({ reason: reportReason, note: reportNote || undefined }),
       });
       if (resp.ok) {
+        if (typeof pendo !== "undefined") {
+          pendo.track("bounty_reported", {
+            bountyId: bountyId,
+            reason: reportReason,
+            hasNote: !!reportNote,
+            platform: bounty?.platform || "",
+          });
+        }
         setReportSent(true);
         setTimeout(() => { setShowReport(false); setReportSent(false); setReportReason(""); setReportNote(""); }, 2000);
       }

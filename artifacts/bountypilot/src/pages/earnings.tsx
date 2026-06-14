@@ -52,6 +52,14 @@ export function Earnings() {
       },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("earning_logged", {
+              platform: formData.platform || "",
+              amount: parseFloat(formData.amount),
+              currency: formData.currency,
+              hasNotes: !!formData.notes,
+            });
+          }
           queryClient.invalidateQueries({ queryKey: getListEarningsQueryKey() });
           setShowForm(false);
           setFormData({ platform: "", amount: "", currency: "USDC", notes: "" });

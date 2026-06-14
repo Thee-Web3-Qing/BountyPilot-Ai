@@ -28,10 +28,22 @@ export function Settings() {
       const res = await fetch(`${API_BASE}/admin/bootstrap`, { method: "POST", headers: { "Content-Type": "application/json" } });
       const data = await res.json();
       if (data.ok) {
+        if (typeof pendo !== "undefined") {
+          pendo.track("admin_bootstrap_activated", {
+            result: "success",
+            message: (data.message || "").substring(0, 100),
+          });
+        }
         setBootstrapMsg(data.message || "Bootstrap complete! Sign out and back in to see the Admin panel.");
         setBootstrapState("done");
         await refreshUser();
       } else {
+        if (typeof pendo !== "undefined") {
+          pendo.track("admin_bootstrap_activated", {
+            result: "already_done",
+            message: (data.message || "").substring(0, 100),
+          });
+        }
         setBootstrapMsg(data.message || "Already bootstrapped — sign out and back in.");
         setBootstrapState("done");
       }

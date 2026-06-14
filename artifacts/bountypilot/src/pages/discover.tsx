@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -495,6 +495,20 @@ export function Discover() {
       });
       if (resp.ok) {
         const data = await resp.json();
+        if (typeof pendo !== "undefined") {
+          const claimedBounty = bounties.find((b) => b.id === bountyId);
+          pendo.track("bounty_claimed_from_discover", {
+            sourceBountyId: bountyId,
+            claimedBountyId: data.id,
+            platform: claimedBounty?.platform || "",
+            projectName: claimedBounty?.projectName || "",
+            rewardAmount: claimedBounty?.rewardAmount || "",
+            rewardCurrency: claimedBounty?.rewardCurrency || "",
+            opportunityScore: claimedBounty?.opportunityScore ?? 0,
+            contentFormat: claimedBounty?.contentFormat || "",
+            confidenceScore: claimedBounty?.confidenceScore ?? 0,
+          });
+        }
         setClaimed((prev) => new Set([...prev, bountyId]));
         queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
         if (selected?.id === bountyId) {
@@ -516,6 +530,13 @@ export function Discover() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (typeof pendo !== "undefined") {
+        pendo.track("crawler_manually_triggered", {
+          triggerSource: "discover",
+          crawlerWasRunning: crawlerStatus?.isRunning || false,
+          totalCrawledBounties: crawlerStatus?.totalCrawledBounties ?? 0,
+        });
+      }
       setTimeout(fetchData, 3000);
     } finally {
       setTimeout(() => setTriggering(false), 4000);
@@ -554,6 +575,26 @@ export function Discover() {
       if (forYouMode) return (b.opportunityScore ?? 0) - (a.opportunityScore ?? 0);
       return 0;
     });
+
+  const filteredCountRef = useRef(filtered.length);
+  filteredCountRef.current = filtered.length;
+
+  useEffect(() => {
+    if (!search.trim()) return;
+    const timer = setTimeout(() => {
+      if (typeof pendo !== "undefined") {
+        pendo.track("discover_search_performed", {
+          query: search,
+          resultsCount: filteredCountRef.current,
+          totalBounties: bounties.length,
+          filterPlatform: filterPlatform || "",
+          filterType: filterType || "",
+          forYouMode: forYouMode,
+        });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -646,7 +687,19 @@ export function Discover() {
         {/* For You smart filter */}
         {hasProfileFilter ? (
           <button
-            onClick={() => { setForYouMode(!forYouMode); setFilterPlatform(""); }}
+            onClick={() => {
+              if (!forYouMode && typeof pendo !== "undefined") {
+                pendo.track("for_you_filter_activated", {
+                  matchingBountyCount: forYouCount,
+                  totalBounties: bounties.length,
+                  minimumReward: profile?.minimumReward ?? 0,
+                  contentFormats: profile?.contentFormats || "",
+                  hasProfileFilter: !!hasProfileFilter,
+                });
+              }
+              setForYouMode(!forYouMode);
+              setFilterPlatform("");
+            }}
             className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary hover:bg-primary/10"}`}
           >
             <Sparkles className="w-3 h-3" />

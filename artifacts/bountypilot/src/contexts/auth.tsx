@@ -143,6 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
+      if (typeof pendo !== "undefined") {
+        pendo.track("user_logged_in", {
+          plan: u.plan,
+          isAdmin: u.isAdmin,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -174,6 +180,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
+      if (typeof pendo !== "undefined") {
+        pendo.track("user_signed_up", {
+          plan: u.plan,
+          username: u.username,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
