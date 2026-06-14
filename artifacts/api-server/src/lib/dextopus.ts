@@ -106,7 +106,7 @@ export async function listChains(): Promise<Array<{ chainId: number; name: strin
 
 // ── List tokens for a chain ──────────────────────────────────────
 export async function listTokens(chainId: number): Promise<Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>> {
-  const data = await dextopusFetch(`/deposit/tokens?chainId=${chainId}`);
+  const data = await dextopusFetch(`/tokens?chainId=${chainId}`);
   const inner = (data.data as Record<string, unknown> | undefined) || data;
   return (inner.tokens || inner.data || []) as Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>;
 }
