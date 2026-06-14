@@ -83,12 +83,19 @@ export function Login() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-muted-foreground font-mono text-sm">
-          No account?{" "}
-          <button onClick={() => navigate("/signup")} className="text-primary hover:underline">
-            Create one
-          </button>
-        </p>
+        <div className="text-center space-y-2">
+          <p className="text-muted-foreground font-mono text-sm">
+            No account?{" "}
+            <button onClick={() => navigate("/signup")} className="text-primary hover:underline">
+              Create one
+            </button>
+          </p>
+          <p className="text-muted-foreground font-mono text-sm">
+            <button onClick={() => navigate("/forgot-password")} className="text-primary hover:underline">
+              Forgot password?
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

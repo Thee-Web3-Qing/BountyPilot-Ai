@@ -11,6 +11,8 @@ export const usersTable = pgTable("users", {
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   isAdmin: boolean("is_admin").notNull().default(false),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

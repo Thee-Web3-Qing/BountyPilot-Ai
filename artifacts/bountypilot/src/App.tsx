@@ -14,6 +14,8 @@ import { Submissions } from "./pages/submissions";
 import { Earnings } from "./pages/earnings";
 import { Login } from "./pages/login";
 import { Signup } from "./pages/signup";
+import { ForgotPassword } from "./pages/forgot-password";
+import { ResetPassword } from "./pages/reset-password";
 import { Profile } from "./pages/profile";
 import { Settings } from "./pages/settings";
 import { Discover } from "./pages/discover";
@@ -40,6 +42,8 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/" nest>
         {isAuthenticated ? (
           <Layout>

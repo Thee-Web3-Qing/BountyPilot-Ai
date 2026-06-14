@@ -99,6 +99,85 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 
+// POST /auth/forgot-password
+authRouter.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Email is required" });
+      return;
+    }
+
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email, username: usersTable.username })
+      .from(usersTable)
+      .where(eq(usersTable.email, email.toLowerCase()));
+
+    if (!user) {
+      // Don't reveal if email exists
+      res.json({ message: "If an account exists, a reset code has been generated." });
+      return;
+    }
+
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await db
+      .update(usersTable)
+      .set({ passwordResetToken: code, passwordResetExpires: expiresAt })
+      .where(eq(usersTable.id, user.id));
+
+    logger.info({ userId: user.id, email: user.email }, "Password reset code generated");
+    res.json({ message: "Reset code generated", code, username: user.username });
+  } catch (err) {
+    logger.error(err, "Forgot password error");
+    res.status(500).json({ error: "Failed to process request" });
+  }
+});
+
+// POST /auth/reset-password
+authRouter.post("/reset-password", async (req, res) => {
+  try {
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) {
+      res.status(400).json({ error: "Email, code, and new password are required" });
+      return;
+    }
+    if (password.length < 6) {
+      res.status(400).json({ error: "Password must be at least 6 characters" });
+      return;
+    }
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email.toLowerCase()));
+
+    if (!user || user.passwordResetToken !== code || !user.passwordResetExpires) {
+      res.status(400).json({ error: "Invalid or expired reset code" });
+      return;
+    }
+
+    if (new Date() > user.passwordResetExpires) {
+      res.status(400).json({ error: "Reset code has expired" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await db
+      .update(usersTable)
+      .set({ passwordHash, passwordResetToken: null, passwordResetExpires: null, updatedAt: new Date() })
+      .where(eq(usersTable.id, user.id));
+
+    logger.info({ userId: user.id }, "Password reset successful");
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    logger.error(err, "Reset password error");
+    res.status(500).json({ error: "Failed to reset password" });
+  }
+});
+
 // GET /auth/me
 authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
   try {
