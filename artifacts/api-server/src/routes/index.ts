@@ -11,7 +11,6 @@ import { settingsRouter } from "./settings";
 import { discoverRouter } from "./discover";
 import { adminRouter } from "./admin";
 import { mcpRouter } from "./mcp";
-import stripeRouter from "./stripe";
 import devpostRouter from "./devpost";
 
 const router: IRouter = Router();
@@ -28,7 +27,6 @@ router.use("/settings", settingsRouter);
 router.use("/discover", discoverRouter);
 router.use("/admin", adminRouter);
 router.use("/mcp", mcpRouter);
-router.use("/stripe", stripeRouter);
 router.use("/devpost", devpostRouter);
 
 export default router;
