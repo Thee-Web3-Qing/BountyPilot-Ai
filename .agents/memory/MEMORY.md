@@ -1,3 +1,5 @@
 - [BountyPilot Auth](bountypilot-auth.md) — JWT in localStorage via setAuthTokenGetter; all routes require requireAuth middleware; signup creates empty user_profile row.
 - [BountyPilot DB migration](bountypilot-db.md) — correct push command is `cd lib/db && pnpm run push`; users/user_profiles tables added; bounties/submissions/earnings have user_id column.
 - [BountyPilot LLM config](bountypilot-llm.md) — reads QWEN_API_KEY, QWEN_MODEL, QWEN_BASE_URL env vars; falls back to rule-based mock when no key; settings/status endpoint reports provider mode.
+- [BountyPilot Novus Analytics](bountypilot-novus.md) — analytics-only integration via MCP at `https://novus-api.pendo.io/mcp`. Dashboard and Admin pages get AI insight cards. Endpoints: `/dashboard/insights`, `/admin/insights`. Uses `analyzeDashboardInsights()` and `analyzeAdminInsights()` in `lib/novus.ts`. Cards hide when no Novus key is configured.
+- **No Stripe** — completely removed from codebase. Payments are crypto-only via Dextopus.

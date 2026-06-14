@@ -47,7 +47,7 @@ This is a **pnpm monorepo** with the following structure:
 ├── lib/
 │   ├── db/                   # Shared Drizzle schema (users, bounties, submissions, earnings)
 │   └── integrations/         # Shared integration packages
-├── scripts/                  # Seed scripts, seed-stripe-products.ts
+├── scripts/                  # Seed scripts
 ├── .env.example              # Environment template
 ├── pnpm-workspace.yaml       # Workspace configuration
 └── package.json

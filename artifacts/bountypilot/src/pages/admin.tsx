@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, Brain } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -352,8 +352,16 @@ export function Admin() {
         </>
       )}
 
-      {activeTab === "report" && report && (
+      {activeTab === "report" && (
         <div className="space-y-6">
+          {/* AI Insights */}
+          <AdminInsights />
+          {!report ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+          <>
           <p className="text-[10px] font-mono text-muted-foreground/60 text-right">
             Generated {new Date(report.generatedAt).toLocaleString()}
           </p>
@@ -490,6 +498,8 @@ export function Admin() {
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
       )}
 
@@ -591,6 +601,63 @@ function KPICard({ icon: Icon, label, value, suffix, color }: {
       <p className={`text-2xl font-bold font-mono ${color}`}>
         {value}{suffix}
       </p>
+    </div>
+  );
+}
+
+function AdminInsights() {
+  const [insights, setInsights] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [hasNovus, setHasNovus] = useState(false);
+
+  const fetchInsights = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/admin/insights`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setInsights(data.insights || null);
+        setHasNovus(!!data.hasNovus);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchInsights();
+  }, []);
+
+  if (!hasNovus) return null;
+
+  return (
+    <div className="bg-card border border-primary/30 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-primary" />
+          <h3 className="font-mono text-xs uppercase tracking-wider text-primary">Novus AI Growth Insights</h3>
+        </div>
+        <button
+          onClick={fetchInsights}
+          disabled={loading}
+          className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+        >
+          <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
+      </div>
+      {loading ? (
+        <div className="space-y-2 animate-pulse">
+          <div className="h-3 bg-border rounded w-full" />
+          <div className="h-3 bg-border rounded w-5/6" />
+          <div className="h-3 bg-border rounded w-4/6" />
+        </div>
+      ) : insights ? (
+        <div className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+          {insights}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground font-mono">No insights available yet.</p>
+      )}
     </div>
   );
 }

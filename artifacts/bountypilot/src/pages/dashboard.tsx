@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Activity, RefreshCw, Crown, Sparkles, Zap } from "lucide-react";
+import { Loader2, Activity, RefreshCw, Crown, Sparkles, Zap, Brain } from "lucide-react";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
 import { API_BASE } from "@/lib/api";
 
@@ -50,6 +50,9 @@ export function Dashboard() {
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
   const [triggeringCrawl, setTriggeringCrawl] = useState(false);
   const [, setTick] = useState(0);
+  const [insights, setInsights] = useState<string | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [hasNovus, setHasNovus] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     if (!token) return;
@@ -61,13 +64,29 @@ export function Dashboard() {
     } catch {}
   }, [token]);
 
+  const fetchInsights = useCallback(async () => {
+    if (!token) return;
+    setLoadingInsights(true);
+    try {
+      const resp = await fetch(`${API_BASE}/dashboard/insights`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setInsights(data.insights || null);
+        setHasNovus(!!data.hasNovus);
+      }
+    } catch {}
+    setLoadingInsights(false);
+  }, [token]);
+
   useEffect(() => {
     fetchStatus();
+    fetchInsights();
     const iv = setInterval(fetchStatus, 15000);
-    // tick every 30s to re-render relative times
     const tick = setInterval(() => setTick((t) => t + 1), 30000);
     return () => { clearInterval(iv); clearInterval(tick); };
-  }, [fetchStatus]);
+  }, [fetchStatus, fetchInsights]);
 
   const triggerCrawl = async () => {
     if (!token) return;
@@ -182,6 +201,42 @@ export function Dashboard() {
         <StatCard title="Active Bounties" value={summary?.activeBounties?.toString() || "0"} loading={loadingSummary} />
         <StatCard title="Avg Score" value={summary?.averageScore?.toFixed(1) || "0.0"} loading={loadingSummary} />
       </div>
+
+      {/* AI Insights */}
+      {hasNovus && (
+        <Card className="bg-card border-primary/30">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-mono text-xs uppercase tracking-wider text-primary flex items-center gap-2">
+                <Brain className="w-4 h-4" /> Novus AI Insights
+              </CardTitle>
+              <button
+                onClick={fetchInsights}
+                disabled={loadingInsights}
+                className="text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <RefreshCw className={`w-3 h-3 inline mr-1 ${loadingInsights ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingInsights ? (
+              <div className="space-y-2">
+                <Skeleton className="w-full h-4" />
+                <Skeleton className="w-full h-4" />
+                <Skeleton className="w-3/4 h-4" />
+              </div>
+            ) : insights ? (
+              <div className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+                {insights}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground font-mono">No insights available. Track more bounties to get AI recommendations.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 bg-card border-border">
