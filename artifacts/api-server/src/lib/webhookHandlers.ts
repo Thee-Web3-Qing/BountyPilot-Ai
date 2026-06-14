@@ -1,4 +1,5 @@
 import { getStripeSync } from "./stripeClient";
+import { handleStripeWebhook } from "./stripeWebhook";
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -10,6 +11,10 @@ export class WebhookHandlers {
       );
     }
     const sync = await getStripeSync();
-    await sync.processWebhook(payload, signature);
+    const result = await sync.processWebhook(payload, signature);
+    // Run custom business logic after stripe-replit-sync processes the event
+    if (result?.event) {
+      await handleStripeWebhook(result.event as { type: string; data: { object: Record<string, unknown> } });
+    }
   }
 }

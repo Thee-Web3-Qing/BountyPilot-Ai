@@ -57,6 +57,11 @@ export class StripeStorage {
     return result.rows[0] || null;
   }
 
+  async getCustomerById(customerId: string) {
+    const result = await db.execute(sql`SELECT * FROM stripe.customers WHERE id = ${customerId} LIMIT 1`);
+    return result.rows[0] || null;
+  }
+
   async getUserSubscription(userId: number) {
     const result = await db.execute(sql`
       SELECT s.* FROM stripe.subscriptions s
@@ -64,6 +69,16 @@ export class StripeStorage {
       WHERE c.metadata->>'userId' = ${String(userId)}
       AND s.status IN ('active', 'trialing')
       ORDER BY s.created DESC LIMIT 1
+    `);
+    return result.rows[0] || null;
+  }
+
+  async getUserSubscriptionByCustomer(customerId: string) {
+    const result = await db.execute(sql`
+      SELECT * FROM stripe.subscriptions
+      WHERE customer = ${customerId}
+      AND status IN ('active', 'trialing')
+      ORDER BY created DESC LIMIT 1
     `);
     return result.rows[0] || null;
   }

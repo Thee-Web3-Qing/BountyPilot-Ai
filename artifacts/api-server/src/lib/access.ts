@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-export type Plan = "beta" | "pending" | "trial" | "expired";
+export type Plan = "beta" | "pending" | "trial" | "expired" | "active" | "lifetime";
 
 const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
 const GRACE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in ms
@@ -24,6 +24,7 @@ function effectiveTrialEnd(trialEndsAt: Date | null): Date | null {
 
 export function getPlanStatus(plan: string, trialEndsAt: Date | null): Plan {
   if (plan === "beta") return "beta";
+  if (plan === "active" || plan === "lifetime") return "active";
   if (plan === "trial" || plan === "pending") {
     const effEnd = effectiveTrialEnd(trialEndsAt);
     if (!effEnd) return "trial";
@@ -34,7 +35,7 @@ export function getPlanStatus(plan: string, trialEndsAt: Date | null): Plan {
 
 export function canAccessAI(plan: string, trialEndsAt: Date | null): boolean {
   const status = getPlanStatus(plan, trialEndsAt);
-  return status === "beta" || status === "trial";
+  return status === "beta" || status === "trial" || status === "active";
 }
 
 export async function requireActivePlan(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {

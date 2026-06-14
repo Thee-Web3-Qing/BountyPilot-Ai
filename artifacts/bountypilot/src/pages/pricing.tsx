@@ -1,33 +1,42 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeft, Check, Zap, Crown, Star, Loader2 } from "lucide-react";
 
-const TIER = {
+interface StripeProduct {
+  id: string;
+  name: string;
+  description: string;
+  prices: Array<{
+    id: string;
+    unit_amount: number;
+    currency: string;
+    recurring: string | null;
+  }>;
+}
+
+const DISPLAY_TIER = {
   monthly: {
     name: "Monthly",
-    price: 5,
+    displayPrice: 5,
     unit: "/month",
-    priceId: "price_monthly", // Will be filled from Stripe API
     features: ["All bounties", "AI scoring", "Research briefs", "Production plans"],
   },
   yearly: {
     name: "Yearly",
-    price: 45,
+    displayPrice: 45,
     originalPrice: 55,
     unit: "/year",
     badge: "Pre-Launch Deal",
-    priceId: "price_yearly",
     features: ["All bounties", "AI scoring", "Research briefs", "Production plans", "Save $10"],
   },
   lifetime: {
     name: "Lifetime",
-    price: 250,
+    displayPrice: 250,
     originalPrice: 300,
     unit: " one-time",
     badge: "Best Value",
-    priceId: "price_lifetime",
     features: ["All bounties forever", "AI scoring", "Research briefs", "Production plans", "No recurring fees", "All future updates"],
   },
 };
@@ -36,13 +45,62 @@ export function Pricing() {
   const [, navigate] = useLocation();
   const { token } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
+  const [products, setProducts] = useState<StripeProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
 
-  const handleCheckout = async (priceId: string) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/stripe/products", { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        const json = await res.json();
+        if (!cancelled && json.data) {
+          setProducts(json.data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setProductsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const getPriceId = (tier: "monthly" | "yearly" | "lifetime") => {
+    const nameHint = tier === "monthly" ? "month" : tier === "yearly" ? "year" : "lifetime";
+    const product = products.find((p) =>
+      p.name.toLowerCase().includes(nameHint)
+    );
+    if (product && product.prices.length > 0) {
+      return product.prices[0].id;
+    }
+    // Fallback: use product name to match a price in any product
+    const fallback = products.find((p) => p.prices.some((pr) =>
+      pr.id.toLowerCase().includes(nameHint) ||
+      (p.name.toLowerCase().includes("month") && nameHint === "month") ||
+      (p.name.toLowerCase().includes("year") && nameHint === "year") ||
+      (p.name.toLowerCase().includes("lifetime") && nameHint === "lifetime")
+    ));
+    if (fallback) {
+      const price = fallback.prices.find((pr) =>
+        nameHint === "month" ? pr.recurring : nameHint === "year" ? pr.recurring : !pr.recurring
+      ) || fallback.prices[0];
+      return price.id;
+    }
+    return null;
+  };
+
+  const handleCheckout = async (tier: "monthly" | "yearly" | "lifetime") => {
     if (!token) {
       navigate("/login?redirect=pricing");
       return;
     }
-    setLoading(priceId);
+    const priceId = getPriceId(tier);
+    if (!priceId) {
+      alert("Stripe products not configured yet. Connect Stripe in the Integrations tab.");
+      return;
+    }
+    setLoading(tier);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -91,14 +149,14 @@ export function Pricing() {
           <div className="border border-border rounded-lg p-6 flex flex-col gap-4 bg-card/30 hover:bg-card/50 transition-colors">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-400" />
-              <h3 className="font-sans font-bold text-lg">{TIER.monthly.name}</h3>
+              <h3 className="font-sans font-bold text-lg">{DISPLAY_TIER.monthly.name}</h3>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold font-mono">${TIER.monthly.price}</span>
-              <span className="text-muted-foreground font-mono text-sm">{TIER.monthly.unit}</span>
+              <span className="text-3xl font-bold font-mono">${DISPLAY_TIER.monthly.displayPrice}</span>
+              <span className="text-muted-foreground font-mono text-sm">{DISPLAY_TIER.monthly.unit}</span>
             </div>
             <ul className="space-y-2">
-              {TIER.monthly.features.map((f, i) => (
+              {DISPLAY_TIER.monthly.features.map((f, i) => (
                 <li key={i} className="flex items-center gap-2 font-mono text-sm">
                   <Check className="w-3.5 h-3.5 text-green-400" /> {f}
                 </li>
@@ -107,29 +165,29 @@ export function Pricing() {
             <Button
               variant="outline"
               className="mt-auto font-mono text-xs uppercase tracking-wider"
-              onClick={() => handleCheckout(TIER.monthly.priceId)}
+              onClick={() => handleCheckout("monthly")}
               disabled={!!loading}
             >
-              {loading === TIER.monthly.priceId ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+              {loading === "monthly" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
             </Button>
           </div>
 
           {/* Yearly */}
           <div className="border border-primary/40 rounded-lg p-6 flex flex-col gap-4 bg-primary/5 relative">
             <span className="absolute top-3 right-3 text-[10px] font-mono bg-primary text-primary-foreground px-2 py-0.5 rounded uppercase tracking-wider">
-              {TIER.yearly.badge}
+              {DISPLAY_TIER.yearly.badge}
             </span>
             <div className="flex items-center gap-2">
               <Crown className="w-5 h-5 text-primary" />
-              <h3 className="font-sans font-bold text-lg">{TIER.yearly.name}</h3>
+              <h3 className="font-sans font-bold text-lg">{DISPLAY_TIER.yearly.name}</h3>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold font-mono">${TIER.yearly.price}</span>
-              <span className="text-muted-foreground font-mono text-sm">{TIER.yearly.unit}</span>
-              <span className="text-sm font-mono text-red-400 line-through ml-2">${TIER.yearly.originalPrice}</span>
+              <span className="text-3xl font-bold font-mono">${DISPLAY_TIER.yearly.displayPrice}</span>
+              <span className="text-muted-foreground font-mono text-sm">{DISPLAY_TIER.yearly.unit}</span>
+              <span className="text-sm font-mono text-red-400 line-through ml-2">${DISPLAY_TIER.yearly.originalPrice}</span>
             </div>
             <ul className="space-y-2">
-              {TIER.yearly.features.map((f, i) => (
+              {DISPLAY_TIER.yearly.features.map((f, i) => (
                 <li key={i} className="flex items-center gap-2 font-mono text-sm">
                   <Check className="w-3.5 h-3.5 text-green-400" /> {f}
                 </li>
@@ -137,29 +195,29 @@ export function Pricing() {
             </ul>
             <Button
               className="mt-auto font-mono text-xs uppercase tracking-wider"
-              onClick={() => handleCheckout(TIER.yearly.priceId)}
+              onClick={() => handleCheckout("yearly")}
               disabled={!!loading}
             >
-              {loading === TIER.yearly.priceId ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reserve Yearly"}
+              {loading === "yearly" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reserve Yearly"}
             </Button>
           </div>
 
           {/* Lifetime */}
           <div className="border border-yellow-500/30 rounded-lg p-6 flex flex-col gap-4 bg-yellow-500/5 relative">
             <span className="absolute top-3 right-3 text-[10px] font-mono bg-yellow-500 text-black px-2 py-0.5 rounded uppercase tracking-wider">
-              {TIER.lifetime.badge}
+              {DISPLAY_TIER.lifetime.badge}
             </span>
             <div className="flex items-center gap-2">
               <Star className="w-5 h-5 text-yellow-400" />
-              <h3 className="font-sans font-bold text-lg">{TIER.lifetime.name}</h3>
+              <h3 className="font-sans font-bold text-lg">{DISPLAY_TIER.lifetime.name}</h3>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold font-mono">${TIER.lifetime.price}</span>
-              <span className="text-muted-foreground font-mono text-sm">{TIER.lifetime.unit}</span>
-              <span className="text-sm font-mono text-red-400 line-through ml-2">${TIER.lifetime.originalPrice}</span>
+              <span className="text-3xl font-bold font-mono">${DISPLAY_TIER.lifetime.displayPrice}</span>
+              <span className="text-muted-foreground font-mono text-sm">{DISPLAY_TIER.lifetime.unit}</span>
+              <span className="text-sm font-mono text-red-400 line-through ml-2">${DISPLAY_TIER.lifetime.originalPrice}</span>
             </div>
             <ul className="space-y-2">
-              {TIER.lifetime.features.map((f, i) => (
+              {DISPLAY_TIER.lifetime.features.map((f, i) => (
                 <li key={i} className="flex items-center gap-2 font-mono text-sm">
                   <Check className="w-3.5 h-3.5 text-green-400" /> {f}
                 </li>
@@ -167,10 +225,10 @@ export function Pricing() {
             </ul>
             <Button
               className="mt-auto font-mono text-xs uppercase tracking-wider bg-yellow-500 hover:bg-yellow-400 text-black"
-              onClick={() => handleCheckout(TIER.lifetime.priceId)}
+              onClick={() => handleCheckout("lifetime")}
               disabled={!!loading}
             >
-              {loading === TIER.lifetime.priceId ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reserve Lifetime"}
+              {loading === "lifetime" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reserve Lifetime"}
             </Button>
           </div>
         </div>

@@ -9,25 +9,13 @@ export class StripeService {
     });
   }
 
-  async createCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string) {
+  async createCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string, mode: "subscription" | "payment" = "subscription") {
     const stripe = await getUncachableStripeClient();
     return await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
-  }
-
-  async createLifetimeCheckoutSession(customerId: string, priceId: string, successUrl: string, cancelUrl: string) {
-    const stripe = await getUncachableStripeClient();
-    return await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ["card"],
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: "payment",
+      mode,
       success_url: successUrl,
       cancel_url: cancelUrl,
     });

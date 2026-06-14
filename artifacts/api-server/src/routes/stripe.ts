@@ -66,11 +66,15 @@ router.post("/checkout", async (req: AuthRequest, res) => {
     }
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const price = await stripeStorage.getPrice(priceId);
+    const isOneTime = !price || !price.recurring || (typeof price.recurring === "string" && price.recurring === "null") || price.recurring === null;
+    const mode = isOneTime ? "payment" as const : "subscription" as const;
     const session = await stripeService.createCheckoutSession(
       customerId as string,
       priceId,
       `${baseUrl}/checkout/success`,
-      `${baseUrl}/checkout/cancel`
+      `${baseUrl}/checkout/cancel`,
+      mode
     );
 
     res.json({ url: session.url });
