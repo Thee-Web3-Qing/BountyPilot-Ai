@@ -25,14 +25,30 @@ router.get("/status", async (_req, res) => {
 // ── Webhook: Dextopus sends deposit events here (PUBLIC) ──
 router.post("/webhook", async (req, res) => {
   const payload = req.body;
-  logger.info({ event: payload?.event, depositId: payload?.data?.depositId }, "Dextopus webhook received");
+  const eventType = payload?.event as string | undefined;
+  const data = payload?.data as Record<string, unknown> | undefined;
+  logger.info({ event: eventType, depositId: data?.depositId }, "Dextopus webhook received");
 
-  if (!payload?.data?.depositId) {
+  if (!data?.depositId) {
     res.status(400).json({ error: "Missing depositId" });
     return;
   }
 
-  const { depositId, status, requestId, settlementAmount } = payload.data;
+  const depositId = data.depositId as string;
+  const requestId = data.requestId as string | undefined;
+  const settlementAmount = data.settlementAmount as string | undefined;
+
+  // Derive status from event type if not explicitly provided
+  let status: string;
+  if (eventType === "deposit.completed") {
+    status = "COMPLETED";
+  } else if (eventType === "deposit.failed") {
+    status = "FAILED";
+  } else if (eventType === "deposit.pending") {
+    status = "PENDING";
+  } else {
+    status = (data.status as string) || "COMPLETED";
+  }
 
   try {
     // Update our local record
@@ -45,7 +61,7 @@ router.post("/webhook", async (req, res) => {
       await db
         .update(dextopusDepositsTable)
         .set({
-          status: status || "COMPLETED",
+          status,
           requestId: requestId || existing[0].requestId,
           settlementAmount: settlementAmount ? String(settlementAmount) : existing[0].settlementAmount,
           updatedAt: new Date(),
@@ -67,7 +83,12 @@ router.post("/webhook", async (req, res) => {
       );
     }
 
-    res.status(200).json({ received: true });
+    // If failed, log it (don't downgrade plan if already active)
+    if (status === "FAILED" && existing.length > 0) {
+      logger.warn({ userId: existing[0].userId, depositId }, "Deposit failed");
+    }
+
+    res.status(200).json({ received: true, status });
   } catch (e: any) {
     logger.error({ err: e.message }, "Dextopus webhook processing failed");
     res.status(500).json({ error: e.message });
