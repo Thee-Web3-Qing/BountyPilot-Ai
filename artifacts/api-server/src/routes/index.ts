@@ -12,7 +12,6 @@ import { discoverRouter } from "./discover";
 import { adminRouter } from "./admin";
 import { mcpRouter } from "./mcp";
 import devpostRouter from "./devpost";
-import stripeRouter from "./stripe";
 import dextopusRouter from "./dextopus";
 
 const router: IRouter = Router();
@@ -30,7 +29,6 @@ router.use("/discover", discoverRouter);
 router.use("/admin", adminRouter);
 router.use("/mcp", mcpRouter);
 router.use("/devpost", devpostRouter);
-router.use("/stripe", stripeRouter);
 router.use("/dextopus", dextopusRouter);
 
 export default router;

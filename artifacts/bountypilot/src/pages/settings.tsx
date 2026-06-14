@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck, CreditCard, ExternalLink } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { API_BASE } from "@/lib/api";
 
@@ -22,8 +22,6 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [bootstrapState, setBootstrapState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [bootstrapMsg, setBootstrapMsg] = useState("");
-  const [portalLoading, setPortalLoading] = useState(false);
-
   async function runBootstrap() {
     setBootstrapState("loading");
     try {
@@ -120,42 +118,6 @@ export function Settings() {
               </CardContent>
             </Card>
           )}
-
-          <Card className="bg-card border-border">
-            <CardContent className="p-6 flex flex-col gap-4">
-              <p className="font-mono text-xs uppercase tracking-wider text-primary border-b border-border pb-2">Billing</p>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Current Plan</span>
-                <span className="font-mono text-sm text-green-400">{user?.plan?.toUpperCase() || "PENDING"}</span>
-              </div>
-              <button
-                onClick={async () => {
-                  setPortalLoading(true);
-                  try {
-                    const token = localStorage.getItem("bountypilot_token");
-                    const res = await fetch(`${API_BASE}/stripe/portal`, {
-                      method: "POST",
-                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                    });
-                    const json = await res.json();
-                    if (json.url) {
-                      window.location.href = json.url;
-                    } else {
-                      alert(json.error || "No Stripe subscription found.");
-                    }
-                  } catch {
-                    alert("Failed to open billing portal.");
-                  } finally {
-                    setPortalLoading(false);
-                  }
-                }}
-                disabled={portalLoading}
-                className="flex items-center gap-2 self-start font-mono text-xs uppercase tracking-wider px-4 py-2 rounded-sm bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {portalLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <><CreditCard className="w-3 h-3" /> Manage Billing</>}
-              </button>
-            </CardContent>
-          </Card>
 
           {user?.username === "QingTheCreator_" && (
             <Card className="border-purple-500/30 bg-purple-500/5">
