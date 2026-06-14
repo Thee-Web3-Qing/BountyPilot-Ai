@@ -350,6 +350,7 @@ function BountyCard({
 }) {
   const score = bounty.opportunityScore ?? 0;
   const dl = daysLeft(bounty.deadline);
+  const tl = timeLeft(bounty.deadline);
 
   return (
     <div
@@ -406,10 +407,10 @@ function BountyCard({
           </span>
         )}
 
-        {dl !== null && (
-          <span className={`font-mono text-[10px] flex items-center gap-1 whitespace-nowrap ${dl < 0 ? "text-muted-foreground/50" : dl < 3 ? "text-red-400" : dl < 7 ? "text-yellow-400" : "text-muted-foreground"}`}>
+        {tl !== null && (
+          <span className={`font-mono text-[10px] flex items-center gap-1 whitespace-nowrap ${tl === "Expired" ? "text-muted-foreground/50" : dl !== null && dl < 3 ? "text-red-400" : dl !== null && dl < 7 ? "text-yellow-400" : "text-muted-foreground"}`}>
             <Clock className="w-3 h-3 shrink-0" />
-            {dl < 0 ? "Expired" : dl === 0 ? "Today" : `${dl}d`}
+            {tl}
           </span>
         )}
 
