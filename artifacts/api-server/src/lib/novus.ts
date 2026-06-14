@@ -34,9 +34,12 @@ async function novusRpc(method: string, params?: unknown): Promise<unknown> {
     },
     body: JSON.stringify(req),
   });
-  const data = (await resp.json()) as JsonRpcResponse;
-  if (data.error) {
-    throw new Error(`Novus MCP error ${data.error.code}: ${data.error.message}`);
+  const data = (await resp.json()) as JsonRpcResponse & { message?: string; statusCode?: number };
+  // Novus returns errors in different shapes — handle both JSON-RPC and REST-style errors
+  if (data.error || data.statusCode && data.statusCode >= 400) {
+    const msg = data.error?.message || data.message || `HTTP ${data.statusCode}`;
+    const code = data.error?.code || data.statusCode || "unknown";
+    throw new Error(`Novus MCP error ${code}: ${msg}`);
   }
   return data.result;
 }
