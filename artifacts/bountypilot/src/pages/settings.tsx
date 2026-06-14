@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck, CreditCard, ExternalLink } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { API_BASE } from "@/lib/api";
 
@@ -9,10 +9,11 @@ interface LLMStatus {
   model: string;
   baseUrl: string | null;
   apiKeyConfigured: boolean;
-  status: "active" | "mock_mode";
+  status: "active" | "mock_mode" | "novus_active";
   message: string;
   environment: string;
   supportedProviders: string[];
+  novus?: { connected: boolean; serverInfo?: { name: string; version: string } } | null;
 }
 
 export function Settings() {
@@ -21,6 +22,7 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [bootstrapState, setBootstrapState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [bootstrapMsg, setBootstrapMsg] = useState("");
+  const [portalLoading, setPortalLoading] = useState(false);
 
   async function runBootstrap() {
     setBootstrapState("loading");
@@ -66,14 +68,14 @@ export function Settings() {
         </div>
       ) : status ? (
         <div className="flex flex-col gap-5">
-          <Card className={`border ${status.status === "active" ? "border-green-500/30 bg-green-500/5" : "border-yellow-500/30 bg-yellow-500/5"}`}>
+          <Card className={`border ${status.status === "active" || status.status === "novus_active" ? "border-green-500/30 bg-green-500/5" : "border-yellow-500/30 bg-yellow-500/5"}`}>
             <CardContent className="p-5 flex items-center gap-4">
-              {status.status === "active"
+              {status.status === "active" || status.status === "novus_active"
                 ? <CheckCircle className="w-6 h-6 text-green-400 shrink-0" />
                 : <Zap className="w-6 h-6 text-yellow-400 shrink-0" />}
               <div>
-                <p className={`font-mono font-bold text-sm ${status.status === "active" ? "text-green-400" : "text-yellow-400"}`}>
-                  {status.status === "active" ? "AI ACTIVE" : "MOCK MODE"}
+                <p className={`font-mono font-bold text-sm ${status.status === "active" || status.status === "novus_active" ? "text-green-400" : "text-yellow-400"}`}>
+                  {status.status === "active" || status.status === "novus_active" ? "AI ACTIVE" : "MOCK MODE"}
                 </p>
                 <p className="text-muted-foreground font-mono text-xs mt-0.5">{status.message}</p>
               </div>
@@ -83,7 +85,7 @@ export function Settings() {
           <Card className="bg-card border-border">
             <CardContent className="p-6 flex flex-col gap-4">
               <p className="font-mono text-xs uppercase tracking-wider text-primary border-b border-border pb-2">Provider Configuration</p>
-              <Row label="Current Provider" value={status.provider.toUpperCase()} highlight={status.status === "active"} />
+              <Row label="Current Provider" value={status.provider.toUpperCase()} highlight={status.status === "active" || status.status === "novus_active"} />
               <Row label="Model" value={status.model} />
               <Row label="API Key" value={status.apiKeyConfigured ? "Configured ✓" : "Not configured"} highlight={status.apiKeyConfigured} warn={!status.apiKeyConfigured} />
               {status.baseUrl && <Row label="Base URL" value={status.baseUrl} mono />}
@@ -118,6 +120,42 @@ export function Settings() {
               </CardContent>
             </Card>
           )}
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-6 flex flex-col gap-4">
+              <p className="font-mono text-xs uppercase tracking-wider text-primary border-b border-border pb-2">Billing</p>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Current Plan</span>
+                <span className="font-mono text-sm text-green-400">{user?.plan?.toUpperCase() || "PENDING"}</span>
+              </div>
+              <button
+                onClick={async () => {
+                  setPortalLoading(true);
+                  try {
+                    const token = localStorage.getItem("bountypilot_token");
+                    const res = await fetch(`${API_BASE}/stripe/portal`, {
+                      method: "POST",
+                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                    });
+                    const json = await res.json();
+                    if (json.url) {
+                      window.location.href = json.url;
+                    } else {
+                      alert(json.error || "No Stripe subscription found.");
+                    }
+                  } catch {
+                    alert("Failed to open billing portal.");
+                  } finally {
+                    setPortalLoading(false);
+                  }
+                }}
+                disabled={portalLoading}
+                className="flex items-center gap-2 self-start font-mono text-xs uppercase tracking-wider px-4 py-2 rounded-sm bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {portalLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <><CreditCard className="w-3 h-3" /> Manage Billing</>}
+              </button>
+            </CardContent>
+          </Card>
 
           {user?.username === "QingTheCreator_" && (
             <Card className="border-purple-500/30 bg-purple-500/5">

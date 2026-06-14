@@ -100,4 +100,32 @@ router.get("/subscription", async (req: AuthRequest, res) => {
   }
 });
 
+// Create customer portal session for managing subscriptions
+router.post("/portal", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const customer = await stripeStorage.getCustomerByEmail(user.email);
+    if (!customer) {
+      return res.status(404).json({ error: "No Stripe customer found" });
+    }
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const session = await stripeService.createCustomerPortalSession(
+      customer.id as string,
+      `${baseUrl}/settings`
+    );
+
+    res.json({ url: session.url });
+    return;
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+    return;
+  }
+});
+
 export default router;

@@ -14,6 +14,8 @@ import {
   ExternalLink,
   Copy,
   CheckCircle2,
+  CreditCard,
+  Settings2,
 } from "lucide-react";
 
 interface Chain {
@@ -41,26 +43,36 @@ interface DepositResult {
 
 const API_BASE = "/api";
 
-const DISPLAY_TIER = {
+const DISPLAY_TIER: Record<string, {
+  name: string;
+  displayPrice: string;
+  originalPrice?: string;
+  unit: string;
+  badge?: string;
+  features: string[];
+  stripePriceId?: string;
+}> = {
   monthly: {
     name: "Monthly",
     displayPrice: "$5",
-    unit: "USDC/month",
+    unit: "USD/month",
     features: ["All bounties", "AI scoring", "Research briefs", "Production plans"],
+    stripePriceId: "price_1TiLa1LgOc98eWZChXslsP8G",
   },
   yearly: {
     name: "Yearly",
     displayPrice: "$45",
     originalPrice: "$55",
-    unit: "USDC/year",
+    unit: "USD/year",
     badge: "Pre-Launch Deal",
     features: ["All bounties", "AI scoring", "Research briefs", "Production plans", "Save $10"],
+    stripePriceId: "price_1TiLa2LgOc98eWZCxeBS0vhR",
   },
   lifetime: {
     name: "Lifetime",
     displayPrice: "$250",
     originalPrice: "$300",
-    unit: "USDC one-time",
+    unit: "USD one-time",
     badge: "Best Value",
     features: [
       "All bounties forever",
@@ -70,6 +82,7 @@ const DISPLAY_TIER = {
       "No recurring fees",
       "All future updates",
     ],
+    stripePriceId: "price_1TiLa2LgOc98eWZCGiJHJLII",
   },
 };
 
@@ -170,6 +183,39 @@ export function Pricing() {
     setSelectedChain(null);
     setSelectedToken(null);
     setRefundAddress("");
+  };
+
+  const handleStripeCheckout = async (tier: string) => {
+    if (!token) {
+      navigate("/login?redirect=pricing");
+      return;
+    }
+    const priceId = DISPLAY_TIER[tier]?.stripePriceId;
+    if (!priceId) {
+      alert("Stripe price not configured for this tier.");
+      return;
+    }
+    setLoading(tier);
+    try {
+      const res = await fetch(`${API_BASE}/stripe/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ priceId }),
+      });
+      const json = await res.json();
+      if (json.url) {
+        window.location.href = json.url;
+      } else {
+        alert(json.error || "Failed to create Stripe checkout session.");
+      }
+    } catch (e) {
+      alert("Error creating Stripe checkout. Try again.");
+    } finally {
+      setLoading(null);
+    }
   };
 
   const handleGenerateDeposit = async () => {
@@ -427,14 +473,23 @@ export function Pricing() {
                 </li>
               ))}
             </ul>
-            <Button
-              variant="outline"
-              className="mt-auto font-mono text-xs uppercase tracking-wider"
-              onClick={() => handleStartCheckout("monthly")}
-              disabled={!!loading || !dextopusEnabled}
-            >
-              {loading === "monthly" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
-            </Button>
+            <div className="flex flex-col gap-2 mt-auto">
+              <Button
+                className="font-mono text-xs uppercase tracking-wider"
+                onClick={() => handleStripeCheckout("monthly")}
+                disabled={!!loading}
+              >
+                {loading === "monthly" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-3.5 h-3.5 mr-1" /> Pay with Card</>}
+              </Button>
+              <Button
+                variant="outline"
+                className="font-mono text-xs uppercase tracking-wider"
+                onClick={() => handleStartCheckout("monthly")}
+                disabled={!!loading || !dextopusEnabled}
+              >
+                <Wallet className="w-3.5 h-3.5 mr-1" /> Pay with Crypto
+              </Button>
+            </div>
           </div>
 
           {/* Yearly */}
@@ -458,13 +513,23 @@ export function Pricing() {
                 </li>
               ))}
             </ul>
-            <Button
-              className="mt-auto font-mono text-xs uppercase tracking-wider"
-              onClick={() => handleStartCheckout("yearly")}
-              disabled={!!loading || !dextopusEnabled}
-            >
-              {loading === "yearly" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reserve Yearly"}
-            </Button>
+            <div className="flex flex-col gap-2 mt-auto">
+              <Button
+                className="font-mono text-xs uppercase tracking-wider"
+                onClick={() => handleStripeCheckout("yearly")}
+                disabled={!!loading}
+              >
+                {loading === "yearly" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-3.5 h-3.5 mr-1" /> Pay with Card</>}
+              </Button>
+              <Button
+                variant="outline"
+                className="font-mono text-xs uppercase tracking-wider"
+                onClick={() => handleStartCheckout("yearly")}
+                disabled={!!loading || !dextopusEnabled}
+              >
+                <Wallet className="w-3.5 h-3.5 mr-1" /> Pay with Crypto
+              </Button>
+            </div>
           </div>
 
           {/* Lifetime */}
@@ -488,20 +553,30 @@ export function Pricing() {
                 </li>
               ))}
             </ul>
-            <Button
-              className="mt-auto font-mono text-xs uppercase tracking-wider bg-yellow-500 hover:bg-yellow-400 text-black"
-              onClick={() => handleStartCheckout("lifetime")}
-              disabled={!!loading || !dextopusEnabled}
-            >
-              {loading === "lifetime" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reserve Lifetime"}
-            </Button>
+            <div className="flex flex-col gap-2 mt-auto">
+              <Button
+                className="font-mono text-xs uppercase tracking-wider bg-yellow-500 hover:bg-yellow-400 text-black"
+                onClick={() => handleStripeCheckout("lifetime")}
+                disabled={!!loading}
+              >
+                {loading === "lifetime" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-3.5 h-3.5 mr-1" /> Pay with Card</>}
+              </Button>
+              <Button
+                variant="outline"
+                className="font-mono text-xs uppercase tracking-wider"
+                onClick={() => handleStartCheckout("lifetime")}
+                disabled={!!loading || !dextopusEnabled}
+              >
+                <Wallet className="w-3.5 h-3.5 mr-1" /> Pay with Crypto
+              </Button>
+            </div>
           </div>
         </div>
 
         <p className="text-muted-foreground font-mono text-xs text-center mt-8">
           {!dextopusEnabled
-            ? "Crypto payments coming soon. Dextopus integration not configured."
-            : "Pay with any crypto. Dextopus auto-bridges to our treasury."}
+            ? "Card payments via Stripe. Crypto payments coming soon — Dextopus integration not configured."
+            : "Pay with card (Stripe) or any crypto (Dextopus auto-bridges to our treasury)."}
         </p>
       </div>
 

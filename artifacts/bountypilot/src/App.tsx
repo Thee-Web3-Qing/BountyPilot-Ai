@@ -23,6 +23,8 @@ import { Settings } from "./pages/settings";
 import { Discover } from "./pages/discover";
 import { Landing } from "./pages/landing";
 import { Pricing } from "./pages/pricing";
+import { CheckoutSuccess } from "./pages/checkout-success";
+import { CheckoutCancel } from "./pages/checkout-cancel";
 
 import { Admin } from "./pages/admin";
 
@@ -62,6 +64,8 @@ function Router() {
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/checkout/success" component={CheckoutSuccess} />
+        <Route path="/checkout/cancel" component={CheckoutCancel} />
         <Route path="/" nest>
           {isAuthenticated ? (
             <Layout>

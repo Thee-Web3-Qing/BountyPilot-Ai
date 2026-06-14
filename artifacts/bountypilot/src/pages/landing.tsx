@@ -58,7 +58,7 @@ export function Landing() {
       <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20 max-w-4xl mx-auto w-full">
         <div className="inline-flex items-center gap-2 border border-primary/30 bg-primary/5 rounded-full px-3 py-1 mb-8">
           <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <span className="font-mono text-xs text-primary uppercase tracking-wider">Powered by Qwen AI</span>
+          <span className="font-mono text-xs text-primary uppercase tracking-wider">Powered by AI</span>
         </div>
 
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold font-sans uppercase tracking-tighter leading-none mb-6">
