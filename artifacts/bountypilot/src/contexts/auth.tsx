@@ -111,6 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             minimumReward: data.profile?.minimumReward,
             weeklyContentCapacity: data.profile?.weeklyContentCapacity,
             targetMonthlyEarnings: data.profile?.targetMonthlyEarnings,
+            creatorStrengths: data.profile?.creatorStrengths,
+            creatorWeaknesses: data.profile?.creatorWeaknesses,
+            portfolioLinks: data.profile?.portfolioLinks,
           }
         });
       })
