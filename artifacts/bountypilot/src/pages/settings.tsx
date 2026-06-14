@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
+import { API_BASE } from "@/lib/api";
 
 interface LLMStatus {
   provider: string;

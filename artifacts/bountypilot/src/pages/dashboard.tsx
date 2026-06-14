@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Activity, RefreshCw } from "lucide-react";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
+import { API_BASE } from "@/lib/api";
 
 interface CrawlerStatus {
   isRunning: boolean;

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBountiesQueryKey } from "@workspace/api-client-react";
+import { API_BASE } from "@/lib/api";
 
 interface DiscoveredBounty {
   id: number;
