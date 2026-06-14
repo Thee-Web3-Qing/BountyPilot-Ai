@@ -8,6 +8,7 @@ import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Activity, RefreshCw, Crown, Sparkles, Zap } from "lucide-react";
+import { trackPendo } from "@/lib/pendo";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
 import { API_BASE } from "@/lib/api";
 
@@ -77,6 +78,7 @@ export function Dashboard() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+      trackPendo("DiscoverCrawlTriggered", { source: "dashboard" });
       setTimeout(fetchStatus, 2000);
     } finally {
       setTriggeringCrawl(false);

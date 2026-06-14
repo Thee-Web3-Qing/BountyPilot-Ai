@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Crosshair, Loader2, AlertCircle, CheckCircle, ArrowLeft, Copy } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import { trackPendo } from "@/lib/pendo";
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -33,6 +34,7 @@ export function ForgotPassword() {
         setResetCode(data.code);
         setUsername(data.username || "");
         setStep("code");
+        trackPendo("PasswordResetRequested");
       } else {
         setError("No account found with that email.");
       }

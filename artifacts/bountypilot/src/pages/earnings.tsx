@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Loader2, TrendingUp } from "lucide-react";
+import { trackPendo } from "@/lib/pendo";
 
 const PLATFORMS = ["Superteam Earn", "GibWork", "First Dollar", "DoraHacks", "Gitcoin", "Other"];
 
@@ -53,6 +54,11 @@ export function Earnings() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListEarningsQueryKey() });
+          trackPendo("EarningLogged", {
+            platform: formData.platform,
+            amount: parseFloat(formData.amount),
+            currency: formData.currency,
+          });
           setShowForm(false);
           setFormData({ platform: "", amount: "", currency: "USDC", notes: "" });
         },

@@ -13,6 +13,7 @@ import { getListBountiesQueryKey } from "@workspace/api-client-react";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/contexts/auth";
 import { FreeLimitGate } from "@/components/trial-gate";
+import { trackPendo } from "@/lib/pendo";
 
 interface DiscoveredBounty {
   id: number;
@@ -524,6 +525,17 @@ export function Discover() {
         const data = await resp.json();
         setClaimed((prev) => new Set([...prev, bountyId]));
         queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+        const sourceBounty = bounties.find(b => b.id === bountyId);
+        trackPendo("DiscoverBountyClaimed", {
+          sourceBountyId: bountyId,
+          claimedBountyId: data.id,
+          platform: sourceBounty?.platform,
+          title: sourceBounty?.title,
+          rewardAmount: sourceBounty?.rewardAmount,
+          rewardCurrency: sourceBounty?.rewardCurrency,
+          opportunityScore: sourceBounty?.opportunityScore,
+          confidenceScore: sourceBounty?.confidenceScore,
+        });
         if (selected?.id === bountyId) {
           setTimeout(() => navigate(`/bounties/${data.id}`), 900);
         }
@@ -543,6 +555,7 @@ export function Discover() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
+      trackPendo("DiscoverCrawlTriggered", { source: "discover" });
       setTimeout(fetchData, 3000);
     } finally {
       setTimeout(() => setTriggering(false), 4000);
