@@ -1,8 +1,8 @@
 import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "./auth.js";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { usersTable, bountiesTable } from "@workspace/db";
+import { eq, count, and } from "drizzle-orm";
 
 export type Plan = "beta" | "pending" | "trial" | "expired" | "active" | "lifetime";
 
@@ -60,6 +60,28 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
   }
 
   next();
+}
+
+export function isFreeTier(plan: string, trialEndsAt: Date | null): boolean {
+  const status = getPlanStatus(plan, trialEndsAt);
+  return status === "trial" || status === "pending" || status === "expired";
+}
+
+export async function getUserPlanStatus(userId: number): Promise<{ plan: string; trialEndsAt: Date | null; isFree: boolean }> {
+  const [user] = await db
+    .select({ plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+  if (!user) return { plan: "expired", trialEndsAt: null, isFree: true };
+  return { plan: user.plan, trialEndsAt: user.trialEndsAt, isFree: isFreeTier(user.plan, user.trialEndsAt) };
+}
+
+export async function countUserBounties(userId: number): Promise<number> {
+  const [result] = await db
+    .select({ value: count() })
+    .from(bountiesTable)
+    .where(eq(bountiesTable.userId, userId));
+  return Number(result?.value ?? 0);
 }
 
 export function getTrialDays(): number {

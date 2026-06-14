@@ -6,6 +6,7 @@ import {
   useApproveBounty,
   useRejectBounty,
   useSaveBountyForLater,
+  useListBounties,
   getListBountiesQueryKey,
   getGetDashboardSummaryQueryKey,
   getGetRecentBountiesQueryKey,
@@ -15,7 +16,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle, Shield } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle, Shield, Lock, Crown } from "lucide-react";
+import { useAuth } from "@/contexts/auth";
 
 const WORKFLOW_STEPS = [
   "Fetching page content...",
@@ -149,6 +151,12 @@ export function BountyAdd() {
   const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { isPaid, isFree } = useAuth();
+  const FREE_LIMIT = 3;
+
+  const { data: existingBounties } = useListBounties({});
+  const pipelineCount = existingBounties?.length ?? 0;
+  const atLimit = isFree && pipelineCount >= FREE_LIMIT;
 
   const createMutation = useCreateBounty();
   const updateMutation = useUpdateBounty();
@@ -269,9 +277,26 @@ export function BountyAdd() {
         <p className="text-muted-foreground font-mono mt-2 text-sm">
           Paste a bounty URL. We extract what we can — you review and fill in the rest.
         </p>
+        {isFree && (
+          <p className="text-yellow-500 font-mono text-xs mt-1">
+            {pipelineCount} of {FREE_LIMIT} free bounties used
+          </p>
+        )}
       </div>
 
-      <Card className="bg-card border-border">
+      {atLimit && (
+        <div className="flex flex-col items-center gap-3 py-6 border border-dashed border-yellow-500/30 rounded-sm bg-yellow-500/5">
+          <Crown className="w-6 h-6 text-yellow-500" />
+          <p className="font-mono text-xs text-yellow-500 text-center max-w-xs">
+            You have reached the free limit of {FREE_LIMIT} pipeline bounties.
+          </p>
+          <Button onClick={() => navigate("/pricing")} size="sm" className="font-mono text-xs bg-yellow-500 text-black hover:bg-yellow-400">
+            Upgrade for Unlimited
+          </Button>
+        </div>
+      )}
+
+      <Card className={`bg-card border-border ${atLimit ? "opacity-50 pointer-events-none" : ""}`}>
         <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground">

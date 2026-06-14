@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -5,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { AuthProvider, useAuth } from "@/contexts/auth";
+import { trackPageLoad, trackPendo } from "@/lib/pendo";
 
 import { Dashboard } from "./pages/dashboard";
 import { Bounties } from "./pages/bounties";
@@ -36,41 +38,56 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   return <Component />;
 }
 
+function PageTracker() {
+  const [location] = useLocation();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    trackPageLoad();
+    trackPendo("PageView", { path: location, userId: user?.id ?? "anonymous" });
+  }, [location, user]);
+
+  return null;
+}
+
 function Router() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <Switch>
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/" nest>
-        {isAuthenticated ? (
-          <Layout>
+    <>
+      <PageTracker />
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/signup" component={Signup} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/" nest>
+          {isAuthenticated ? (
+            <Layout>
+              <Switch>
+                <Route path="/" component={Dashboard} />
+                <Route path="/discover" component={Discover} />
+                <Route path="/bounties" component={Bounties} />
+                <Route path="/bounties/add" component={BountyAdd} />
+                <Route path="/bounties/:id" component={BountyDetail} />
+                <Route path="/submissions" component={Submissions} />
+                <Route path="/earnings" component={Earnings} />
+                <Route path="/profile" component={Profile} />
+                <Route path="/settings" component={Settings} />
+                <Route path="/admin" component={Admin} />
+                <Route component={NotFound} />
+              </Switch>
+            </Layout>
+          ) : (
             <Switch>
-              <Route path="/" component={Dashboard} />
-              <Route path="/discover" component={Discover} />
-              <Route path="/bounties" component={Bounties} />
-              <Route path="/bounties/add" component={BountyAdd} />
-              <Route path="/bounties/:id" component={BountyDetail} />
-              <Route path="/submissions" component={Submissions} />
-              <Route path="/earnings" component={Earnings} />
-              <Route path="/profile" component={Profile} />
-              <Route path="/settings" component={Settings} />
-              <Route path="/admin" component={Admin} />
-              <Route component={NotFound} />
+              <Route path="/" component={Landing} />
+              <Route component={Login} />
             </Switch>
-          </Layout>
-        ) : (
-          <Switch>
-            <Route path="/" component={Landing} />
-            <Route component={Login} />
-          </Switch>
-        )}
-      </Route>
-    </Switch>
+          )}
+        </Route>
+      </Switch>
+    </>
   );
 }
 

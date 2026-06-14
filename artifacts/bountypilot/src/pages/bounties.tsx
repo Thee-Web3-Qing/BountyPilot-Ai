@@ -10,7 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Clock, Check } from "lucide-react";
+import { Plus, Trash2, Clock, Check, Crown, Lock } from "lucide-react";
+import { useAuth } from "@/contexts/auth";
+import { FreeLimitGate } from "@/components/trial-gate";
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -58,6 +60,8 @@ export function Bounties() {
   const [platformFilter, setPlatformFilter] = useState<string>("");
   const [activeOnly, setActiveOnly] = useState<boolean>(true);
   const queryClient = useQueryClient();
+  const { isPaid, isFree } = useAuth();
+  const FREE_LIMIT = 3;
 
   const params = {
     ...(statusFilter ? { status: statusFilter } : {}),
@@ -67,6 +71,8 @@ export function Bounties() {
 
   const { data: bounties, isLoading } = useListBounties(params);
   const deleteMutation = useDeleteBounty();
+  const pipelineCount = bounties?.length ?? 0;
+  const atLimit = isFree && pipelineCount >= FREE_LIMIT;
 
   const handleDelete = (e: React.MouseEvent, id: number) => {
     e.preventDefault();
@@ -89,14 +95,40 @@ export function Bounties() {
           <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">All Bounties</h1>
           <p className="text-muted-foreground font-mono mt-1 text-sm">
             {bounties?.length ?? 0} bounties found
+            {isFree && (
+              <span className="text-yellow-500 ml-1">
+                · {FREE_LIMIT - Math.min(pipelineCount, FREE_LIMIT)} of {FREE_LIMIT} free slots remaining
+              </span>
+            )}
           </p>
         </div>
         <Link href="/bounties/add">
-          <Button className="font-mono uppercase tracking-wider">
-            <Plus className="w-4 h-4 mr-2" /> Hunt Bounty
+          <Button
+            className="font-mono uppercase tracking-wider"
+            disabled={atLimit}
+            title={atLimit ? "Free limit reached — upgrade to add more" : ""}
+          >
+            {atLimit ? <Lock className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            {atLimit ? "Limit Reached" : "Hunt Bounty"}
           </Button>
         </Link>
       </div>
+
+      {atLimit && (
+        <div className="flex items-center gap-3 px-4 py-3 border border-dashed border-yellow-500/30 rounded-sm bg-yellow-500/5 text-yellow-500">
+          <Crown className="w-4 h-4 shrink-0" />
+          <div className="flex-1">
+            <p className="font-mono text-xs">
+              You have reached the free plan limit of {FREE_LIMIT} pipeline bounties.
+            </p>
+          </div>
+          <Link href="/pricing">
+            <Button size="sm" className="font-mono text-[10px] uppercase bg-yellow-500 text-black hover:bg-yellow-400">
+              Upgrade
+            </Button>
+          </Link>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <select

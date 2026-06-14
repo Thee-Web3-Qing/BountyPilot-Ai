@@ -11,6 +11,10 @@ import {
   Zap,
   Target,
   DollarSign,
+  Check,
+  X,
+  Crown,
+  Lock,
 } from "lucide-react";
 
 export function Landing() {
@@ -188,6 +192,63 @@ export function Landing() {
         </div>
       </section>
 
+      {/* Tier Comparison */}
+      <section className="border-t border-border px-6 py-16">
+        <div className="max-w-3xl mx-auto">
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground text-center mb-8">
+            Free vs Premium
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-border rounded-lg overflow-hidden">
+            {/* Header row */}
+            <div className="bg-card/50 p-4 border-b border-border md:border-b-0 md:border-r border-r-0">
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Feature</p>
+            </div>
+            <div className="bg-card/50 p-4 border-b border-border md:border-b-0 md:border-r border-r-0 text-center">
+              <p className="font-mono text-xs text-muted-foreground uppercase tracking-wider">Free</p>
+            </div>
+            <div className="bg-primary/5 p-4 text-center">
+              <p className="font-mono text-xs text-primary uppercase tracking-wider">Premium</p>
+            </div>
+            {/* Rows */}
+            {[
+              { feature: "Browse Bounties", free: "Up to 50", paid: "Unlimited" },
+              { feature: "Pipeline Bounties", free: "Up to 3", paid: "Unlimited" },
+              { feature: "AI Opportunity Score", free: "Hidden", paid: "Full 1-10 score" },
+              { feature: "Score Explanation", free: "Preview only", paid: "Full breakdown" },
+              { feature: "For You Matching", free: "N/A", paid: "Profile-based filter" },
+              { feature: "Research Brief", free: "N/A", paid: "AI-generated" },
+              { feature: "Production Plan", free: "N/A", paid: "AI-generated" },
+              { feature: "Dashboard Analytics", free: "Basic", paid: "Full breakdown" },
+            ].map((row, i) => (
+              <div key={`row-${i}`} className={`contents ${i > 0 ? "" : ""}`}>
+                <div className={`p-4 ${i > 0 ? "border-t border-border" : ""} md:border-r border-r-0 flex items-center`}>
+                  <span className="font-mono text-xs text-muted-foreground">{row.feature}</span>
+                </div>
+                <div className={`p-4 ${i > 0 ? "border-t border-border" : ""} md:border-r border-r-0 text-center flex items-center justify-center gap-1`}>
+                  {row.free === "N/A" || row.free === "Hidden" || row.free === "Preview only" ? (
+                    <><X className="w-3 h-3 text-muted-foreground/50" /> <span className="font-mono text-xs text-muted-foreground/50">{row.free}</span></>
+                  ) : (
+                    <span className="font-mono text-xs text-foreground">{row.free}</span>
+                  )}
+                </div>
+                <div className={`p-4 ${i > 0 ? "border-t border-border" : ""} flex items-center justify-center gap-1`}>
+                  <Check className="w-3 h-3 text-green-400" />
+                  <span className="font-mono text-xs text-foreground">{row.paid}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <Button variant="outline" size="sm" onClick={() => navigate("/signup")} className="font-mono text-xs uppercase">
+              Start Free
+            </Button>
+            <Button size="sm" onClick={() => navigate("/pricing")} className="font-mono text-xs uppercase bg-yellow-500 text-black hover:bg-yellow-400">
+              <Crown className="w-3 h-3 mr-1" /> Go Premium
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* CTA footer */}
       <section className="border-t border-border px-6 py-16 text-center">
         <div className="max-w-lg mx-auto flex flex-col items-center gap-6">
@@ -195,7 +256,7 @@ export function Landing() {
             Ready to start<br />earning from bounties?
           </h2>
           <p className="font-mono text-sm text-muted-foreground">
-            Limited beta. 1000 spots. 14-day free trial.
+            Start free. Upgrade when you are ready. No credit card required.
           </p>
           <Button
             size="lg"

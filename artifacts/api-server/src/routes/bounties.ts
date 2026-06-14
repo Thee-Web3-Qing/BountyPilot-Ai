@@ -13,6 +13,7 @@ import { logger } from "../lib/logger.js";
 import { scrapeBounty } from "../lib/scraper.js";
 import { analyzeBounty, generateResearchBrief, generateProductionPlan } from "../lib/qwen.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { getUserPlanStatus, countUserBounties } from "../lib/access.js";
 
 export const bountiesRouter = Router();
 
@@ -60,6 +61,16 @@ bountiesRouter.post("/", async (req: AuthRequest, res) => {
       return;
     }
     const { url } = parsed.data;
+
+    // Enforce free tier 3-bounty pipeline limit
+    const { isFree } = await getUserPlanStatus(userId);
+    if (isFree) {
+      const bountyCount = await countUserBounties(userId);
+      if (bountyCount >= 3) {
+        res.status(403).json({ error: "free_limit", message: "Free plan is limited to 3 bounties. Upgrade to add more." });
+        return;
+      }
+    }
 
     logger.info({ url, userId }, "Scraping bounty URL");
     const scraped = await scrapeBounty(url);

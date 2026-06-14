@@ -71,7 +71,7 @@ export function BountyDetail() {
   const bountyId = parseInt(id ?? "0");
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
-  const { token } = useAuth();
+  const { token, canAccessAI, isPaid } = useAuth();
 
   const { data: bounty, isLoading: loadingBounty } = useGetBounty(bountyId, {
     query: { enabled: !!bountyId, queryKey: getGetBountyQueryKey(bountyId) },
@@ -314,15 +314,29 @@ export function BountyDetail() {
       </div>
 
       {bounty.opportunityScore != null && bounty.scoreExplanation && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
-              <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
-            </div>
-            <p className="text-sm">{bounty.scoreExplanation}</p>
-          </CardContent>
-        </Card>
+        <AIFeatureGate
+          fallback={
+            <Card className="border-border/50 bg-muted/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
+                  <span className="inline-block px-1.5 py-0 bg-yellow-500/10 border border-yellow-500/20 rounded text-[9px] text-yellow-500 font-mono">Premium</span>
+                </div>
+                <p className="text-sm text-muted-foreground">{bounty.scoreExplanation.substring(0, 120)}...</p>
+              </CardContent>
+            </Card>
+          }
+        >
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
+                <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+              </div>
+              <p className="text-sm">{bounty.scoreExplanation}</p>
+            </CardContent>
+          </Card>
+        </AIFeatureGate>
       )}
 
       {/* Agentic Retry Extraction */}

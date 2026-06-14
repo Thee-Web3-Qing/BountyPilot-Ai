@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { initializePendo, identifyPendo, trackPendo } from "@/lib/pendo";
 
 export type Plan = "beta" | "trial" | "expired" | "pending" | "active" | "lifetime";
 
@@ -21,6 +22,8 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   canAccessAI: boolean;
+  isPaid: boolean;
+  isFree: boolean;
   trialDaysLeft: number | null;
   planStatus: Plan | null;
   refreshUser: () => Promise<void>;
@@ -93,6 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         localStorage.setItem(USER_KEY, JSON.stringify(updated));
         setUser(updated);
+        identifyPendo(String(updated.id), updated.email, updated.plan);
+        trackPendo("UserRefreshed", { plan: updated.plan });
       })
       .catch(() => {});
   }, []);
@@ -144,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
+      identifyPendo(String(u.id), u.email, u.plan);
+      trackPendo("UserLoggedIn", { plan: u.plan });
     } finally {
       setIsLoading(false);
     }
@@ -175,6 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
+      identifyPendo(String(u.id), u.email, u.plan);
+      trackPendo("UserSignedUp", { plan: u.plan });
     } finally {
       setIsLoading(false);
     }
@@ -191,6 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const planStatus = computePlanStatus(user);
   const trialDaysLeft = computeTrialDaysLeft(user);
   const canAccessAI = planStatus === "beta" || planStatus === "trial" || planStatus === "active";
+  const isPaid = planStatus === "active" || planStatus === "beta";
+  const isFree = planStatus === "trial" || planStatus === "pending" || planStatus === "expired";
 
   return (
     <AuthContext.Provider value={{
@@ -198,6 +209,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, signup, logout,
       isAuthenticated: !!user && !!token,
       canAccessAI,
+      isPaid,
+      isFree,
       trialDaysLeft,
       planStatus,
       refreshUser,

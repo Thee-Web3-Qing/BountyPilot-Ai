@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { bountiesTable } from "@workspace/db";
 import { isNull, eq, and, desc, or, gte } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { getUserPlanStatus, countUserBounties } from "../lib/access.js";
 import { logger } from "../lib/logger.js";
 import { crawlAll } from "../lib/crawler.js";
 import { getCrawlerStatus } from "../lib/cron.js";
@@ -56,6 +57,16 @@ discoverRouter.post("/:id/claim", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const id = parseInt(req.params.id as string);
+
+    // Enforce free tier 3-bounty pipeline limit
+    const { isFree } = await getUserPlanStatus(userId);
+    if (isFree) {
+      const bountyCount = await countUserBounties(userId);
+      if (bountyCount >= 3) {
+        res.status(403).json({ error: "free_limit", message: "Free plan is limited to 3 bounties. Upgrade to add more." });
+        return;
+      }
+    }
 
     const [source] = await db
       .select()
