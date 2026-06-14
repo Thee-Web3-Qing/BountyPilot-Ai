@@ -208,7 +208,7 @@ export function Dashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="font-mono text-xs uppercase tracking-wider text-primary flex items-center gap-2">
-                <Brain className="w-4 h-4" /> Novus AI Insights
+                <Brain className="w-4 h-4" /> AI Insights
               </CardTitle>
               <button
                 onClick={fetchInsights}

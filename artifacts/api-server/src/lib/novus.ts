@@ -1,4 +1,5 @@
 import { logger } from "./logger.js";
+import { callQwen } from "./qwen.js";
 
 const NOVUS_BASE_URL = process.env.NOVUS_BASE_URL || "https://novus-api.pendo.io/mcp";
 const NOVUS_API_KEY = process.env.NOVUS_API_KEY || "";
@@ -111,9 +112,7 @@ export async function analyzeDashboardInsights(data: {
   averageScore: number | null;
   statusBreakdown: { status: string; count: number }[];
 }): Promise<string | null> {
-  if (!hasNovusKey()) return null;
-  try {
-    const prompt = `You are a senior Web3 creator strategist analyzing a creator's bounty pipeline.
+  const prompt = `You are a senior Web3 creator strategist analyzing a creator's bounty pipeline.
 
 Here is the creator's current data:
 - Total bounties tracked: ${data.totalBounties}
@@ -132,13 +131,26 @@ Give 3-4 concise, actionable insights. Be specific and motivational. Focus on:
 
 Return plain text with bullet points. Keep it under 250 words. No markdown headers.`;
 
-    return await callNovusLLM(
+  // Try Novus first, fall back to Qwen for guaranteed availability
+  if (hasNovusKey()) {
+    try {
+      return await callNovusLLM(
+        "You are a concise, direct Web3 creator coach. Give actionable advice based on numbers. No fluff.",
+        prompt,
+        { maxTokens: 500 }
+      );
+    } catch (e: any) {
+      logger.warn({ err: e.message }, "Novus dashboard insights failed, trying Qwen fallback");
+    }
+  }
+  try {
+    return await callQwen(
       "You are a concise, direct Web3 creator coach. Give actionable advice based on numbers. No fluff.",
       prompt,
       { maxTokens: 500 }
     );
   } catch (e: any) {
-    logger.warn({ err: e.message }, "Novus dashboard insights failed");
+    logger.warn({ err: e.message }, "Qwen dashboard insights fallback also failed");
     return null;
   }
 }
@@ -153,9 +165,7 @@ export async function analyzeAdminInsights(data: {
   platformBreakdown: { platform: string; count: number; totalReward: number }[];
   topEarners: { username: string; amount: number }[];
 }): Promise<string | null> {
-  if (!hasNovusKey()) return null;
-  try {
-    const prompt = `You are a growth strategist for a Web3 creator tool called BountyPilot. Analyze the product metrics and give growth + marketing advice.
+  const prompt = `You are a growth strategist for a Web3 creator tool called BountyPilot. Analyze the product metrics and give growth + marketing advice.
 
 Current metrics:
 Users:
@@ -186,13 +196,26 @@ Give 5 concise strategic recommendations covering:
 
 Be direct and data-driven. No generic advice. Keep it under 350 words. Plain text bullet points.`;
 
-    return await callNovusLLM(
+  // Try Novus first, fall back to Qwen for guaranteed availability
+  if (hasNovusKey()) {
+    try {
+      return await callNovusLLM(
+        "You are a sharp product growth strategist. Give data-backed, specific recommendations. No generic fluff.",
+        prompt,
+        { maxTokens: 700 }
+      );
+    } catch (e: any) {
+      logger.warn({ err: e.message }, "Novus admin insights failed, trying Qwen fallback");
+    }
+  }
+  try {
+    return await callQwen(
       "You are a sharp product growth strategist. Give data-backed, specific recommendations. No generic fluff.",
       prompt,
       { maxTokens: 700 }
     );
   } catch (e: any) {
-    logger.warn({ err: e.message }, "Novus admin insights failed");
+    logger.warn({ err: e.message }, "Qwen admin insights fallback also failed");
     return null;
   }
 }

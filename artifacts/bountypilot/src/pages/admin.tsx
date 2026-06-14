@@ -634,7 +634,7 @@ function AdminInsights() {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Brain className="w-4 h-4 text-primary" />
-          <h3 className="font-mono text-xs uppercase tracking-wider text-primary">Novus AI Growth Insights</h3>
+          <h3 className="font-mono text-xs uppercase tracking-wider text-primary">AI Growth Insights</h3>
         </div>
         <button
           onClick={fetchInsights}
