@@ -72,10 +72,19 @@ export function Bounties() {
     e.preventDefault();
     e.stopPropagation();
     if (!confirm("Delete this bounty?")) return;
+    const deletedBounty = bounties?.find((b) => b.id === id);
     deleteMutation.mutate(
       { id },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("bounty_deleted", {
+              bountyId: id,
+              bountyStatus: deletedBounty?.status || "",
+              platform: deletedBounty?.platform || "",
+              rewardAmount: deletedBounty?.rewardAmount || "",
+            });
+          }
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
         },
       }

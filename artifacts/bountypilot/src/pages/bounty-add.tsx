@@ -169,6 +169,19 @@ export function BountyAdd() {
           setExtracted(b);
           setEditFields(bountyToEditable(b));
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+          if (typeof pendo !== "undefined") {
+            pendo.track("bounty_url_scanned", {
+              url: url,
+              platform: b.platform || "",
+              projectName: b.projectName || "",
+              rewardAmount: b.rewardAmount || "",
+              rewardCurrency: b.rewardCurrency || "",
+              opportunityScore: b.opportunityScore ?? 0,
+              confidenceScore: (b as any).confidenceScore ?? 0,
+              contentFormat: b.contentFormat || "",
+              hasDeadline: !!b.deadline,
+            });
+          }
         },
       }
     );
@@ -221,6 +234,17 @@ export function BountyAdd() {
       { id: extracted.id },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("bounty_approved", {
+              bountyId: extracted.id,
+              platform: extracted.platform || "",
+              rewardAmount: extracted.rewardAmount || "",
+              rewardCurrency: extracted.rewardCurrency || "",
+              opportunityScore: extracted.opportunityScore ?? 0,
+              contentFormat: extracted.contentFormat || "",
+              missingFieldCount: missing,
+            });
+          }
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetRecentBountiesQueryKey() });
@@ -237,6 +261,15 @@ export function BountyAdd() {
       { id: extracted.id },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("bounty_rejected", {
+              bountyId: extracted.id,
+              platform: extracted.platform || "",
+              rewardAmount: extracted.rewardAmount || "",
+              opportunityScore: extracted.opportunityScore ?? 0,
+              contentFormat: extracted.contentFormat || "",
+            });
+          }
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           setActionDone("rejected");
           setTimeout(() => navigate("/bounties"), 1200);
@@ -252,6 +285,15 @@ export function BountyAdd() {
       { id: extracted.id },
       {
         onSuccess: () => {
+          if (typeof pendo !== "undefined") {
+            pendo.track("bounty_saved_for_later", {
+              bountyId: extracted.id,
+              platform: extracted.platform || "",
+              rewardAmount: extracted.rewardAmount || "",
+              opportunityScore: extracted.opportunityScore ?? 0,
+              contentFormat: extracted.contentFormat || "",
+            });
+          }
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           setActionDone("saved");
           setTimeout(() => navigate("/bounties"), 1200);

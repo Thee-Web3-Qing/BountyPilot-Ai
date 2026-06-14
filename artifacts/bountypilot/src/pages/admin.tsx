@@ -142,11 +142,20 @@ export function Admin() {
   }
 
   async function resolveReport(id: number, resolution: string) {
+    const report = bountyReports.find((r: any) => r.id === id);
     setReportAction(id);
     try {
       await fetch(`${API}/admin/bounty-reports/${id}/resolve`, {
         method: "POST", headers: authHeaders(), body: JSON.stringify({ resolution }),
       });
+      if (typeof pendo !== "undefined") {
+        pendo.track("admin_report_resolved", {
+          reportId: id,
+          bountyId: report?.bounty?.id ?? 0,
+          reason: report?.reason || "",
+          resolution: resolution,
+        });
+      }
       await loadReports();
     } finally {
       setReportAction(null);
@@ -165,9 +174,18 @@ export function Admin() {
 
   async function removeBounty(id: number) {
     if (!confirm("Delete the bounty and all its reports? This cannot be undone.")) return;
+    const report = bountyReports.find((r: any) => r.id === id);
     setReportAction(id);
     try {
       await fetch(`${API}/admin/bounty-reports/${id}/remove-bounty`, { method: "DELETE", headers: authHeaders() });
+      if (typeof pendo !== "undefined") {
+        pendo.track("admin_bounty_removed_via_report", {
+          reportId: id,
+          bountyId: report?.bounty?.id ?? 0,
+          bountyTitle: (report?.bounty?.title || "").substring(0, 100),
+          platform: report?.bounty?.platform || "",
+        });
+      }
       await loadReports();
     } finally {
       setReportAction(null);
@@ -175,6 +193,7 @@ export function Admin() {
   }
 
   async function setPlan(userId: number, plan: Plan) {
+    const previousPlan = selected?.plan || "";
     setChanging(plan);
     setError("");
     try {
@@ -185,6 +204,14 @@ export function Admin() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed"); setChanging(null); return; }
+      if (typeof pendo !== "undefined") {
+        pendo.track("admin_user_plan_changed", {
+          targetUserId: userId,
+          targetUsername: selected?.username || "",
+          previousPlan: previousPlan,
+          newPlan: plan,
+        });
+      }
       await loadData();
       setSelected(prev => prev ? { ...prev, plan } : null);
     } finally {

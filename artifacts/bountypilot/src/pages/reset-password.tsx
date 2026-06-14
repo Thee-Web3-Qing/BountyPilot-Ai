@@ -40,6 +40,9 @@ export function ResetPassword() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Reset failed");
       setSuccess(true);
+      if (typeof pendo !== "undefined") {
+        pendo.track("password_reset_completed", {});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reset failed");
     } finally {
