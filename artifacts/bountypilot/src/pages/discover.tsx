@@ -699,13 +699,6 @@ export function Discover() {
         >
           All ({bounties.length})
         </button>
-        <button
-          onClick={() => { setFilterBeginner(!filterBeginner); setFilterPlatform(""); setFilterType(""); setForYouMode(false); }}
-          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${filterBeginner ? "bg-green-500 text-black border-green-500" : "border-border text-muted-foreground hover:text-foreground"}`}
-        >
-          <Zap className="w-3 h-3" />
-          Beginner/Vibe ({bounties.filter((b) => b.tags?.toLowerCase().includes("beginner-friendly")).length})
-        </button>
         {platforms.map((p) => (
           <button
             key={p}
@@ -721,6 +714,13 @@ export function Discover() {
       {opportunityTypes.length > 0 && (
         <div className="flex gap-1.5 flex-wrap">
           <span className="font-mono text-[11px] text-muted-foreground/60 px-1 py-1">Type:</span>
+          <button
+            onClick={() => { setFilterBeginner(!filterBeginner); setFilterPlatform(""); setFilterType(""); setForYouMode(false); }}
+            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${filterBeginner ? "bg-green-500 text-black border-green-500" : "border-border text-muted-foreground hover:text-foreground"}`}
+          >
+            <Zap className="w-3 h-3" />
+            Beginner/Vibe ({bounties.filter((b) => b.tags?.toLowerCase().includes("beginner-friendly")).length})
+          </button>
           {opportunityTypes.map((t) => (
             <button
               key={t}
