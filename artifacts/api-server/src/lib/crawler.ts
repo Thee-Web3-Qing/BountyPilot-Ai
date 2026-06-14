@@ -50,6 +50,7 @@ interface PlatformBountyHint {
   projectName?: string;
   description?: string;
   type?: string;
+  prizeRank?: string;
 }
 
 interface PlatformConfig {
@@ -266,6 +267,7 @@ async function fetchFirstDollar(): Promise<PlatformBountyHint[]> {
         let deadline: string | undefined;
         let projectName: string | undefined;
 
+        let prizeRank: string | undefined;
         try {
           const detail = await fetch(`https://app.firstdollar.money/api/bounties/${b.id}`, {
             headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
@@ -283,6 +285,17 @@ async function fetchFirstDollar(): Promise<PlatformBountyHint[]> {
             }
             const co = d.company as Record<string, unknown> | undefined;
             projectName = (co?.name as string | undefined) || (d.companyName as string | undefined);
+            // Extract prize distribution — prizeDistribution is a JSON string
+            try {
+              const pdRaw = d.prizeDistribution as string | undefined;
+              if (pdRaw) {
+                const pd = JSON.parse(pdRaw) as { prizes?: Array<{ rank: string; amount: number }> };
+                if (pd.prizes && pd.prizes.length > 0) {
+                  const count = pd.prizes.length;
+                  prizeRank = count >= 10 ? "1st-10th+" : count >= 3 ? `1st-${count}th` : "1st-3rd";
+                }
+              }
+            } catch {}
           }
         } catch {}
 
@@ -299,6 +312,7 @@ async function fetchFirstDollar(): Promise<PlatformBountyHint[]> {
           rewardAmount,
           rewardCurrency,
           deadline,
+          prizeRank,
         };
       })
     );
@@ -789,11 +803,12 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
   try {
     const scraped = await scrapeBounty(hint.url, hint.type);
 
-    // Merge API hint data over scraped data — API is authoritative for reward/deadline
+    // Merge API hint data over scraped data — API is authoritative for reward/deadline/prizeRank
     const merged = {
       ...scraped,
       rewardAmount: hint.rewardAmount || scraped.rewardAmount,
       rewardCurrency: hint.rewardCurrency || scraped.rewardCurrency,
+      prizeRank: hint.prizeRank || scraped.prizeRank,
       deadline: hint.deadline || scraped.deadline,
     };
 
@@ -807,6 +822,7 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
       projectName: hint.projectName || scraped.projectName,
       rewardAmount: merged.rewardAmount,
       rewardCurrency: merged.rewardCurrency,
+      prizeRank: scraped.prizeRank,
       deadline: merged.deadline,
       contentFormat: scraped.contentFormat,
       submissionRequirements: scraped.submissionRequirements,

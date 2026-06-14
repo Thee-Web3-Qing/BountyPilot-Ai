@@ -48,7 +48,32 @@ function extractReward(text: string): { amount: string | null; currency: string 
 }
 
 function extractPrizeRank(text: string): string | null {
-  const patterns = [
+  // Look for "1st to 10th", "1st - 10th", "1st-10th", "top 10", etc.
+  const rangePatterns = [
+    /\b(1st|first)\s*(?:to|[-–—])\s*(\d+)(?:st|nd|rd|th)?\b/i,
+    /\b(1st|first)\s*[-–—]\s*(\d+)(?:st|nd|rd|th)?\s*(?:place|prize|winner)/i,
+    /\btop\s*(\d+)\s*(?:winners?|prizes?|places?|positions?)/i,
+    /\b(\d+)\s*(?:winners?|prizes?|places?|positions?)\s*(?:total|available|up for grabs)/i,
+    /\b(\d+)\s*(?:winners?|prizes?)\s*\(/i,
+  ];
+  for (const pat of rangePatterns) {
+    const m = text.match(pat);
+    if (m) {
+      if (pat.source.includes("to|")) {
+        // "1st to 10th" -> "1st-10th"
+        const end = m[2];
+        const endSuffix = end === "1" ? "st" : end === "2" ? "nd" : end === "3" ? "rd" : "th";
+        return `1st-${end}${endSuffix}`;
+      }
+      if (pat.source.includes("top")) {
+        return `Top ${m[1]}`;
+      }
+      return `${m[1]} winners`;
+    }
+  }
+
+  // Look for individual prize ranks
+  const rankPatterns = [
     /\b(1st|first)\b.*prize/i,
     /\b(2nd|second)\b.*prize/i,
     /\b(3rd|third)\b.*prize/i,
@@ -68,7 +93,7 @@ function extractPrizeRank(text: string): string | null {
     /\b(\d+)(st|nd|rd|th)\b.*prize/i,
     /\b(\d+)(st|nd|rd|th)\b.*place/i,
   ];
-  for (const pat of patterns) {
+  for (const pat of rankPatterns) {
     const m = text.match(pat);
     if (m) {
       const rank = m[1] || m[0];
