@@ -34,6 +34,7 @@ interface DiscoveredBounty {
   confidenceScore: number | null;
   opportunityType: string | null;
   status: string;
+  tags: string | null;
   createdAt: string;
 }
 
@@ -477,6 +478,7 @@ export function Discover() {
   const [search, setSearch] = useState("");
   const [filterPlatform, setFilterPlatform] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [filterBeginner, setFilterBeginner] = useState(false);
   const [forYouMode, setForYouMode] = useState(false);
   const [selected, setSelected] = useState<DiscoveredBounty | null>(null);
   const [, navigate] = useLocation();
@@ -563,13 +565,15 @@ export function Discover() {
       if (forYouMode && hasProfileFilter && !matchesProfile(b, profile!)) return false;
       if (filterPlatform && b.platform !== filterPlatform) return false;
       if (filterType && b.opportunityType !== filterType) return false;
+      if (filterBeginner && !b.tags?.toLowerCase().includes("beginner-friendly")) return false;
       if (search) {
         const q = search.toLowerCase();
         return (
           b.title?.toLowerCase().includes(q) ||
           b.platform?.toLowerCase().includes(q) ||
           b.projectName?.toLowerCase().includes(q) ||
-          b.opportunityType?.toLowerCase().includes(q)
+          b.opportunityType?.toLowerCase().includes(q) ||
+          b.tags?.toLowerCase().includes(q)
         );
       }
       return true;
@@ -675,7 +679,7 @@ export function Discover() {
         {isPaid ? (
           hasProfileFilter ? (
             <button
-              onClick={() => { setForYouMode(!forYouMode); setFilterPlatform(""); }}
+              onClick={() => { setForYouMode(!forYouMode); setFilterPlatform(""); setFilterBeginner(false); }}
               className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary hover:bg-primary/10"}`}
             >
               <Sparkles className="w-3 h-3" />
@@ -701,15 +705,22 @@ export function Discover() {
         )}
 
         <button
-          onClick={() => { setFilterPlatform(""); setFilterType(""); setForYouMode(false); }}
-          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform && !filterType && !forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+          onClick={() => { setFilterPlatform(""); setFilterType(""); setFilterBeginner(false); setForYouMode(false); }}
+          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${!filterPlatform && !filterType && !filterBeginner && !forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
         >
           All ({bounties.length})
+        </button>
+        <button
+          onClick={() => { setFilterBeginner(!filterBeginner); setFilterPlatform(""); setFilterType(""); setForYouMode(false); }}
+          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${filterBeginner ? "bg-green-500 text-black border-green-500" : "border-border text-muted-foreground hover:text-foreground"}`}
+        >
+          <Zap className="w-3 h-3" />
+          Beginner/Vibe ({bounties.filter((b) => b.tags?.toLowerCase().includes("beginner-friendly")).length})
         </button>
         {platforms.map((p) => (
           <button
             key={p}
-            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setFilterType(""); setForYouMode(false); }}
+            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setFilterType(""); setFilterBeginner(false); setForYouMode(false); }}
             className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
           >
             {p} ({bounties.filter((b) => b.platform === p).length})
@@ -724,7 +735,7 @@ export function Discover() {
           {opportunityTypes.map((t) => (
             <button
               key={t}
-              onClick={() => { setFilterType(filterType === t ? "" : t); setFilterPlatform(""); setForYouMode(false); }}
+              onClick={() => { setFilterType(filterType === t ? "" : t); setFilterPlatform(""); setFilterBeginner(false); setForYouMode(false); }}
               className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterType === t ? "bg-amber-500 text-black border-amber-500" : "border-border text-muted-foreground hover:text-foreground"}`}
             >
               {t} ({bounties.filter((b) => b.opportunityType === t).length})

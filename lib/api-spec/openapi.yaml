@@ -468,6 +468,8 @@ components:
           enum: [discovered, saved_for_later, approved, rejected, researching, scripting, recording, editing, submitted, won, lost]
         hoursSaved:
           type: ["integer", "null"]
+        tags:
+          type: ["string", "null"]
         createdAt:
           type: string
         updatedAt:
