@@ -213,6 +213,25 @@ export function Bounties() {
                           <span className="inline-block ml-1 text-xs text-primary/70 border border-primary/30 px-1.5 py-0.5 rounded">{bounty.prizeRank}</span>
                         )}
                       </div>
+
+                      {/* Prize Breakdown */}
+                      {bounty.prizeBreakdown && (() => {
+                        try {
+                          const breakdown = JSON.parse(bounty.prizeBreakdown) as Array<{rank: string; amount: string; currency: string; count?: number}>;
+                          if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
+                          return (
+                            <div className="flex items-center gap-1 flex-wrap mt-1">
+                              {breakdown.map((p, i) => (
+                                <span key={i} className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
+                                  {p.rank}: ${p.amount} {p.currency}
+                                  {p.count && p.count > 1 ? <span className="text-muted-foreground/60"> x{p.count}</span> : null}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        } catch { return null; }
+                      })()}
+
                       {bounty.deadline && (
                         <div className="text-xs text-muted-foreground font-mono">{timeLeft(bounty.deadline)}</div>
                       )}

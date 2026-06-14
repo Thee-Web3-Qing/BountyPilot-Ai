@@ -22,6 +22,7 @@ interface DiscoveredBounty {
   rewardAmount: string | null;
   rewardCurrency: string | null;
   prizeRank: string | null;
+  prizeBreakdown: string | null;
   deadline: string | null;
   contentFormat: string | null;
   submissionRequirements: string | null;
@@ -383,7 +384,7 @@ function BountyCard({
         {bounty.title || "Untitled Bounty"}
       </h3>
 
-      {/* Row 3: metrics + score */}
+      {/* Row 3: reward + prize breakdown */}
       <div className="flex items-center gap-2 flex-wrap">
         {isValidReward(bounty.rewardAmount) ? (
           <span className="font-mono text-sm font-bold text-primary whitespace-nowrap">
@@ -397,6 +398,24 @@ function BountyCard({
             {bounty.prizeRank}
           </span>
         )}
+
+        {/* Prize Breakdown */}
+        {bounty.prizeBreakdown && (() => {
+          try {
+            const breakdown = JSON.parse(bounty.prizeBreakdown) as Array<{rank: string; amount: string; currency: string; count?: number}>;
+            if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
+            return (
+              <div className="flex items-center gap-1 flex-wrap">
+                {breakdown.map((p, i) => (
+                  <span key={i} className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
+                    {p.rank}: ${p.amount} {p.currency}
+                    {p.count && p.count > 1 ? <span className="text-muted-foreground/60"> x{p.count}</span> : null}
+                  </span>
+                ))}
+              </div>
+            );
+          } catch { return null; }
+        })()}
 
         {bounty.contentFormat && (
           <span className="font-mono text-[10px] border border-border px-1.5 py-0.5 rounded-sm text-muted-foreground whitespace-nowrap">
