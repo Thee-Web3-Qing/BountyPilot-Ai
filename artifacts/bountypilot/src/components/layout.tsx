@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
@@ -27,6 +27,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setOpen(false);
     setProfileExpanded(false);
   };
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -184,7 +194,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ── Page content ────────────────────────────────────── */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto overscroll-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 md:px-6 md:py-10 lg:max-w-7xl xl:max-w-8xl">
           {children}
         </div>

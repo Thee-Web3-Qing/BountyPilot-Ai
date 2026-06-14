@@ -238,7 +238,7 @@ export function BountyDetail() {
   const lowConfidence = (bounty.confidenceScore ?? 100) < 55;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate("/bounties")} className="font-mono">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
