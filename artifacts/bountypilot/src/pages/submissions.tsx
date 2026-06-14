@@ -11,7 +11,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Clock } from "lucide-react";
+
+function timeLeft(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Expired";
+  const days = Math.floor(ms / 86400000);
+  const hrs = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  if (days > 0) return `${days}d ${hrs}h ${mins}m`;
+  if (hrs > 0) return `${hrs}h ${mins}m`;
+  return `${mins}m`;
+}
 
 const RESULT_COLORS: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
@@ -38,10 +50,13 @@ export function Submissions() {
   const createMutation = useCreateSubmission();
   const updateMutation = useUpdateSubmission();
 
+  const getBounty = (bountyId: number) => bounties?.find((b) => b.id === bountyId);
   const getBountyTitle = (bountyId: number) =>
-    bounties?.find((b) => b.id === bountyId)?.title ?? `Bounty #${bountyId}`;
+    getBounty(bountyId)?.title ?? `Bounty #${bountyId}`;
   const getBountyPlatform = (bountyId: number) =>
-    bounties?.find((b) => b.id === bountyId)?.platform ?? "Unknown";
+    getBounty(bountyId)?.platform ?? "Unknown";
+  const getBountyDeadline = (bountyId: number) =>
+    getBounty(bountyId)?.deadline ?? null;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +184,7 @@ export function Submissions() {
                 <tr className="border-b border-border">
                   <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Bounty</th>
                   <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Platform</th>
+                  <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Deadline</th>
                   <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Submitted</th>
                   <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Result</th>
                   <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider text-muted-foreground">Reward</th>
@@ -183,6 +199,17 @@ export function Submissions() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
                       {getBountyPlatform(sub.bountyId)}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
+                      {(() => {
+                        const dl = getBountyDeadline(sub.bountyId);
+                        const tl = dl ? timeLeft(dl) : null;
+                        if (!tl) return <span className="text-muted-foreground/50">—</span>;
+                        const isExpired = tl === "Expired";
+                        const days = dl ? Math.round((new Date(dl).getTime() - Date.now()) / 86400000) : null;
+                        const color = isExpired ? "text-muted-foreground/50" : days !== null && days < 3 ? "text-red-400" : days !== null && days < 7 ? "text-yellow-400" : "text-muted-foreground";
+                        return <span className={color}>{tl}</span>;
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
                       {sub.submittedAt ? new Date(sub.submittedAt).toLocaleDateString() : "—"}

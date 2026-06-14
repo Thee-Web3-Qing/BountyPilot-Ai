@@ -20,6 +20,18 @@ interface CrawlerStatus {
   lastResults: { platform: string; found: number; added: number }[];
 }
 
+function timeLeft(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return "Expired";
+  const days = Math.floor(ms / 86400000);
+  const hrs = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  if (days > 0) return `${days}d ${hrs}h ${mins}m`;
+  if (hrs > 0) return `${hrs}h ${mins}m`;
+  return `${mins}m`;
+}
+
 function timeAgo(iso: string | null): string {
   if (!iso) return "never";
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -212,7 +224,7 @@ export function Dashboard() {
                       </div>
                       <div className="flex justify-between items-center text-xs text-muted-foreground font-mono">
                         <span>{bounty.platform || 'Unknown'}</span>
-                        <span className="uppercase">{bounty.status.replace('_', ' ')}</span>
+                        <span>{bounty.deadline ? timeLeft(bounty.deadline) || 'Open' : 'Open'}</span>
                       </div>
                     </div>
                   </Link>
