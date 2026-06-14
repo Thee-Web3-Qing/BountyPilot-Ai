@@ -376,6 +376,41 @@ async function fetchGitcoin(): Promise<PlatformBountyHint[]> {
   return [];
 }
 
+// ─── Devpost — public hackathons API ────────────────────────
+async function fetchDevpost(): Promise<PlatformBountyHint[]> {
+  try {
+    const url = `https://devpost.com/api/hackathons?status=open&per_page=40&page=1`;
+    const resp = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json() as { hackathons?: Array<Record<string, unknown>>; meta?: { total_count: number } };
+    const hackathons = data.hackathons || [];
+    return hackathons.slice(0, 10).map((h) => {
+      const title = (h.title as string) || "";
+      const rawReward = (h.prize_amount as string) || (h.total_prize_value as string) || undefined;
+      const tags = Array.isArray(h.themes) ? (h.themes as Array<Record<string, unknown>>).map((t) => t.name as string).filter(Boolean) : [];
+      return {
+        url: (h.url as string) || "",
+        title,
+        deadline: (h.submission_period_ends_at as string) || (h.deadline as string) || undefined,
+        rewardAmount: rawReward ? stripHtml(rawReward) : undefined,
+        rewardCurrency: "USD",
+        projectName: (h.organization_name as string) || (h.displayed_location as Record<string, unknown>)?.location as string || "Devpost",
+        description: tags.join(", ") || undefined,
+        type: "Hackathon",
+      };
+    });
+  } catch (e: any) {
+    logger.warn({ err: e.message }, "Devpost API fetch failed");
+    return [];
+  }
+}
+
 // ─── Galxe — GraphQL campaigns API ─────────────────────────
 async function fetchGalxe(): Promise<PlatformBountyHint[]> {
   try {
@@ -1002,9 +1037,18 @@ export async function crawlAll(): Promise<CrawlPlatformResult[]> {
     results.push(zealyResult);
     await sleep(2000);
 
+    const devpostHints = await fetchDevpost();
+    const devpostResult = await crawlPlatform(
+      PLATFORMS.find((p) => p.name === "Devpost")!,
+      existingUrls,
+      () => Promise.resolve(devpostHints)
+    );
+    results.push(devpostResult);
+    await sleep(2000);
+
     // Generic HTML scrapers for remaining platforms
     const remainingPlatforms = PLATFORMS.filter(
-      (p) => !["Superteam Earn", "First Dollar", "Gitcoin", "Galxe", "Zealy"].includes(p.name)
+      (p) => !["Superteam Earn", "First Dollar", "Gitcoin", "Galxe", "Zealy", "Devpost"].includes(p.name)
     );
 
     for (const platform of remainingPlatforms) {

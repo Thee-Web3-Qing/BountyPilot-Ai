@@ -226,6 +226,7 @@ function detectPlatform(url: string): string {
   if (url.includes("elevenlabs")) return "ElevenLabs Creative";
   if (url.includes("scouts")) return "Scouts";
   if (url.includes("anthum")) return "Anthum AI";
+  if (url.includes("devpost")) return "Devpost";
   if (url.includes("dework")) return "Dework";
   if (url.includes("job")) return "Job Board";
   if (url.includes("contest")) return "Contest";
