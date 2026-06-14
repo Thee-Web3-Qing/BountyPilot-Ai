@@ -47,6 +47,7 @@ export interface DextopusWebhookPayload {
 
 async function dextopusFetch(path: string, options: RequestInit = {}) {
   const url = `${API_BASE}${path}`;
+  const body = options.body;
   const resp = await fetch(url, {
     ...options,
     headers: {
@@ -58,8 +59,8 @@ async function dextopusFetch(path: string, options: RequestInit = {}) {
   });
   const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
   if (!resp.ok) {
-    logger.warn({ status: resp.status, path, data }, "Dextopus API error");
-    throw new Error((data.message as string) || `Dextopus error ${resp.status}`);
+    logger.warn({ status: resp.status, path, body, data }, "Dextopus API error");
+    throw new Error((data.message as string) || (data.error as string) || `Dextopus error ${resp.status}: ${JSON.stringify(data)}`);
   }
   return data;
 }

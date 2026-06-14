@@ -226,8 +226,10 @@ router.post("/checkout", async (req: AuthRequest, res) => {
       userId: String(userId),
       originChainId: Number(originChainId),
       originAsset: String(originAsset),
+      settlementChainId: 8453, // Base
+      settlementAsset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+      settlementAddress: TREASURY_WALLET,
       refundTo: refundTo ? String(refundTo) : undefined,
-      // Settlement is configured in Dextopus dashboard — do not override
     };
 
     const result = await generateStaticAddress(dextReq);
