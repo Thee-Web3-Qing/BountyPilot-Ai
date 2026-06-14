@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Activity, RefreshCw, Crown, Sparkles } from "lucide-react";
+import { Loader2, Activity, RefreshCw, Crown, Sparkles, Zap } from "lucide-react";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
 import { API_BASE } from "@/lib/api";
 
@@ -91,6 +91,23 @@ export function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
           <p className="text-muted-foreground font-mono mt-2">Welcome back, <span className="text-foreground font-bold">@{user?.username}</span></p>
+        </div>
+        <div className="flex items-center gap-2">
+          {user?.plan === "beta" && (
+            <span className="font-mono text-[10px] px-2 py-1 border border-primary/30 bg-primary/10 text-primary rounded-sm uppercase tracking-wider flex items-center gap-1">
+              <Crown className="w-3 h-3" /> Beta
+            </span>
+          )}
+          {user?.plan === "trial" && (
+            <span className="font-mono text-[10px] px-2 py-1 border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 rounded-sm uppercase tracking-wider flex items-center gap-1">
+              <Zap className="w-3 h-3" /> Trial
+            </span>
+          )}
+          {(user?.plan === "active" || user?.plan === "lifetime") && (
+            <span className="font-mono text-[10px] px-2 py-1 border border-green-500/30 bg-green-500/10 text-green-400 rounded-sm uppercase tracking-wider flex items-center gap-1">
+              <Crown className="w-3 h-3" /> Active
+            </span>
+          )}
         </div>
       </div>
 

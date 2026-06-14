@@ -22,6 +22,7 @@ import { Profile } from "./pages/profile";
 import { Settings } from "./pages/settings";
 import { Discover } from "./pages/discover";
 import { Landing } from "./pages/landing";
+import { Pricing } from "./pages/pricing";
 
 import { Admin } from "./pages/admin";
 
@@ -60,6 +61,7 @@ function Router() {
         <Route path="/signup" component={Signup} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/pricing" component={Pricing} />
         <Route path="/" nest>
           {isAuthenticated ? (
             <Layout>

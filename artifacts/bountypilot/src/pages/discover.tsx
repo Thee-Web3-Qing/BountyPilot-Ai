@@ -12,6 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getListBountiesQueryKey } from "@workspace/api-client-react";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/contexts/auth";
+import { FreeLimitGate } from "@/components/trial-gate";
 
 interface DiscoveredBounty {
   id: number;
@@ -481,6 +482,7 @@ export function Discover() {
   const [filterBeginner, setFilterBeginner] = useState(false);
   const [forYouMode, setForYouMode] = useState(false);
   const [selected, setSelected] = useState<DiscoveredBounty | null>(null);
+  const { isPaid } = useAuth();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const token = localStorage.getItem("bountypilot_token");
@@ -745,55 +747,59 @@ export function Discover() {
         </div>
       )}
 
-      {/* Bounties list */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground font-mono gap-3 text-sm">
-          <Loader2 className="w-5 h-5 animate-spin" /> Loading…
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-16 text-center">
-          <Globe className="w-10 h-10 text-muted-foreground/30" />
-          <div>
-            <p className="font-mono text-sm text-muted-foreground">
-              {forYouMode ? "No opportunities match your profile yet" : "No opportunities yet"}
-            </p>
-            <p className="font-mono text-xs text-muted-foreground/50 mt-1">
-              {forYouMode
-                ? "Try updating your profile skills, or browse All"
-                : crawlerStatus?.isRunning
-                ? "Crawl running — check back in a moment"
-                : "Click Refresh to pull the latest"}
-            </p>
+      {/* Free tier browse cap: 50 bounties visible */}
+      <FreeLimitGate limit={50} current={bounties.length} itemName="browseable bounties">
+        {/* Bounties list */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground font-mono gap-3 text-sm">
+            <Loader2 className="w-5 h-5 animate-spin" /> Loading…
           </div>
-          {forYouMode ? (
-            <Button onClick={() => setForYouMode(false)} variant="outline" size="sm" className="font-mono text-xs uppercase">
-              Show All
-            </Button>
-          ) : !crawlerStatus?.isRunning ? (
-            <Button onClick={handleTrigger} disabled={triggering} variant="outline" size="sm" className="font-mono text-xs uppercase">
-              <Zap className="w-3.5 h-3.5 mr-1.5" /> Trigger Crawl
-            </Button>
-          ) : null}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <p className="font-mono text-xs text-muted-foreground">
-              {displayBounties.length} opportunities{forYouMode ? " matching your profile" : ""}
-            </p>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <Globe className="w-10 h-10 text-muted-foreground/30" />
+            <div>
+              <p className="font-mono text-sm text-muted-foreground">
+                {forYouMode ? "No opportunities match your profile yet" : "No opportunities yet"}
+              </p>
+              <p className="font-mono text-xs text-muted-foreground/50 mt-1">
+                {forYouMode
+                  ? "Try updating your profile skills, or browse All"
+                  : crawlerStatus?.isRunning
+                  ? "Crawl running — check back in a moment"
+                  : "Click Refresh to pull the latest"}
+              </p>
+            </div>
+            {forYouMode ? (
+              <Button onClick={() => setForYouMode(false)} variant="outline" size="sm" className="font-mono text-xs uppercase">
+                Show All
+              </Button>
+            ) : !crawlerStatus?.isRunning ? (
+              <Button onClick={handleTrigger} disabled={triggering} variant="outline" size="sm" className="font-mono text-xs uppercase">
+                <Zap className="w-3.5 h-3.5 mr-1.5" /> Trigger Crawl
+              </Button>
+            ) : null}
           </div>
-          {displayBounties.map((bounty) => (
-            <BountyCard
-              key={bounty.id}
-              bounty={bounty}
-              isClaiming={claiming === bounty.id}
-              isClaimed={claimed.has(bounty.id)}
-              onClaim={(e) => handleClaim(bounty.id, e)}
-              onExpand={() => setSelected(bounty)}
-            />
-          ))}
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-xs text-muted-foreground">
+                {displayBounties.length} opportunities{forYouMode ? " matching your profile" : ""}
+                {!isPaid && bounties.length > 50 && <span className="ml-1 text-yellow-400">(showing 50 of {bounties.length})</span>}
+              </p>
+            </div>
+            {(isPaid ? displayBounties : displayBounties.slice(0, 50)).map((bounty) => (
+              <BountyCard
+                key={bounty.id}
+                bounty={bounty}
+                isClaiming={claiming === bounty.id}
+                isClaimed={claimed.has(bounty.id)}
+                onClaim={(e) => handleClaim(bounty.id, e)}
+                onExpand={() => setSelected(bounty)}
+              />
+            ))}
+          </div>
+        )}
+      </FreeLimitGate>
 
       {/* Detail drawer — rendered via portal so it escapes overflow-auto on iOS */}
       {selected && createPortal(

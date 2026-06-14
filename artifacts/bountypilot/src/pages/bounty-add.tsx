@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle, Shield } from "lucide-react";
+import { AIFeatureGate } from "@/components/trial-gate";
 
 const WORKFLOW_STEPS = [
   "Fetching page content...",
@@ -431,23 +432,25 @@ export function BountyAdd() {
             </CardContent>
           </Card>
 
-          {extracted.scoreExplanation && (
-            <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="p-5 flex flex-col gap-3">
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                  Score Explanation
-                </p>
-                <p className="text-sm text-foreground">{extracted.scoreExplanation}</p>
-                {(extracted as any).confidenceScore != null && (
-                  <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground border-t border-border/50 pt-3">
-                    <Shield className="w-3.5 h-3.5 text-blue-400" />
-                    Extraction confidence: <span className="text-blue-400 font-bold">{(extracted as any).confidenceScore}%</span>
-                    {(extracted as any).confidenceScore < 60 && <span className="text-yellow-400 ml-1">— review fields carefully</span>}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          <AIFeatureGate>
+            {extracted.scoreExplanation && (
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="p-5 flex flex-col gap-3">
+                  <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    Score Explanation
+                  </p>
+                  <p className="text-sm text-foreground">{extracted.scoreExplanation}</p>
+                  {(extracted as any).confidenceScore != null && (
+                    <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground border-t border-border/50 pt-3">
+                      <Shield className="w-3.5 h-3.5 text-blue-400" />
+                      Extraction confidence: <span className="text-blue-400 font-bold">{(extracted as any).confidenceScore}%</span>
+                      {(extracted as any).confidenceScore < 60 && <span className="text-yellow-400 ml-1">— review fields carefully</span>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </AIFeatureGate>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Button

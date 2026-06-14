@@ -25,7 +25,7 @@ export function Landing() {
       {/* Beta Banner */}
       <div className="bg-primary text-primary-foreground text-center py-2 px-4">
         <p className="font-mono text-sm">
-          BountyPilot is in free beta — all features are unlocked. Happy hunting!
+          Free access open until Aug 7, 10pm GMT+1 — all features are unlocked. Happy hunting!
         </p>
       </div>
 
@@ -103,6 +103,9 @@ export function Landing() {
               <p className="font-mono text-sm text-muted-foreground">Unlimited</p>
             </div>
           </div>
+          <p className="font-mono text-[10px] text-muted-foreground mt-3 text-center">
+            After Aug 7, free plan gets 3 bounties + 50 browse limit. Upgrade to unlock everything.
+          </p>
         </div>
       </section>
 
@@ -228,7 +231,7 @@ export function Landing() {
             Ready to start<br />earning from bounties?
           </h2>
           <p className="font-mono text-sm text-muted-foreground">
-            All features are free during beta. No credit card required.
+            Free during beta. No credit card required. Upgrade anytime for unlimited access.
           </p>
           <Button
             size="lg"

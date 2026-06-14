@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X } from "lucide-react";
+import { AIFeatureGate } from "@/components/trial-gate";
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -312,44 +313,46 @@ export function BountyDetail() {
         </div>
       </div>
 
-      {bounty.opportunityScore != null && bounty.scoreExplanation && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
-              <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
-            </div>
-            <p className="text-sm">{bounty.scoreExplanation}</p>
+      <AIFeatureGate>
+        {bounty.opportunityScore != null && bounty.scoreExplanation && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
+                <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+              </div>
+              <p className="text-sm">{bounty.scoreExplanation}</p>
 
-            {/* Score Breakdown */}
-            {(() => {
-              if (!bounty.scoreBreakdown) return null;
-              try {
-                const breakdown = JSON.parse(bounty.scoreBreakdown) as Array<{label: string; score: number; note: string}>;
-                if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
-                return (
-                  <div className="mt-3 space-y-2">
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
-                    {breakdown.map((c, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase">{c.label}</span>
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${(c.score / 10) * 100}%` }}
-                          />
+              {/* Score Breakdown */}
+              {(() => {
+                if (!bounty.scoreBreakdown) return null;
+                try {
+                  const breakdown = JSON.parse(bounty.scoreBreakdown) as Array<{label: string; score: number; note: string}>;
+                  if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
+                  return (
+                    <div className="mt-3 space-y-2">
+                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
+                      {breakdown.map((c, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase">{c.label}</span>
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary"
+                              style={{ width: `${(c.score / 10) * 100}%` }}
+                            />
+                          </div>
+                          <span className="w-6 font-mono text-xs font-bold text-right">{c.score}</span>
+                          <span className="flex-1 text-xs text-muted-foreground">{c.note}</span>
                         </div>
-                        <span className="w-6 font-mono text-xs font-bold text-right">{c.score}</span>
-                        <span className="flex-1 text-xs text-muted-foreground">{c.note}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              } catch { return null; }
-            })()}
-          </CardContent>
-        </Card>
-      )}
+                      ))}
+                    </div>
+                  );
+                } catch { return null; }
+              })()}
+            </CardContent>
+          </Card>
+        )}
+      </AIFeatureGate>
 
       {/* Agentic Retry Extraction */}
       {(lowConfidence || rescrapeResult) && (
@@ -534,86 +537,90 @@ export function BountyDetail() {
         </Card>
       )}
 
-      {loadingBrief ? (
-        <Skeleton className="h-32 w-full" />
-      ) : (
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Research Brief</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateBrief}
-              disabled={generatingBrief}
-              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
-            >
-              {generatingBrief
-                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
-                : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
-            </Button>
-          </CardHeader>
-          <CardContent className="text-sm">
-            {brief ? (
-              brief.fullContent ? (
-                <BriefMarkdown content={brief.fullContent} />
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <Field label="Summary" value={brief.summary} />
-                  <Field label="Content Angles" value={brief.contentAngles} />
-                  <Field label="Key Points" value={brief.keyPoints} />
-                  <Field label="Target Audience" value={brief.targetAudience} />
-                  <Field label="Competitor Analysis" value={brief.competitorAnalysis} />
-                </div>
-              )
-            ) : (
-              <p className="text-sm text-muted-foreground font-mono py-2">
-                {generatingBrief ? "AI is generating your research brief… This may take up to 60 seconds." : "No research brief yet. Click Generate with AI to create one."}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {loadingPlan ? (
-        <Skeleton className="h-32 w-full" />
-      ) : (
-        <Card className="bg-card border-border">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Production Plan</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGeneratePlan}
-              disabled={generatingPlan}
-              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
-            >
-              {generatingPlan
-                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
-                : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
-            </Button>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 text-sm">
-            {plan ? (
-              <>
-                {plan.estimatedHours && (
-                  <div>
-                    <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">Estimated Time</p>
-                    <p className="text-primary font-bold font-mono">{plan.estimatedHours}h</p>
+      <AIFeatureGate>
+        {loadingBrief ? (
+          <Skeleton className="h-32 w-full" />
+        ) : (
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Research Brief</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateBrief}
+                disabled={generatingBrief}
+                className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+              >
+                {generatingBrief
+                  ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                  : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
+              </Button>
+            </CardHeader>
+            <CardContent className="text-sm">
+              {brief ? (
+                brief.fullContent ? (
+                  <BriefMarkdown content={brief.fullContent} />
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <Field label="Summary" value={brief.summary} />
+                    <Field label="Content Angles" value={brief.contentAngles} />
+                    <Field label="Key Points" value={brief.keyPoints} />
+                    <Field label="Target Audience" value={brief.targetAudience} />
+                    <Field label="Competitor Analysis" value={brief.competitorAnalysis} />
                   </div>
-                )}
-                <PreField label="Script Outline" value={plan.scriptOutline} />
-                <PreField label="Shot List" value={plan.shotList} />
-                <Field label="Caption Draft" value={plan.captionDraft} />
-                <PreField label="Submission Checklist" value={plan.submissionChecklist} />
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground font-mono">
-                {generatingPlan ? "AI is building your production plan…" : "No production plan yet. Click Generate with AI to create one."}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                )
+              ) : (
+                <p className="text-sm text-muted-foreground font-mono py-2">
+                  {generatingBrief ? "AI is generating your research brief… This may take up to 60 seconds." : "No research brief yet. Click Generate with AI to create one."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </AIFeatureGate>
+
+      <AIFeatureGate>
+        {loadingPlan ? (
+          <Skeleton className="h-32 w-full" />
+        ) : (
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Production Plan</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGeneratePlan}
+                disabled={generatingPlan}
+                className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+              >
+                {generatingPlan
+                  ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                  : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
+              </Button>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 text-sm">
+              {plan ? (
+                <>
+                  {plan.estimatedHours && (
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-1">Estimated Time</p>
+                      <p className="text-primary font-bold font-mono">{plan.estimatedHours}h</p>
+                    </div>
+                  )}
+                  <PreField label="Script Outline" value={plan.scriptOutline} />
+                  <PreField label="Shot List" value={plan.shotList} />
+                  <Field label="Caption Draft" value={plan.captionDraft} />
+                  <PreField label="Submission Checklist" value={plan.submissionChecklist} />
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground font-mono">
+                  {generatingPlan ? "AI is building your production plan…" : "No production plan yet. Click Generate with AI to create one."}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </AIFeatureGate>
 
       <ReportModal
         show={showReport}

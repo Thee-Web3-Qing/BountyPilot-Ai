@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Clock, Check } from "lucide-react";
+import { FreeLimitGate } from "@/components/trial-gate";
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -91,14 +92,16 @@ export function Bounties() {
             {bounties?.length ?? 0} bounties found
           </p>
         </div>
-        <Link href="/bounties/add">
-          <Button
-            className="font-mono uppercase tracking-wider"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Hunt Bounty
-          </Button>
-        </Link>
+        <FreeLimitGate limit={3} current={bounties?.length ?? 0} itemName="bounties">
+          <Link href="/bounties/add">
+            <Button
+              className="font-mono uppercase tracking-wider"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Hunt Bounty
+            </Button>
+          </Link>
+        </FreeLimitGate>
       </div>
 
       <div className="flex flex-wrap gap-3">

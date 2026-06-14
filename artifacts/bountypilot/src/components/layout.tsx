@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
+import { TrialBanner } from "@/components/trial-banner";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -187,6 +188,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
+
+      {/* ── Trial Banner ────────────────────────────────────── */}
+      <TrialBanner />
 
       {/* ── Page content ────────────────────────────────────── */}
       <main className="flex-1 overflow-auto overscroll-y-auto">
