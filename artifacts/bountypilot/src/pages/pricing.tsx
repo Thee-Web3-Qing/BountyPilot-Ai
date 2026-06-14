@@ -88,6 +88,8 @@ export function Pricing() {
   const [selectedChain, setSelectedChain] = useState<number | null>(null);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
   const [settlementAddress, setSettlementAddress] = useState("");
+  const [refundAddress, setRefundAddress] = useState("");
+  const [useSameAddress, setUseSameAddress] = useState(true);
   const [chainsLoading, setChainsLoading] = useState(false);
   const [tokensLoading, setTokensLoading] = useState(false);
 
@@ -169,6 +171,8 @@ export function Pricing() {
     setSelectedChain(null);
     setSelectedToken(null);
     setSettlementAddress("");
+    setRefundAddress("");
+    setUseSameAddress(true);
   };
 
   const handleGenerateDeposit = async () => {
@@ -189,6 +193,7 @@ export function Pricing() {
           settlementChainId: 1, // Default to Ethereum for settlement
           settlementAsset: "0xA0b86a33E6441e0A421e56E4773C3C0f0d8f6b0e", // USDC
           settlementAddress: settlementAddress,
+          refundTo: useSameAddress ? settlementAddress : refundAddress,
         }),
       });
       const json = await res.json();
@@ -293,23 +298,52 @@ export function Pricing() {
             )}
 
             {selectedToken && (
-              <div className="space-y-2">
-                <label className="text-sm font-mono text-muted-foreground">
-                  Your wallet address (for settlement)
-                </label>
-                <input
-                  type="text"
-                  value={settlementAddress}
-                  onChange={(e) => setSettlementAddress(e.target.value)}
-                  placeholder="0x... or your wallet address"
-                  className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
-                />
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-mono text-muted-foreground">
+                    Your wallet address (for settlement)
+                  </label>
+                  <input
+                    type="text"
+                    value={settlementAddress}
+                    onChange={(e) => {
+                      setSettlementAddress(e.target.value);
+                      if (useSameAddress) setRefundAddress(e.target.value);
+                    }}
+                    placeholder="0x... or your wallet address"
+                    className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-mono text-muted-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useSameAddress}
+                      onChange={(e) => {
+                        setUseSameAddress(e.target.checked);
+                        if (e.target.checked) setRefundAddress(settlementAddress);
+                      }}
+                      className="w-3.5 h-3.5 rounded border border-border accent-primary"
+                    />
+                    <span>Use same address for refunds</span>
+                  </label>
+                  {!useSameAddress && (
+                    <input
+                      type="text"
+                      value={refundAddress}
+                      onChange={(e) => setRefundAddress(e.target.value)}
+                      placeholder="Refund address (0x...)"
+                      className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
+                    />
+                  )}
+                </div>
               </div>
             )}
 
             <Button
               className="w-full font-mono uppercase tracking-wider"
-              disabled={!selectedChain || !selectedToken || !settlementAddress || !!loading}
+              disabled={!selectedChain || !selectedToken || !settlementAddress || (!useSameAddress && !refundAddress) || !!loading}
               onClick={handleGenerateDeposit}
             >
               {loading === selectedTier ? (
