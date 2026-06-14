@@ -22,8 +22,28 @@ router.get("/status", async (_req, res) => {
   res.json({ enabled: isDextopusEnabled() });
 });
 
+const DEXTOPUS_WEBHOOK_SECRET = process.env.DEXTOPUS_WEBHOOK_SECRET || "";
+
 // ── Webhook: Dextopus sends deposit events here (PUBLIC) ──
 router.post("/webhook", async (req, res) => {
+  // Verify webhook signature if secret is configured
+  if (DEXTOPUS_WEBHOOK_SECRET) {
+    const signature = req.headers["x-dextopus-signature"] || req.headers["x-webhook-signature"] || req.headers["x-signature"];
+    if (!signature) {
+      logger.warn({ headers: req.headers }, "Dextopus webhook: missing signature");
+      res.status(400).json({ error: "Missing signature" });
+      return;
+    }
+    const rawBody = JSON.stringify(req.body);
+    const expected = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawBody + DEXTOPUS_WEBHOOK_SECRET))
+      .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join(""));
+    if (Array.isArray(signature) ? signature[0] : signature !== expected) {
+      logger.warn({ signature }, "Dextopus webhook: invalid signature");
+      res.status(400).json({ error: "Invalid signature" });
+      return;
+    }
+  }
+
   const payload = req.body;
   const eventType = payload?.event as string | undefined;
   const data = payload?.data as Record<string, unknown> | undefined;
