@@ -185,7 +185,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* ── Page content ────────────────────────────────────── */}
       <main className="flex-1 overflow-auto">
-        <div className="max-w-2xl mx-auto px-4 py-6 md:px-6 md:py-10">
+        <div className="max-w-2xl mx-auto px-4 py-6 md:px-6 md:py-10 lg:max-w-7xl xl:max-w-8xl">
           {children}
         </div>
       </main>

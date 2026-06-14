@@ -129,8 +129,8 @@ export function Bounties() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
             <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
@@ -142,7 +142,7 @@ export function Bounties() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {bounties.map((bounty) => (
             <Link key={bounty.id} href={`/bounties/${bounty.id}`}>
               <Card className="bg-card border-border hover:border-primary/50 transition-all cursor-pointer group h-full">

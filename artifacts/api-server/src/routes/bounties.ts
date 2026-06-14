@@ -33,7 +33,10 @@ bountiesRouter.get("/", async (req: AuthRequest, res) => {
     if (platform) filtered = filtered.filter((b) => b.platform === platform);
     if (active === "true") {
       const nowDate = new Date().toISOString().slice(0, 10);
+      const completedStatuses = new Set(["submitted", "won", "lost"]);
       filtered = filtered.filter((b) => {
+        // Always include completed bounties so users can track outcomes
+        if (completedStatuses.has(b.status)) return true;
         if (!b.deadline) return true;
         const deadlineDate = b.deadline.slice(0, 10);
         return deadlineDate >= nowDate;
