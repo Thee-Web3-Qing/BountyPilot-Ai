@@ -15,5 +15,8 @@
     "tsx": "catalog:",
     "typescript": "~5.9.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "stripe": "^22.2.1",
+    "stripe-replit-sync": "^1.0.0"
+  }
 }

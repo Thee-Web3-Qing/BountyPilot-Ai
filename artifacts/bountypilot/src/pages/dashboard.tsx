@@ -45,7 +45,7 @@ export function Dashboard() {
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
   const { data: recent, isLoading: loadingRecent } = useGetRecentBounties();
   const { data: platformStats, isLoading: loadingPlatform } = useGetPlatformBreakdown();
-  const { user, token, isPaid, isFree, planStatus } = useAuth();
+  const { user, token } = useAuth();
   const queryClient = useQueryClient();
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
   const [triggeringCrawl, setTriggeringCrawl] = useState(false);
@@ -91,19 +91,6 @@ export function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
           <p className="text-muted-foreground font-mono mt-2">Welcome back, <span className="text-foreground font-bold">@{user?.username}</span></p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isPaid ? (
-            <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider bg-primary/10 border border-primary/30 text-primary px-2 py-1 rounded-sm">
-              <Sparkles className="w-3 h-3" /> Premium
-            </span>
-          ) : (
-            <Link href="/pricing">
-              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 px-2 py-1 rounded-sm cursor-pointer hover:bg-yellow-500/20 transition-colors">
-                <Crown className="w-3 h-3" /> {planStatus === "trial" ? "Trial" : "Free"} — Upgrade
-              </span>
-            </Link>
-          )}
         </div>
       </div>
 

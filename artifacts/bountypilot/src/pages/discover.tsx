@@ -484,7 +484,6 @@ export function Discover() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const token = localStorage.getItem("bountypilot_token");
-  const { isPaid, isFree } = useAuth();
 
   const fetchData = useCallback(async () => {
     try {
@@ -583,9 +582,7 @@ export function Discover() {
       return 0;
     });
 
-  // Free tier: cap to 50 bounties
-  const displayBounties = isFree ? filtered.slice(0, FREE_BOUNTY_LIMIT) : filtered;
-  const isCapped = isFree && filtered.length > FREE_BOUNTY_LIMIT;
+  const displayBounties = filtered;
 
   return (
     <div className="flex flex-col gap-5">
@@ -675,32 +672,22 @@ export function Discover() {
 
       {/* Filter row */}
       <div className="flex gap-1.5 flex-wrap">
-        {/* For You smart filter — paid only */}
-        {isPaid ? (
-          hasProfileFilter ? (
-            <button
-              onClick={() => { setForYouMode(!forYouMode); setFilterPlatform(""); setFilterBeginner(false); }}
-              className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary hover:bg-primary/10"}`}
-            >
-              <Sparkles className="w-3 h-3" />
-              For You ({forYouCount})
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate("/profile")}
-              className="font-mono text-[11px] px-2.5 py-1 rounded-sm border border-dashed border-border text-muted-foreground/60 hover:text-muted-foreground transition-colors whitespace-nowrap flex items-center gap-1"
-            >
-              <Sparkles className="w-3 h-3" />
-              Set skills for smart filter
-            </button>
-          )
+        {/* For You smart filter */}
+        {hasProfileFilter ? (
+          <button
+            onClick={() => { setForYouMode(!forYouMode); setFilterPlatform(""); setFilterBeginner(false); }}
+            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${forYouMode ? "bg-primary text-primary-foreground border-primary" : "border-primary/40 text-primary hover:bg-primary/10"}`}
+          >
+            <Sparkles className="w-3 h-3" />
+            For You ({forYouCount})
+          </button>
         ) : (
           <button
-            onClick={() => navigate("/pricing")}
-            className="font-mono text-[11px] px-2.5 py-1 rounded-sm border border-dashed border-yellow-500/40 text-yellow-500 hover:bg-yellow-500/10 transition-colors whitespace-nowrap flex items-center gap-1"
+            onClick={() => navigate("/profile")}
+            className="font-mono text-[11px] px-2.5 py-1 rounded-sm border border-dashed border-border text-muted-foreground/60 hover:text-muted-foreground transition-colors whitespace-nowrap flex items-center gap-1"
           >
-            <Crown className="w-3 h-3" />
-            For You — Upgrade
+            <Sparkles className="w-3 h-3" />
+            Set skills for smart filter
           </button>
         )}
 
@@ -793,13 +780,7 @@ export function Discover() {
           <div className="flex items-center justify-between">
             <p className="font-mono text-xs text-muted-foreground">
               {displayBounties.length} opportunities{forYouMode ? " matching your profile" : ""}
-              {isCapped && <span className="text-yellow-500 ml-1">(showing first 50 — upgrade for all)</span>}
             </p>
-            {isFree && (
-              <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] text-yellow-500 hover:text-yellow-400 underline underline-offset-2">
-                <Crown className="w-3 h-3 inline mr-0.5" /> Upgrade for unlimited
-              </button>
-            )}
           </div>
           {displayBounties.map((bounty) => (
             <BountyCard
@@ -811,17 +792,6 @@ export function Discover() {
               onExpand={() => setSelected(bounty)}
             />
           ))}
-          {isCapped && (
-            <div className="flex flex-col items-center gap-2 py-6 border border-dashed border-yellow-500/30 rounded-sm bg-yellow-500/5">
-              <Crown className="w-5 h-5 text-yellow-500" />
-              <p className="font-mono text-xs text-yellow-500 text-center">
-                {filtered.length - FREE_BOUNTY_LIMIT} more opportunities hidden on free plan
-              </p>
-              <button onClick={() => navigate("/pricing")} className="font-mono text-[10px] bg-yellow-500 text-black px-3 py-1 rounded-sm hover:bg-yellow-400 transition-colors">
-                Upgrade to unlock
-              </button>
-            </div>
-          )}
         </div>
       )}
 

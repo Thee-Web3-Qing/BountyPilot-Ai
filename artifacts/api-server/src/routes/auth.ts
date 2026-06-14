@@ -5,7 +5,6 @@ import { usersTable, userProfilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
-import { getTrialDays, trialEndsAt, getPlanStatus } from "../lib/access.js";
 
 export const authRouter = Router();
 
@@ -41,25 +40,17 @@ authRouter.post("/signup", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const plan = "trial";
-    const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z");
-    const now = new Date();
-    // Before Aug 7: open access until hackathon closes. After Aug 7: 7-day trial.
-    const trialEnd = now < HACKATHON_DEADLINE
-      ? HACKATHON_DEADLINE
-      : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
     const [user] = await db
       .insert(usersTable)
-      .values({ email: email.toLowerCase(), username, passwordHash, plan, trialEndsAt: trialEnd })
+      .values({ email: email.toLowerCase(), username, passwordHash, plan: "active" })
       .returning();
 
     // Create empty profile
     await db.insert(userProfilesTable).values({ userId: user.id });
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
-    logger.info({ userId: user.id, plan }, "User signed up");
-    res.status(201).json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, isAdmin: user.isAdmin } });
+    logger.info({ userId: user.id }, "User signed up");
+    res.status(201).json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, isAdmin: user.isAdmin } });
   } catch (err) {
     logger.error(err, "Signup error");
     res.status(500).json({ error: "Signup failed" });

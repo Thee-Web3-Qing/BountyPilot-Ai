@@ -22,7 +22,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X } from "lucide-react";
-import { AIFeatureGate } from "@/components/trial-gate";
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -71,7 +70,7 @@ export function BountyDetail() {
   const bountyId = parseInt(id ?? "0");
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
-  const { token, canAccessAI, isPaid } = useAuth();
+  const { token } = useAuth();
 
   const { data: bounty, isLoading: loadingBounty } = useGetBounty(bountyId, {
     query: { enabled: !!bountyId, queryKey: getGetBountyQueryKey(bountyId) },
@@ -314,56 +313,42 @@ export function BountyDetail() {
       </div>
 
       {bounty.opportunityScore != null && bounty.scoreExplanation && (
-        <AIFeatureGate
-          fallback={
-            <Card className="border-border/50 bg-muted/20">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
-                  <span className="inline-block px-1.5 py-0 bg-yellow-500/10 border border-yellow-500/20 rounded text-[9px] text-yellow-500 font-mono">Premium</span>
-                </div>
-                <p className="text-sm text-muted-foreground">{bounty.scoreExplanation.substring(0, 120)}...</p>
-              </CardContent>
-            </Card>
-          }
-        >
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
-                <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
-              </div>
-              <p className="text-sm">{bounty.scoreExplanation}</p>
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
+              <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+            </div>
+            <p className="text-sm">{bounty.scoreExplanation}</p>
 
-              {/* Score Breakdown */}
-              {(() => {
-                if (!bounty.scoreBreakdown) return null;
-                try {
-                  const breakdown = JSON.parse(bounty.scoreBreakdown) as Array<{label: string; score: number; note: string}>;
-                  if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
-                  return (
-                    <div className="mt-3 space-y-2">
-                      <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
-                      {breakdown.map((c, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase">{c.label}</span>
-                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-primary"
-                              style={{ width: `${(c.score / 10) * 100}%` }}
-                            />
-                          </div>
-                          <span className="w-6 font-mono text-xs font-bold text-right">{c.score}</span>
-                          <span className="flex-1 text-xs text-muted-foreground">{c.note}</span>
+            {/* Score Breakdown */}
+            {(() => {
+              if (!bounty.scoreBreakdown) return null;
+              try {
+                const breakdown = JSON.parse(bounty.scoreBreakdown) as Array<{label: string; score: number; note: string}>;
+                if (!Array.isArray(breakdown) || breakdown.length === 0) return null;
+                return (
+                  <div className="mt-3 space-y-2">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
+                    {breakdown.map((c, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase">{c.label}</span>
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${(c.score / 10) * 100}%` }}
+                          />
                         </div>
-                      ))}
-                    </div>
-                  );
-                } catch { return null; }
-              })()}
-            </CardContent>
-          </Card>
-        </AIFeatureGate>
+                        <span className="w-6 font-mono text-xs font-bold text-right">{c.score}</span>
+                        <span className="flex-1 text-xs text-muted-foreground">{c.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+          </CardContent>
+        </Card>
       )}
 
       {/* Agentic Retry Extraction */}
@@ -555,19 +540,17 @@ export function BountyDetail() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Research Brief</CardTitle>
-            <AIFeatureGate>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGenerateBrief}
-                disabled={generatingBrief}
-                className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
-              >
-                {generatingBrief
-                  ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
-                  : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
-              </Button>
-            </AIFeatureGate>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateBrief}
+              disabled={generatingBrief}
+              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+            >
+              {generatingBrief
+                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                : <><Sparkles className="w-3 h-3 mr-1.5" />{brief ? "Regenerate" : "Generate with AI"}</>}
+            </Button>
           </CardHeader>
           <CardContent className="text-sm">
             {brief ? (
@@ -597,19 +580,17 @@ export function BountyDetail() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Production Plan</CardTitle>
-            <AIFeatureGate>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGeneratePlan}
-                disabled={generatingPlan}
-                className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
-              >
-                {generatingPlan
-                  ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
-                  : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
-              </Button>
-            </AIFeatureGate>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGeneratePlan}
+              disabled={generatingPlan}
+              className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2"
+            >
+              {generatingPlan
+                ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Generating…</>
+                : <><Sparkles className="w-3 h-3 mr-1.5" />{plan ? "Regenerate" : "Generate with AI"}</>}
+            </Button>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 text-sm">
             {plan ? (
