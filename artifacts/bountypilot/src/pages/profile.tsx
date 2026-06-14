@@ -4,7 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, User, X, Plus, Calendar } from "lucide-react";
+import { Loader2, CheckCircle, User, X, Plus, Calendar, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 
 interface Profile {
   fullName?: string; creatorName?: string; mainPlatforms?: string;
@@ -139,6 +140,13 @@ export function Profile() {
               <p className="font-mono text-xs text-muted-foreground mt-0.5">
                 <Calendar className="w-3 h-3 inline mr-1" />ends {subStatus.endsAt}
               </p>
+            )}
+            {(user?.plan === "trial" || user?.plan === "pending" || user?.plan === "expired") && (
+              <Link href="/pricing">
+                <span className="inline-flex items-center gap-1 text-[10px] bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors mt-1">
+                  <Sparkles className="w-3 h-3" /> Upgrade
+                </span>
+              </Link>
             )}
           </div>
         )}

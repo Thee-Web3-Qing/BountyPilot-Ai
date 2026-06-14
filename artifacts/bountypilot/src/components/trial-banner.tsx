@@ -1,5 +1,6 @@
-import { Clock } from "lucide-react";
+import { Clock, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
+import { Link } from "wouter";
 
 const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z"); // Aug 7 10pm GMT+1
 const GRACE_END = new Date(HACKATHON_DEADLINE.getTime() + 3 * 24 * 60 * 60 * 1000); // Aug 10
@@ -37,7 +38,14 @@ export function TrialBanner() {
           <Clock className="w-3.5 h-3.5 shrink-0" />
           <span>Free access open until Aug 7, 10pm GMT+1</span>
         </div>
-        <span className="shrink-0 tabular-nums">{formatTimeLeft(ms)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/pricing">
+            <span className="inline-flex items-center gap-1 text-[10px] bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors">
+              <Sparkles className="w-3 h-3" /> Upgrade
+            </span>
+          </Link>
+          <span className="tabular-nums">{formatTimeLeft(ms)}</span>
+        </div>
       </div>
     );
   }
@@ -55,7 +63,14 @@ export function TrialBanner() {
           <Clock className="w-3.5 h-3.5 shrink-0" />
           <span>Subscription launching soon — access ends Aug 10, 10pm GMT+1</span>
         </div>
-        <span className="shrink-0 tabular-nums">{formatTimeLeft(ms)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/pricing">
+            <span className="inline-flex items-center gap-1 text-[10px] bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors">
+              <Sparkles className="w-3 h-3" /> Upgrade
+            </span>
+          </Link>
+          <span className="tabular-nums">{formatTimeLeft(ms)}</span>
+        </div>
       </div>
     );
   }
@@ -79,16 +94,30 @@ export function TrialBanner() {
               : `Free trial — ${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining`}
           </span>
         </div>
-        <span className="shrink-0 tabular-nums">{formatTimeLeft(ms)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/pricing">
+            <span className="inline-flex items-center gap-1 text-[10px] bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors">
+              <Sparkles className="w-3 h-3" /> Upgrade
+            </span>
+          </Link>
+          <span className="tabular-nums">{formatTimeLeft(ms)}</span>
+        </div>
       </div>
     );
   }
 
   // ── Case 4: Expired ───────────────────────────────────────────────────────
   return (
-    <div className="w-full px-4 py-2 text-xs font-mono flex items-center gap-2 bg-red-500/15 text-red-400 border-b border-red-500/20">
-      <Clock className="w-3.5 h-3.5 shrink-0" />
-      <span>Your access has ended — subscription coming soon</span>
+    <div className="w-full px-4 py-2 text-xs font-mono flex items-center justify-between gap-2 bg-red-500/15 text-red-400 border-b border-red-500/20">
+      <div className="flex items-center gap-1.5">
+        <Clock className="w-3.5 h-3.5 shrink-0" />
+        <span>Your access has ended — upgrade to continue</span>
+      </div>
+      <Link href="/pricing">
+        <span className="inline-flex items-center gap-1 text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors">
+          <Sparkles className="w-3 h-3" /> Upgrade
+        </span>
+      </Link>
     </div>
   );
 }
