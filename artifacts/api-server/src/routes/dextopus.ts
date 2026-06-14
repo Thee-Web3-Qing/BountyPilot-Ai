@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
+import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import {
@@ -38,12 +39,17 @@ router.get("/chains", async (_req, res) => {
 // ── List tokens for a chain ───────────────────────────────────
 router.get("/tokens", async (req, res) => {
   const chainId = Number(req.query.chainId);
-  if (!chainId) return res.status(400).json({ error: "chainId required" });
+  if (!chainId) {
+    res.status(400).json({ error: "chainId required" });
+    return;
+  }
   try {
     const tokens = await listTokens(chainId);
     res.json({ data: tokens });
+    return;
   } catch (e: any) {
     res.status(500).json({ error: e.message });
+    return;
   }
 });
 
@@ -52,20 +58,30 @@ router.get("/destinations", async (req, res) => {
   const originChainId = Number(req.query.originChainId);
   const originAddress = req.query.originAddress as string;
   if (!originChainId || !originAddress) {
-    return res.status(400).json({ error: "originChainId and originAddress required" });
+    res.status(400).json({ error: "originChainId and originAddress required" });
+    return;
   }
   try {
     const destinations = await getDestinations(originChainId, originAddress);
     res.json({ data: destinations });
+    return;
   } catch (e: any) {
     res.status(500).json({ error: e.message });
+    return;
   }
 });
 
-// ── Generate a static deposit address for subscription payment ─
-router.post("/generate", async (req: AuthRequest, res) => {
+// ── Generate a deposit address for a subscription tier ──
+const TIER_AMOUNTS: Record<string, string> = {
+  monthly: "5",
+  yearly: "45",
+  lifetime: "250",
+};
+
+router.post("/checkout", async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
   const {
+    tier,
     originChainId,
     originAsset,
     settlementChainId,
@@ -74,8 +90,14 @@ router.post("/generate", async (req: AuthRequest, res) => {
     refundTo,
   } = req.body;
 
-  if (!originChainId || !originAsset || !settlementChainId || !settlementAsset || !settlementAddress) {
-    return res.status(400).json({ error: "Missing required fields" });
+  if (!tier || !originChainId || !originAsset || !settlementChainId || !settlementAsset || !settlementAddress) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+
+  if (!TIER_AMOUNTS[tier]) {
+    res.status(400).json({ error: "Invalid tier" });
+    return;
   }
 
   try {
@@ -94,6 +116,7 @@ router.post("/generate", async (req: AuthRequest, res) => {
     // Store in our database
     await db.insert(dextopusDepositsTable).values({
       userId,
+      tier,
       depositId: result.depositId,
       originChainId: dextReq.originChainId,
       originAsset: dextReq.originAsset,
@@ -101,13 +124,63 @@ router.post("/generate", async (req: AuthRequest, res) => {
       settlementAsset: dextReq.settlementAsset,
       settlementAddress: dextReq.settlementAddress,
       depositAddress: result.depositAddress,
+      expectedAmount: TIER_AMOUNTS[tier],
       status: "PENDING",
       refundTo: dextReq.refundTo,
     });
 
-    res.json({ data: result });
+    res.json({
+      data: {
+        depositId: result.depositId,
+        depositAddress: result.depositAddress,
+        tier,
+        expectedAmount: TIER_AMOUNTS[tier],
+        status: "PENDING",
+      },
+    });
+    return;
   } catch (e: any) {
-    logger.warn({ err: e.message, userId }, "Dextopus generate failed");
+    logger.warn({ err: e.message, userId }, "Dextopus checkout failed");
+    res.status(500).json({ error: e.message });
+    return;
+  }
+});
+
+// ── Get user's active subscription status ───────────────
+router.get("/subscription", async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  try {
+    // Check for any completed deposits
+    const deposits = await db
+      .select()
+      .from(dextopusDepositsTable)
+      .where(eq(dextopusDepositsTable.userId, userId));
+
+    const active = deposits
+      .filter(d => d.status === "COMPLETED")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+    res.json({
+      subscription: active
+        ? {
+            tier: active.tier,
+            status: "active",
+            depositId: active.depositId,
+            settlementAmount: active.settlementAmount,
+            completedAt: active.updatedAt,
+          }
+        : null,
+      pending: deposits
+        .filter(d => d.status === "PENDING")
+        .map(d => ({
+          depositId: d.depositId,
+          depositAddress: d.depositAddress,
+          tier: d.tier,
+          status: d.status,
+          createdAt: d.createdAt,
+        })),
+    });
+  } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -116,88 +189,12 @@ router.post("/generate", async (req: AuthRequest, res) => {
 router.get("/deposits", async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
   try {
-    // Try to sync from Dextopus API
-    const apiDeposits = await listDeposits(String(userId));
-    
-    // Also get local records
-    const local = await db.select().from(dextopusDepositsTable).where(eq(dextopusDepositsTable.userId, userId));
-    
-    // Merge: prefer API data for status, keep local for anything not in API
-    const apiIds = new Set(apiDeposits.map(d => d.depositId));
-    const merged = [
-      ...apiDeposits.map(d => ({
-        depositId: d.depositId,
-        depositAddress: d.depositAddress,
-        originChainId: d.originChainId,
-        originAsset: d.originAsset,
-        settlementChainId: d.settlementChainId,
-        settlementAsset: d.settlementAsset,
-        settlementAddress: d.settlementAddress,
-        status: d.status,
-        settlementAmount: d.settlementAmount,
-        createdAt: d.createdAt,
-      })),
-      ...local.filter(l => !apiIds.has(l.depositId)).map(l => ({
-        depositId: l.depositId,
-        depositAddress: l.depositAddress,
-        originChainId: l.originChainId,
-        settlementChainId: l.settlementChainId,
-        settlementAsset: l.settlementAsset,
-        settlementAddress: l.settlementAddress,
-        status: l.status,
-        settlementAmount: l.settlementAmount,
-        createdAt: l.createdAt?.toISOString(),
-      })),
-    ];
-
-    res.json({ data: merged });
-  } catch (e: any) {
-    // Fallback to local only
-    const local = await db.select().from(dextopusDepositsTable).where(eq(dextopusDepositsTable.userId, userId));
-    res.json({ data: local });
-  }
-});
-
-// ── Webhook: Dextopus sends deposit events here ───────────────
-router.post("/webhook", async (req, res) => {
-  const payload = req.body;
-  logger.info({ event: payload?.event, depositId: payload?.data?.depositId }, "Dextopus webhook received");
-
-  if (!payload?.data?.depositId) {
-    return res.status(400).json({ error: "Missing depositId" });
-  }
-
-  const { depositId, userId, status, requestId, settlementAmount } = payload.data;
-
-  try {
-    // Update our local record
-    const existing = await db
+    const local = await db
       .select()
       .from(dextopusDepositsTable)
-      .where(eq(dextopusDepositsTable.depositId, depositId));
-
-    if (existing.length > 0) {
-      await db
-        .update(dextopusDepositsTable)
-        .set({
-          status: status || "COMPLETED",
-          requestId: requestId || existing[0].requestId,
-          settlementAmount: settlementAmount ? String(settlementAmount) : existing[0].settlementAmount,
-          updatedAt: new Date(),
-        })
-        .where(eq(dextopusDepositsTable.depositId, depositId));
-    }
-
-    // If completed, activate user subscription
-    if (status === "COMPLETED" && existing.length > 0) {
-      // Note: actual subscription activation depends on business logic
-      // Could be done via Stripe or direct DB update
-      logger.info({ userId: existing[0].userId, depositId }, "Deposit completed — consider activating subscription");
-    }
-
-    res.status(200).json({ received: true });
+      .where(eq(dextopusDepositsTable.userId, userId));
+    res.json({ data: local });
   } catch (e: any) {
-    logger.error({ err: e.message }, "Dextopus webhook processing failed");
     res.status(500).json({ error: e.message });
   }
 });

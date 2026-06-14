@@ -70,9 +70,10 @@ export async function generateStaticAddress(req: DextopusDepositRequest): Promis
     method: "POST",
     body: JSON.stringify(req),
   });
+  const inner = (data.data as Record<string, unknown> | undefined) || data;
   return {
-    depositAddress: data.data?.depositAddress || data.depositAddress,
-    depositId: data.data?.depositId || data.depositId,
+    depositAddress: (inner.depositAddress as string) || "",
+    depositId: (inner.depositId as string) || "",
   };
 }
 
@@ -105,7 +106,8 @@ export async function listChains(): Promise<Array<{ chainId: number; name: strin
 // ── List tokens for a chain ──────────────────────────────────────
 export async function listTokens(chainId: number): Promise<Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>> {
   const data = await dextopusFetch(`/deposit/tokens?chainId=${chainId}`);
-  return (data.data?.tokens || data.tokens || []) as Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>;
+  const inner = (data.data as Record<string, unknown> | undefined) || data;
+  return (inner.tokens || inner.data || []) as Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>;
 }
 
 // ── Get destinations for an origin token ─────────────────────────

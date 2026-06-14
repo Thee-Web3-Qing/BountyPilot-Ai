@@ -7,12 +7,14 @@ export const dextopusDepositsTable = pgTable("dextopus_deposits", {
   userId: integer("user_id").notNull(),
   depositId: text("deposit_id").notNull(),
   requestId: text("request_id"),
+  tier: text("tier").notNull(), // monthly, yearly, lifetime
   originChainId: integer("origin_chain_id"),
   originAsset: text("origin_asset"),
   settlementChainId: integer("settlement_chain_id"),
   settlementAsset: text("settlement_asset"),
   settlementAddress: text("settlement_address"),
   depositAddress: text("deposit_address").notNull(),
+  expectedAmount: text("expected_amount"), // USD value
   status: text("status").notNull().default("PENDING"),
   settlementAmount: text("settlement_amount"),
   refundTo: text("refund_to"),
