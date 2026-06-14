@@ -206,8 +206,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const planStatus = computePlanStatus(user);
   const trialDaysLeft = computeTrialDaysLeft(user);
   const canAccessAI = planStatus === "beta" || planStatus === "trial" || planStatus === "active";
-  const isPaid = planStatus === "active" || planStatus === "beta";
-  const isFree = planStatus === "trial" || planStatus === "pending" || planStatus === "expired";
+  const isPaid = planStatus === "active" || planStatus === "beta" || planStatus === "trial";
+  const isFree = planStatus === "pending" || planStatus === "expired";
 
   return (
     <AuthContext.Provider value={{

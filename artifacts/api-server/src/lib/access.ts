@@ -71,7 +71,7 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
 
 export function isFreeTier(plan: string, trialEndsAt: Date | null, subscriptionEndsAt?: Date | null): boolean {
   const status = getPlanStatus(plan, trialEndsAt, subscriptionEndsAt);
-  return status === "trial" || status === "pending" || status === "expired";
+  return status === "pending" || status === "expired";
 }
 
 export async function getUserPlanStatus(userId: number): Promise<{ plan: string; trialEndsAt: Date | null; subscriptionEndsAt: Date | null; isFree: boolean }> {
