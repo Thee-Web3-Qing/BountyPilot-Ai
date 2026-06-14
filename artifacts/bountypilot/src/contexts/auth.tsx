@@ -92,6 +92,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         localStorage.setItem(USER_KEY, JSON.stringify(updated));
         setUser(updated);
+        pendo.identify({
+          visitor: {
+            id: data.id,
+            email: data.email,
+            full_name: data.profile?.fullName,
+            username: data.username,
+            plan: data.plan ?? 'trial',
+            isAdmin: data.isAdmin ?? false,
+            trialEndsAt: data.trialEndsAt,
+            createdAt: data.createdAt,
+            creatorName: data.profile?.creatorName,
+            mainPlatforms: data.profile?.mainPlatforms,
+            contentFormats: data.profile?.contentFormats,
+            niche: data.profile?.niche,
+            skillLevel: data.profile?.skillLevel,
+            preferredBountyTypes: data.profile?.preferredBountyTypes,
+            minimumReward: data.profile?.minimumReward,
+            weeklyContentCapacity: data.profile?.weeklyContentCapacity,
+            targetMonthlyEarnings: data.profile?.targetMonthlyEarnings,
+            creatorStrengths: data.profile?.creatorStrengths,
+            creatorWeaknesses: data.profile?.creatorWeaknesses,
+            portfolioLinks: data.profile?.portfolioLinks,
+          }
+        });
       })
       .catch(() => {});
   }, []);
@@ -143,6 +167,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
+      pendo.identify({
+        visitor: {
+          id: u.id,
+          email: u.email,
+          username: u.username,
+          plan: u.plan,
+          isAdmin: u.isAdmin,
+          trialEndsAt: u.trialEndsAt,
+        }
+      });
     } finally {
       setIsLoading(false);
     }
@@ -174,6 +208,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
       setToken(data.token);
       setUser(u);
+      pendo.identify({
+        visitor: {
+          id: u.id,
+          email: u.email,
+          username: u.username,
+          plan: u.plan,
+          isAdmin: u.isAdmin,
+          trialEndsAt: u.trialEndsAt,
+        }
+      });
     } finally {
       setIsLoading(false);
     }
@@ -185,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setAuthTokenGetter(null);
+    pendo.clearSession();
   }, []);
 
   const planStatus = computePlanStatus(user);
