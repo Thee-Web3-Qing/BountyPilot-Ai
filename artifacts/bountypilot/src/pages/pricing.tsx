@@ -15,6 +15,7 @@ import {
   Copy,
   CheckCircle2,
 } from "lucide-react";
+import { trackPendo } from "@/lib/pendo";
 
 interface Chain {
   chainId: number;
@@ -170,6 +171,7 @@ export function Pricing() {
     setSelectedChain(null);
     setSelectedToken(null);
     setRefundAddress("");
+    trackPendo("CheckoutStarted", { tier });
   };
 
   const handleGenerateDeposit = async () => {
@@ -193,6 +195,13 @@ export function Pricing() {
       const json = await res.json();
       if (json.data) {
         setDeposit(json.data);
+        trackPendo("DepositAddressGenerated", {
+          tier: selectedTier,
+          expectedAmount: json.data.expectedAmount,
+          depositId: json.data.depositId,
+          originChainId: selectedChain,
+          originAsset: selectedToken,
+        });
       } else {
         alert(json.error || "Failed to generate deposit address");
       }

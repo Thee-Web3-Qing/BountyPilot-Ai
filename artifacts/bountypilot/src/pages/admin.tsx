@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
+import { trackPendo } from "@/lib/pendo";
 
 interface AdminUser {
   id: number;
@@ -147,6 +148,11 @@ export function Admin() {
       await fetch(`${API}/admin/bounty-reports/${id}/resolve`, {
         method: "POST", headers: authHeaders(), body: JSON.stringify({ resolution }),
       });
+      trackPendo("AdminReportResolved", {
+        reportId: id,
+        resolution,
+        reason: bountyReports.find(r => r.id === id)?.reason,
+      });
       await loadReports();
     } finally {
       setReportAction(null);
@@ -157,6 +163,11 @@ export function Admin() {
     setReportAction(id);
     try {
       await fetch(`${API}/admin/bounty-reports/${id}`, { method: "DELETE", headers: authHeaders() });
+      trackPendo("AdminReportResolved", {
+        reportId: id,
+        resolution: "dismissed",
+        reason: bountyReports.find(r => r.id === id)?.reason,
+      });
       await loadReports();
     } finally {
       setReportAction(null);
@@ -168,6 +179,10 @@ export function Admin() {
     setReportAction(id);
     try {
       await fetch(`${API}/admin/bounty-reports/${id}/remove-bounty`, { method: "DELETE", headers: authHeaders() });
+      trackPendo("AdminBountyRemoved", {
+        reportId: id,
+        bountyTitle: bountyReports.find(r => r.id === id)?.bounty?.title,
+      });
       await loadReports();
     } finally {
       setReportAction(null);
@@ -185,6 +200,12 @@ export function Admin() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed"); setChanging(null); return; }
+      trackPendo("AdminUserPlanChanged", {
+        targetUserId: userId,
+        targetUsername: selected?.username,
+        newPlan: plan,
+        previousPlan: selected?.plan,
+      });
       await loadData();
       setSelected(prev => prev ? { ...prev, plan } : null);
     } finally {

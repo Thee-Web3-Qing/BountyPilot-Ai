@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Crosshair, Loader2, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import { API_BASE } from "@/lib/api";
+import { trackPendo } from "@/lib/pendo";
 
 export function ResetPassword() {
   const [email, setEmail] = useState("");
@@ -40,6 +41,7 @@ export function ResetPassword() {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Reset failed");
       setSuccess(true);
+      trackPendo("PasswordResetCompleted");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reset failed");
     } finally {

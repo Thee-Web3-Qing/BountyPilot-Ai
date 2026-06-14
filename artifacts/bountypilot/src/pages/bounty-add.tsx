@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle, Shield } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
+import { trackPendo } from "@/lib/pendo";
 
 const WORKFLOW_STEPS = [
   "Fetching page content...",
@@ -171,6 +172,17 @@ export function BountyAdd() {
           setExtracted(b);
           setEditFields(bountyToEditable(b));
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+          trackPendo("BountyUrlScanned", {
+            bountyId: b.id,
+            url,
+            platform: b.platform,
+            projectName: b.projectName,
+            rewardAmount: b.rewardAmount,
+            rewardCurrency: b.rewardCurrency,
+            opportunityScore: b.opportunityScore,
+            confidenceScore: (b as any).confidenceScore,
+            missingFieldCount: countMissing(bountyToEditable(b)),
+          });
         },
       }
     );
@@ -226,6 +238,19 @@ export function BountyAdd() {
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetRecentBountiesQueryKey() });
+          trackPendo("BountyApproved", {
+            bountyId: extracted.id,
+            title: extracted.title,
+            platform: extracted.platform,
+            rewardAmount: extracted.rewardAmount,
+            rewardCurrency: extracted.rewardCurrency,
+            opportunityScore: extracted.opportunityScore,
+            confidenceScore: (extracted as any).confidenceScore,
+            hadEdits: editFields
+              ? editFields.title !== (extracted.title ?? "") ||
+                editFields.rewardAmount !== (extracted.rewardAmount ?? "")
+              : false,
+          });
           setActionDone("approved");
           setTimeout(() => navigate(`/bounties/${extracted.id}`), 1500);
         },
@@ -240,6 +265,12 @@ export function BountyAdd() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+          trackPendo("BountyRejected", {
+            bountyId: extracted.id,
+            title: extracted.title,
+            platform: extracted.platform,
+            opportunityScore: extracted.opportunityScore,
+          });
           setActionDone("rejected");
           setTimeout(() => navigate("/bounties"), 1200);
         },
@@ -255,6 +286,12 @@ export function BountyAdd() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+          trackPendo("BountySavedForLater", {
+            bountyId: extracted.id,
+            title: extracted.title,
+            platform: extracted.platform,
+            opportunityScore: extracted.opportunityScore,
+          });
           setActionDone("saved");
           setTimeout(() => navigate("/bounties"), 1200);
         },

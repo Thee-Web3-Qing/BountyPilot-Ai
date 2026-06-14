@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
+import { trackPendo } from "@/lib/pendo";
 
 // ── Team helpers ─────────────────────────────────────────────
 function buildTeamSearchUrl(companyName: string | null | undefined, _platform: string | null | undefined, _url: string | null | undefined): string | null {
@@ -238,6 +239,12 @@ export function BountyDetail() {
           queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          trackPendo("BountyStatusChanged", {
+            bountyId,
+            newStatus: status,
+            platform: bounty?.platform,
+            rewardAmount: bounty?.rewardAmount,
+          });
         },
       }
     );
@@ -262,6 +269,12 @@ export function BountyDetail() {
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListSubmissionsQueryKey() });
+          trackPendo("SubmissionCreated", {
+            bountyId,
+            hasSubmissionUrl: !!submitUrl,
+            source: "bounty_detail",
+            platform: bounty?.platform,
+          });
         },
       }
     );
@@ -277,6 +290,11 @@ export function BountyDetail() {
       });
       if (resp.ok) {
         queryClient.invalidateQueries({ queryKey: getGetResearchBriefByBountyQueryKey(bountyId) });
+        trackPendo("ResearchBriefGenerated", {
+          bountyId,
+          platform: bounty?.platform,
+          isRegenerate: !!brief,
+        });
       }
     } finally {
       setGeneratingBrief(false);
@@ -293,6 +311,11 @@ export function BountyDetail() {
       });
       if (resp.ok) {
         queryClient.invalidateQueries({ queryKey: getGetProductionPlanByBountyQueryKey(bountyId) });
+        trackPendo("ProductionPlanGenerated", {
+          bountyId,
+          platform: bounty?.platform,
+          isRegenerate: !!plan,
+        });
       }
     } finally {
       setGeneratingPlan(false);
@@ -313,6 +336,12 @@ export function BountyDetail() {
         setRescrapeResult({ prevConfidence: data.prevConfidence, newConfidence: data.newConfidence });
         queryClient.invalidateQueries({ queryKey: getGetBountyQueryKey(bountyId) });
         queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+        trackPendo("BountyRescrapeCompleted", {
+          bountyId,
+          prevConfidence: data.prevConfidence,
+          newConfidence: data.newConfidence,
+          platform: bounty?.platform,
+        });
       }
     } finally {
       setRescraping(false);
@@ -330,6 +359,12 @@ export function BountyDetail() {
       });
       if (resp.ok) {
         setReportSent(true);
+        trackPendo("BountyReported", {
+          bountyId,
+          reason: reportReason,
+          hasNote: !!reportNote,
+          platform: bounty?.platform,
+        });
         setTimeout(() => { setShowReport(false); setReportSent(false); setReportReason(""); setReportNote(""); }, 2000);
       }
     } finally {

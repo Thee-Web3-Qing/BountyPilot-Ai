@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle, User, X, Plus, Calendar, Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import { trackPendo } from "@/lib/pendo";
 
 interface Profile {
   fullName?: string; creatorName?: string; mainPlatforms?: string;
@@ -104,6 +105,17 @@ export function Profile() {
         body: JSON.stringify(profile),
       });
       setSaved(true);
+      trackPendo("ProfileSaved", {
+        hasFullName: !!profile.fullName,
+        hasCreatorName: !!profile.creatorName,
+        mainPlatforms: profile.mainPlatforms,
+        contentFormats: profile.contentFormats,
+        niche: profile.niche,
+        skillLevel: profile.skillLevel,
+        minimumReward: profile.minimumReward,
+        weeklyContentCapacity: profile.weeklyContentCapacity,
+        targetMonthlyEarnings: profile.targetMonthlyEarnings,
+      });
       setTimeout(() => setSaved(false), 3000);
     } finally {
       setSaving(false);

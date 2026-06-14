@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Clock, Check } from "lucide-react";
 import { FreeLimitGate } from "@/components/trial-gate";
+import { trackPendo } from "@/lib/pendo";
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -78,6 +79,7 @@ export function Bounties() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListBountiesQueryKey() });
+          trackPendo("BountyDeleted", { bountyId: id });
         },
       }
     );

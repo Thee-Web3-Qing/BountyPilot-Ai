@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Loader2, Clock } from "lucide-react";
+import { trackPendo } from "@/lib/pendo";
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -91,6 +92,12 @@ export function Submissions() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListSubmissionsQueryKey() });
+          trackPendo("SubmissionResultUpdated", {
+            submissionId: id,
+            result: resultData.result,
+            rewardReceived: resultData.rewardReceived ? parseFloat(resultData.rewardReceived) : undefined,
+            bountyId: submissions?.find(s => s.id === id)?.bountyId,
+          });
           setEditingId(null);
           setResultData({ result: "won", rewardReceived: "" });
         },
