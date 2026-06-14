@@ -93,12 +93,33 @@ router.post("/webhook", async (req, res) => {
     if (status === "COMPLETED" && existing.length > 0) {
       const deposit = existing[0];
       const newPlan = deposit.tier === "lifetime" ? "lifetime" : "active";
+      let subscriptionEndsAt: Date | null = null;
+
+      if (deposit.tier !== "lifetime") {
+        // Get the user's current trial end to extend from
+        const [user] = await db
+          .select({ trialEndsAt: usersTable.trialEndsAt })
+          .from(usersTable)
+          .where(eq(usersTable.id, deposit.userId));
+
+        const baseDate = user?.trialEndsAt && new Date(user.trialEndsAt) > new Date()
+          ? new Date(user.trialEndsAt)
+          : new Date();
+
+        subscriptionEndsAt = new Date(baseDate);
+        if (deposit.tier === "monthly") {
+          subscriptionEndsAt.setDate(subscriptionEndsAt.getDate() + 31);
+        } else if (deposit.tier === "yearly") {
+          subscriptionEndsAt.setDate(subscriptionEndsAt.getDate() + 366);
+        }
+      }
+
       await db
         .update(usersTable)
-        .set({ plan: newPlan, updatedAt: new Date() })
+        .set({ plan: newPlan, subscriptionEndsAt, updatedAt: new Date() })
         .where(eq(usersTable.id, deposit.userId));
       logger.info(
-        { userId: deposit.userId, depositId, tier: deposit.tier, plan: newPlan },
+        { userId: deposit.userId, depositId, tier: deposit.tier, plan: newPlan, subscriptionEndsAt },
         "User subscription activated after deposit"
       );
     }
@@ -253,6 +274,12 @@ router.get("/subscription", async (req: AuthRequest, res) => {
       .filter(d => d.status === "COMPLETED")
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
+    // Also get user record for subscriptionEndsAt
+    const [user] = await db
+      .select({ subscriptionEndsAt: usersTable.subscriptionEndsAt })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+
     res.json({
       subscription: active
         ? {
@@ -261,6 +288,7 @@ router.get("/subscription", async (req: AuthRequest, res) => {
             depositId: active.depositId,
             settlementAmount: active.settlementAmount,
             completedAt: active.updatedAt,
+            subscriptionEndsAt: user?.subscriptionEndsAt,
           }
         : null,
       pending: deposits

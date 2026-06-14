@@ -10,6 +10,7 @@ interface User {
   username: string;
   plan: Plan;
   trialEndsAt: string | null;
+  subscriptionEndsAt: string | null;
   isAdmin: boolean;
 }
 
@@ -26,6 +27,7 @@ interface AuthContextType {
   isFree: boolean;
   trialDaysLeft: number | null;
   planStatus: Plan | null;
+  subscriptionEndsAt: string | null;
   refreshUser: () => Promise<void>;
 }
 
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: data.username,
           plan: data.plan ?? "trial",
           trialEndsAt: data.trialEndsAt ?? null,
+          subscriptionEndsAt: data.subscriptionEndsAt ?? null,
           isAdmin: data.isAdmin ?? false,
         };
         localStorage.setItem(USER_KEY, JSON.stringify(updated));
@@ -115,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: data.username,
           plan: data.plan ?? "trial",
           trialEndsAt: data.trialEndsAt ?? null,
+          subscriptionEndsAt: data.subscriptionEndsAt ?? null,
           isAdmin: data.isAdmin ?? false,
         };
         localStorage.setItem(USER_KEY, JSON.stringify(updated));
@@ -142,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: data.user.username,
         plan: data.user.plan ?? "pending",
         trialEndsAt: data.user.trialEndsAt ?? null,
+        subscriptionEndsAt: data.user.subscriptionEndsAt ?? null,
         isAdmin: data.user.isAdmin ?? false,
       };
       localStorage.setItem(TOKEN_KEY, data.token);
@@ -175,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: data.user.username,
         plan: data.user.plan ?? "pending",
         trialEndsAt: data.user.trialEndsAt ?? null,
+        subscriptionEndsAt: data.user.subscriptionEndsAt ?? null,
         isAdmin: data.user.isAdmin ?? false,
       };
       localStorage.setItem(TOKEN_KEY, data.token);
@@ -213,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isFree,
       trialDaysLeft,
       planStatus,
+      subscriptionEndsAt: user?.subscriptionEndsAt ?? null,
       refreshUser,
     }}>
       {children}

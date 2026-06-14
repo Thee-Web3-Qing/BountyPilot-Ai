@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, User, X, Plus } from "lucide-react";
+import { Loader2, CheckCircle, User, X, Plus, Calendar } from "lucide-react";
 
 interface Profile {
   fullName?: string; creatorName?: string; mainPlatforms?: string;
@@ -37,12 +37,50 @@ const BOUNTY_TYPES = [
   "Technical Writing", "Design", "Memes", "Podcasts",
 ];
 
+function formatDate(date: string | null): string {
+  if (!date) return "N/A";
+  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function computeSubscriptionStatus(user: any) {
+  if (!user) return null;
+  if (user.plan === "lifetime") return { plan: "Lifetime", label: "Unlimited", color: "text-green-400" };
+  if (user.plan === "active" && user.subscriptionEndsAt) {
+    const end = new Date(user.subscriptionEndsAt);
+    const now = new Date();
+    const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      plan: "Active",
+      label: daysLeft > 0 ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : "Expired",
+      color: daysLeft > 0 ? "text-green-400" : "text-red-400",
+      endsAt: formatDate(user.subscriptionEndsAt),
+    };
+  }
+  if (user.plan === "trial" || user.plan === "pending") {
+    const end = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
+    const now = new Date();
+    if (end && end > now) {
+      const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        plan: "Trial",
+        label: `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`,
+        color: "text-amber-400",
+        endsAt: formatDate(user.trialEndsAt),
+      };
+    }
+    return { plan: "Expired", label: "Trial ended", color: "text-red-400" };
+  }
+  return { plan: user.plan, label: "", color: "text-muted-foreground" };
+}
+
 export function Profile() {
   const { user, token } = useAuth();
   const [profile, setProfile] = useState<Profile>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const subStatus = computeSubscriptionStatus(user);
 
   useEffect(() => {
     if (!token) return;
@@ -79,16 +117,31 @@ export function Profile() {
 
   return (
     <div className="flex flex-col gap-8 max-w-2xl">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
-          <User className="w-6 h-6 text-primary" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
+            <User className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">Creator Profile</h1>
+            <p className="text-muted-foreground font-mono text-sm mt-0.5">
+              @{user?.username} · {user?.email}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">Creator Profile</h1>
-          <p className="text-muted-foreground font-mono text-sm mt-0.5">
-            @{user?.username} · {user?.email}
-          </p>
-        </div>
+        {subStatus && (
+          <div className="text-right">
+            <div className="flex items-center gap-2 justify-end">
+              <span className={`font-mono text-sm font-semibold ${subStatus.color}`}>{subStatus.plan}</span>
+              <span className="text-muted-foreground font-mono text-xs">{subStatus.label}</span>
+            </div>
+            {subStatus.endsAt && (
+              <p className="font-mono text-xs text-muted-foreground mt-0.5">
+                <Calendar className="w-3 h-3 inline mr-1" />ends {subStatus.endsAt}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="text-muted-foreground font-mono text-xs border-l-2 border-primary/50 pl-3">

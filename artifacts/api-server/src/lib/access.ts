@@ -22,9 +22,16 @@ function effectiveTrialEnd(trialEndsAt: Date | null): Date | null {
   return endsAt;
 }
 
-export function getPlanStatus(plan: string, trialEndsAt: Date | null): Plan {
+export function getPlanStatus(plan: string, trialEndsAt: Date | null, subscriptionEndsAt?: Date | null): Plan {
   if (plan === "beta") return "beta";
-  if (plan === "active" || plan === "lifetime") return "active";
+  if (plan === "lifetime") return "active";
+  if (plan === "active") {
+    // Active subscription can expire
+    if (subscriptionEndsAt && new Date(subscriptionEndsAt) <= new Date()) {
+      return "expired";
+    }
+    return "active";
+  }
   if (plan === "trial" || plan === "pending") {
     const effEnd = effectiveTrialEnd(trialEndsAt);
     if (!effEnd) return "trial";
@@ -33,8 +40,8 @@ export function getPlanStatus(plan: string, trialEndsAt: Date | null): Plan {
   return "expired";
 }
 
-export function canAccessAI(plan: string, trialEndsAt: Date | null): boolean {
-  const status = getPlanStatus(plan, trialEndsAt);
+export function canAccessAI(plan: string, trialEndsAt: Date | null, subscriptionEndsAt?: Date | null): boolean {
+  const status = getPlanStatus(plan, trialEndsAt, subscriptionEndsAt);
   return status === "beta" || status === "trial" || status === "active";
 }
 
@@ -45,7 +52,7 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
   }
 
   const [user] = await db
-    .select({ plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt })
+    .select({ plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt, subscriptionEndsAt: usersTable.subscriptionEndsAt })
     .from(usersTable)
     .where(eq(usersTable.id, req.user.userId));
 
@@ -54,7 +61,7 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
     return;
   }
 
-  if (!canAccessAI(user.plan, user.trialEndsAt)) {
+  if (!canAccessAI(user.plan, user.trialEndsAt, user.subscriptionEndsAt)) {
     res.status(403).json({ error: "trial_expired", message: "Your trial has ended. Subscription coming soon." });
     return;
   }
@@ -62,18 +69,18 @@ export async function requireActivePlan(req: AuthRequest, res: Response, next: N
   next();
 }
 
-export function isFreeTier(plan: string, trialEndsAt: Date | null): boolean {
-  const status = getPlanStatus(plan, trialEndsAt);
+export function isFreeTier(plan: string, trialEndsAt: Date | null, subscriptionEndsAt?: Date | null): boolean {
+  const status = getPlanStatus(plan, trialEndsAt, subscriptionEndsAt);
   return status === "trial" || status === "pending" || status === "expired";
 }
 
-export async function getUserPlanStatus(userId: number): Promise<{ plan: string; trialEndsAt: Date | null; isFree: boolean }> {
+export async function getUserPlanStatus(userId: number): Promise<{ plan: string; trialEndsAt: Date | null; subscriptionEndsAt: Date | null; isFree: boolean }> {
   const [user] = await db
-    .select({ plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt })
+    .select({ plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt, subscriptionEndsAt: usersTable.subscriptionEndsAt })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
-  if (!user) return { plan: "expired", trialEndsAt: null, isFree: true };
-  return { plan: user.plan, trialEndsAt: user.trialEndsAt, isFree: isFreeTier(user.plan, user.trialEndsAt) };
+  if (!user) return { plan: "expired", trialEndsAt: null, subscriptionEndsAt: null, isFree: true };
+  return { plan: user.plan, trialEndsAt: user.trialEndsAt, subscriptionEndsAt: user.subscriptionEndsAt, isFree: isFreeTier(user.plan, user.trialEndsAt, user.subscriptionEndsAt) };
 }
 
 export async function countUserBounties(userId: number): Promise<number> {

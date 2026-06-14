@@ -59,7 +59,7 @@ authRouter.post("/signup", async (req, res) => {
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
     logger.info({ userId: user.id, plan }, "User signed up");
-    res.status(201).json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, isAdmin: user.isAdmin } });
+    res.status(201).json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, subscriptionEndsAt: user.subscriptionEndsAt, isAdmin: user.isAdmin } });
   } catch (err) {
     logger.error(err, "Signup error");
     res.status(500).json({ error: "Signup failed" });
@@ -92,7 +92,7 @@ authRouter.post("/login", async (req, res) => {
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
     logger.info({ userId: user.id }, "User logged in");
-    res.json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, isAdmin: user.isAdmin } });
+    res.json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, subscriptionEndsAt: user.subscriptionEndsAt, isAdmin: user.isAdmin } });
   } catch (err) {
     logger.error(err, "Login error");
     res.status(500).json({ error: "Login failed" });
@@ -182,7 +182,7 @@ authRouter.post("/reset-password", async (req, res) => {
 authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
   try {
     const [user] = await db
-      .select({ id: usersTable.id, email: usersTable.email, username: usersTable.username, createdAt: usersTable.createdAt, plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt, isAdmin: usersTable.isAdmin })
+      .select({ id: usersTable.id, email: usersTable.email, username: usersTable.username, createdAt: usersTable.createdAt, plan: usersTable.plan, trialEndsAt: usersTable.trialEndsAt, subscriptionEndsAt: usersTable.subscriptionEndsAt, isAdmin: usersTable.isAdmin })
       .from(usersTable)
       .where(eq(usersTable.id, req.user!.userId));
     if (!user) {

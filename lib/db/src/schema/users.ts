@@ -9,6 +9,7 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   plan: text("plan").notNull().default("pending"),
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  subscriptionEndsAt: timestamp("subscription_ends_at", { withTimezone: true }),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   isAdmin: boolean("is_admin").notNull().default(false),
   passwordResetToken: text("password_reset_token"),
