@@ -22,6 +22,58 @@ router.get("/status", async (_req, res) => {
   res.json({ enabled: isDextopusEnabled() });
 });
 
+// ── Webhook: Dextopus sends deposit events here (PUBLIC) ──
+router.post("/webhook", async (req, res) => {
+  const payload = req.body;
+  logger.info({ event: payload?.event, depositId: payload?.data?.depositId }, "Dextopus webhook received");
+
+  if (!payload?.data?.depositId) {
+    res.status(400).json({ error: "Missing depositId" });
+    return;
+  }
+
+  const { depositId, status, requestId, settlementAmount } = payload.data;
+
+  try {
+    // Update our local record
+    const existing = await db
+      .select()
+      .from(dextopusDepositsTable)
+      .where(eq(dextopusDepositsTable.depositId, depositId));
+
+    if (existing.length > 0) {
+      await db
+        .update(dextopusDepositsTable)
+        .set({
+          status: status || "COMPLETED",
+          requestId: requestId || existing[0].requestId,
+          settlementAmount: settlementAmount ? String(settlementAmount) : existing[0].settlementAmount,
+          updatedAt: new Date(),
+        })
+        .where(eq(dextopusDepositsTable.depositId, depositId));
+    }
+
+    // If completed, activate user subscription
+    if (status === "COMPLETED" && existing.length > 0) {
+      const deposit = existing[0];
+      const newPlan = deposit.tier === "lifetime" ? "lifetime" : "active";
+      await db
+        .update(usersTable)
+        .set({ plan: newPlan, updatedAt: new Date() })
+        .where(eq(usersTable.id, deposit.userId));
+      logger.info(
+        { userId: deposit.userId, depositId, tier: deposit.tier, plan: newPlan },
+        "User subscription activated after deposit"
+      );
+    }
+
+    res.status(200).json({ received: true });
+  } catch (e: any) {
+    logger.error({ err: e.message }, "Dextopus webhook processing failed");
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Auth required from here ───────────────────────────────────
 router.use(requireAuth);
 
