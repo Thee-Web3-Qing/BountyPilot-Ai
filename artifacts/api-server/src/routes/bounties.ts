@@ -190,6 +190,7 @@ bountiesRouter.post("/:id/approve", async (req: AuthRequest, res) => {
       rewardAmount: bounty.rewardAmount,
       rewardCurrency: bounty.rewardCurrency,
       prizeRank: bounty.prizeRank,
+      prizeBreakdown: bounty.prizeBreakdown ? JSON.parse(bounty.prizeBreakdown) as import("../lib/scraper.js").PrizeBreakdown[] : null,
       deadline: bounty.deadline,
       projectName: bounty.projectName || bounty.platform || "",
       contentFormat: bounty.contentFormat || "Article / Thread",

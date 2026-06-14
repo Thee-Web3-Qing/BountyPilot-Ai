@@ -283,6 +283,27 @@ export function BountyDetail() {
               <span className="inline-block ml-2 px-2 py-0 bg-primary/10 border border-primary/30 rounded text-sm font-mono">{bounty.prizeRank}</span>
             )}
           </span>
+          {/* Prize Breakdown */}
+          {bounty.prizeBreakdown && (() => {
+            try {
+              const breakdown = JSON.parse(bounty.prizeBreakdown) as Array<{rank: string; amount: string; currency: string; count?: number}>;
+              if (breakdown.length === 0) return null;
+              return (
+                <div className="mt-2 space-y-1">
+                  {breakdown.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2 font-mono text-sm">
+                      <span className="w-16 text-muted-foreground text-xs">{p.rank}</span>
+                      <span className="font-bold">${p.amount}</span>
+                      <span className="text-muted-foreground text-xs">{p.currency}</span>
+                      {p.count && p.count > 1 && (
+                        <span className="text-xs text-muted-foreground">x{p.count} winners</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            } catch { return null; }
+          })()}
           <button
             onClick={() => setShowReport(true)}
             className="text-[10px] font-mono text-muted-foreground hover:text-red-400 transition-colors flex items-center gap-1"

@@ -18,6 +18,19 @@ export function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Early Bird Banner */}
+      <div className="bg-primary text-primary-foreground text-center py-2 px-4">
+        <p className="font-mono text-sm">
+          Reserve your spot at launch pricing — $45/year (was $55). Limited time before launch.
+          <button
+            onClick={() => navigate("/pricing")}
+            className="underline ml-2 font-bold hover:text-white/90 transition-colors"
+          >
+            Reserve Now →
+          </button>
+        </p>
+      </div>
+
       {/* Nav */}
       <header className="border-b border-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -74,6 +87,23 @@ export function Landing() {
           >
             Already have an account? Sign In →
           </button>
+        </div>
+
+        <div className="mt-6 border border-border rounded-lg p-4 bg-card/50 max-w-md w-full">
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">Pre-Launch Pricing</p>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="font-sans font-bold text-lg">Yearly</p>
+              <p className="font-mono text-sm text-muted-foreground">$45/yr <span className="line-through text-red-400">$55</span></p>
+            </div>
+            <div className="flex-1">
+              <p className="font-sans font-bold text-lg">Lifetime</p>
+              <p className="font-mono text-sm text-muted-foreground">$250 <span className="line-through text-red-400">$300</span></p>
+            </div>
+            <Button size="sm" onClick={() => navigate("/pricing")} className="font-mono text-xs uppercase tracking-wider">
+              Reserve
+            </Button>
+          </div>
         </div>
       </section>
 

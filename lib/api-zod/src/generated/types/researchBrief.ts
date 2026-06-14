@@ -19,5 +19,7 @@ export interface ResearchBrief {
   targetAudience?: string | null;
   /** @nullable */
   competitorAnalysis?: string | null;
+  /** @nullable */
+  fullContent?: string | null;
   createdAt: string;
 }

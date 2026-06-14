@@ -23,6 +23,8 @@ export interface Bounty {
   /** @nullable */
   prizeRank?: string | null;
   /** @nullable */
+  prizeBreakdown?: string | null;
+  /** @nullable */
   deadline?: string | null;
   /** @nullable */
   contentFormat?: string | null;
@@ -42,8 +44,6 @@ export interface Bounty {
   scoreExplanation?: string | null;
   /** @nullable */
   confidenceScore?: number | null;
-  /** @nullable */
-  opportunityType?: string | null;
   status: BountyStatus;
   /** @nullable */
   hoursSaved?: number | null;

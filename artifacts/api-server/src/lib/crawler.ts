@@ -51,6 +51,7 @@ interface PlatformBountyHint {
   description?: string;
   type?: string;
   prizeRank?: string;
+  prizeBreakdown?: string;
 }
 
 interface PlatformConfig {
@@ -225,22 +226,68 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json() as Array<Record<string, unknown>>;
     const items = Array.isArray(data) ? data : (data as Record<string, unknown[]>).bounties || [];
-    return (items as Array<Record<string, unknown>>)
-      .filter((b) => b.status === "OPEN")
-      .slice(0, 10)
-      .map((b) => {
-        const sponsor = b.sponsor as Record<string, unknown> | undefined;
-        const listingType = b.type as string | undefined;
-        return {
-          url: `https://earn.superteam.fun/listing/${b.slug}`,
-          title: b.title as string | undefined,
-          rewardAmount: b.rewardAmount != null ? String(b.rewardAmount) : undefined,
-          rewardCurrency: (b.token as string | undefined) || "USDC",
-          deadline: b.deadline as string | undefined,
-          projectName: (sponsor?.name as string | undefined) || (b.sponsorName as string | undefined),
-          type: listingType === "project" ? "Job" : undefined,
-        };
-      });
+
+    // Fetch detailed data for each bounty to get prize breakdown
+    const hints: PlatformBountyHint[] = await Promise.all(
+      (items as Array<Record<string, unknown>>)
+        .filter((b) => b.status === "OPEN")
+        .slice(0, 10)
+        .map(async (b) => {
+          const slug = b.slug as string | undefined;
+          const sponsor = b.sponsor as Record<string, unknown> | undefined;
+          const listingType = b.type as string | undefined;
+          const hint: PlatformBountyHint = {
+            url: `https://earn.superteam.fun/listing/${slug}`,
+            title: b.title as string | undefined,
+            rewardAmount: b.rewardAmount != null ? String(b.rewardAmount) : undefined,
+            rewardCurrency: (b.token as string | undefined) || "USDC",
+            deadline: b.deadline as string | undefined,
+            projectName: (sponsor?.name as string | undefined) || (b.sponsorName as string | undefined),
+            type: listingType === "project" ? "Job" : undefined,
+          };
+
+          // Fetch detailed listing for prize breakdown
+          if (slug) {
+            try {
+              const detail = await fetch(`https://earn.superteam.fun/api/listings/${slug}`, {
+                headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
+                signal: AbortSignal.timeout(8000),
+              });
+              if (detail.ok) {
+                const dData = await detail.json() as Record<string, unknown>;
+                const prizes = dData.prizes as Array<Record<string, unknown>> | undefined;
+                if (prizes && prizes.length > 0) {
+                  const breakdown = prizes.map((p) => ({
+                    rank: (p.rank as string) || (p.label as string) || "",
+                    amount: String(p.amount ?? p.reward ?? p.value ?? ""),
+                    currency: hint.rewardCurrency || "USDC",
+                    count: (p.count as number) ?? undefined,
+                  })).filter((p) => p.amount && p.rank);
+                  if (breakdown.length > 0) {
+                    hint.prizeBreakdown = JSON.stringify(breakdown);
+                  }
+                }
+                // Also look for prizeDistribution field
+                const pd = dData.prizeDistribution as Array<Record<string, unknown>> | undefined;
+                if (pd && pd.length > 0 && !hint.prizeBreakdown) {
+                  const breakdown = pd.map((p) => ({
+                    rank: (p.rank as string) || (p.label as string) || (p.position as string) || "",
+                    amount: String(p.amount ?? p.reward ?? p.value ?? ""),
+                    currency: hint.rewardCurrency || "USDC",
+                    count: (p.count as number) ?? undefined,
+                  })).filter((p) => p.amount && p.rank);
+                  if (breakdown.length > 0) {
+                    hint.prizeBreakdown = JSON.stringify(breakdown);
+                  }
+                }
+              }
+            } catch {}
+          }
+
+          return hint;
+        })
+    );
+    return hints;
   } catch (e) {
     logger.warn({ err: e }, "Superteam API fetch failed");
     return [];
@@ -809,13 +856,19 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
       rewardAmount: hint.rewardAmount || scraped.rewardAmount,
       rewardCurrency: hint.rewardCurrency || scraped.rewardCurrency,
       prizeRank: hint.prizeRank || scraped.prizeRank,
+      prizeBreakdown: hint.prizeBreakdown || scraped.prizeBreakdown,
       deadline: hint.deadline || scraped.deadline,
     };
 
-    const analysis = await analyzeBounty(merged);
+    const analysis = await analyzeBounty(merged as import("./scraper.js").ScrapedBounty);
+
+    const mergedBreakdown = merged.prizeBreakdown
+      ? (Array.isArray(merged.prizeBreakdown)
+          ? JSON.stringify(merged.prizeBreakdown)
+          : merged.prizeBreakdown)
+      : null;
 
     await db.insert(bountiesTable).values({
-      userId: null,
       url: hint.url,
       title: hint.title || scraped.title,
       platform: scraped.platform || platform,
@@ -823,6 +876,7 @@ async function storeBountyHint(hint: PlatformBountyHint, platform: string): Prom
       rewardAmount: merged.rewardAmount,
       rewardCurrency: merged.rewardCurrency,
       prizeRank: scraped.prizeRank,
+      prizeBreakdown: mergedBreakdown,
       deadline: merged.deadline,
       contentFormat: scraped.contentFormat,
       submissionRequirements: scraped.submissionRequirements,

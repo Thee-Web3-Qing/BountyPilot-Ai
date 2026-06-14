@@ -437,6 +437,10 @@ components:
           type: ["string", "null"]
         rewardCurrency:
           type: ["string", "null"]
+        prizeRank:
+          type: ["string", "null"]
+        prizeBreakdown:
+          type: ["string", "null"]
         deadline:
           type: ["string", "null"]
         contentFormat:
@@ -455,6 +459,8 @@ components:
           type: ["integer", "null"]
         scoreExplanation:
           type: ["string", "null"]
+        confidenceScore:
+          type: ["integer", "null"]
         status:
           type: string
           enum: [discovered, saved_for_later, approved, rejected, researching, scripting, recording, editing, submitted, won, lost]
@@ -481,6 +487,8 @@ components:
           type: string
         rewardAmount:
           type: string
+        prizeRank:
+          type: string
         deadline:
           type: string
         hoursSaved:
@@ -503,6 +511,8 @@ components:
         targetAudience:
           type: ["string", "null"]
         competitorAnalysis:
+          type: ["string", "null"]
+        fullContent:
           type: ["string", "null"]
         createdAt:
           type: string

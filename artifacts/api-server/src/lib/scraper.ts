@@ -1,9 +1,17 @@
+export interface PrizeBreakdown {
+  rank: string;
+  amount: string;
+  currency: string;
+  count?: number;
+}
+
 export interface ScrapedBounty {
   title: string;
   description: string;
   rewardAmount: string | null;
   rewardCurrency: string | null;
   prizeRank: string | null;
+  prizeBreakdown?: PrizeBreakdown[] | null;
   deadline: string | null;
   projectName: string;
   contentFormat: string;
@@ -413,12 +421,20 @@ export async function scrapeBounty(
   if (html.length > 5000) confidence += 5;
   const confidenceScore = Math.min(99, confidence);
 
+  // Extract prize breakdown from the page text
+  let prizeBreakdown: PrizeBreakdown[] | null = null;
+  try {
+    const breakdowns = parsePrizeBreakdown(searchText);
+    if (breakdowns.length > 0) prizeBreakdown = breakdowns;
+  } catch {}
+
   return {
     title,
     description,
     rewardAmount,
     rewardCurrency,
     prizeRank,
+    prizeBreakdown,
     deadline,
     projectName,
     contentFormat,
@@ -432,6 +448,46 @@ export async function scrapeBounty(
     rawText: searchText.slice(0, 4000),
     confidenceScore,
   };
+}
+
+/**
+ * Parse detailed prize breakdown from text like:
+ * "1,500 USDG 1st", "1,000 USDG 2nd", "500 USDG 3rd", "250 USDG x8 (Bonus)"
+ * Also handles: "1st Prize: $1,500", "1st Place: 1,500 USDC", "1st - 1,500"
+ */
+function parsePrizeBreakdown(text: string): PrizeBreakdown[] {
+  const results: PrizeBreakdown[] = [];
+  const lines = text.split(/\n|\r|\s{2,}/g);
+  const rankSuffix = /(1st|2nd|3rd|4th|5th|6th|7th|8th|9th|10th|11th|12th|13th|14th|15th|16th|17th|18th|19th|20th|first|second|third|fourth|fifth|bonus|runner[- ]up|consolation|special|winner|pool)/i;
+  const amountPattern = /([\d,]+(?:\.\d+)?)\s*(USD[CG]?|USDT|SOL|ETH|USDC|USDG|USDe|DAI|BUSD|G[BT]|EUR|GBP|JPY|XRP|BCH)?/i;
+  const countPattern = /\bx(\d+)|\b(\d+)\s*(?:x|times|entries)\b|\((\d+)\s*(?:prizes|winners|bonus|extra)\)/i;
+
+  for (const line of lines) {
+    if (line.length < 10) continue;
+    const rankMatch = line.match(rankSuffix);
+    const amountMatch = line.match(amountPattern);
+    if (rankMatch && amountMatch) {
+      let rank = rankMatch[1];
+      const amount = amountMatch[1].replace(/,/g, "");
+      const currency = (amountMatch[2] || "USDC").toUpperCase();
+      // Count of winners (e.g., "x8" or "(8 bonus)")
+      const countMatch = line.match(countPattern);
+      const count = countMatch ? Number(countMatch[1] || countMatch[2] || countMatch[3]) : undefined;
+      // Normalize rank
+      rank = rank.toLowerCase();
+      if (rank === "first") rank = "1st";
+      if (rank === "second") rank = "2nd";
+      if (rank === "third") rank = "3rd";
+      if (rank === "fourth") rank = "4th";
+      if (rank === "fifth") rank = "5th";
+      if (rank === "bonus") rank = "Bonus";
+      if (rank === "pool") rank = "Pool";
+      if (rank === "winner") rank = "Winner";
+      results.push({ rank, amount, currency, count });
+    }
+  }
+
+  return results;
 }
 
 function detectOpportunityType(url: string, text: string): string {

@@ -10,6 +10,7 @@ export interface BountyUpdate {
   status?: string;
   title?: string;
   rewardAmount?: string;
+  prizeRank?: string;
   deadline?: string;
   hoursSaved?: number;
 }

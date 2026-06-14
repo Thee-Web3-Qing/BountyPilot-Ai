@@ -64,6 +64,7 @@ researchRouter.post("/bounty/:bountyId/generate", requireAuth, requireActivePlan
       rewardAmount: bounty.rewardAmount,
       rewardCurrency: bounty.rewardCurrency,
       prizeRank: bounty.prizeRank,
+      prizeBreakdown: bounty.prizeBreakdown ? JSON.parse(bounty.prizeBreakdown) as import("../lib/scraper.js").PrizeBreakdown[] : null,
       deadline: bounty.deadline,
       projectName: bounty.projectName || "",
       contentFormat: bounty.contentFormat || "Article / Thread",
