@@ -21,8 +21,132 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Search, Twitter, Globe } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
+
+// ── Team helpers ─────────────────────────────────────────────
+function buildTeamSearchUrl(companyName: string | null | undefined, _platform: string | null | undefined, _url: string | null | undefined): string | null {
+  if (!companyName) return null;
+  const clean = companyName.trim();
+  if (clean.length < 2) return null;
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (slug.length >= 3 && slug.length <= 30) {
+    return `https://www.linkedin.com/company/${slug}`;
+  }
+  return `https://www.google.com/search?q=${encodeURIComponent(clean + " LinkedIn")}`;
+}
+
+function buildXSearchUrl(companyName: string | null | undefined): string | null {
+  if (!companyName) return null;
+  const clean = companyName.trim();
+  if (clean.length < 2) return null;
+  return `https://x.com/search?q=${encodeURIComponent(clean)}`;
+}
+
+function buildWebsiteSearchUrl(companyName: string | null | undefined): string | null {
+  if (!companyName) return null;
+  const clean = companyName.trim();
+  if (clean.length < 2) return null;
+  return `https://www.google.com/search?q=${encodeURIComponent(clean + " official website")}`;
+}
+
+function getCompanyFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Try to extract company name from Devpost subdomain
+  const devpostMatch = url.match(/^https?:\/\/([a-z0-9-]+)\.devpost\.com/);
+  if (devpostMatch) {
+    const subdomain = devpostMatch[1];
+    // Map known subdomains to company names
+    const known: Record<string, string> = {
+      slackhack: "Salesforce",
+      splunk: "Splunk",
+      uipath: "UiPath",
+      xprize: "XPRIZE",
+      mindtheproduct: "Mind the Product",
+      qwencloud: "Alibaba Cloud",
+      nextgenhacks: "NextGenHacks",
+      findevil: "SANS",
+      h01: "AWS",
+      dsh: "DSH",
+    };
+    if (known[subdomain]) return known[subdomain];
+    // Otherwise guess: convert kebab-case to title case
+    return subdomain
+      .split(/[-_]+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+  // Try to extract from other URLs
+  const domainMatch = url.match(/\/\/([^\/]+)/);
+  if (domainMatch) {
+    const domain = domainMatch[1].replace(/^www\./, "");
+    const parts = domain.split(".");
+    if (parts.length >= 2) {
+      const name = parts[parts.length - 2];
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+  }
+  return null;
+}
+
+function TeamCard({ companyName, platform, url }: { companyName: string | null | undefined; platform: string | null | undefined; url: string | null | undefined }) {
+  const orgName = companyName || getCompanyFromUrl(url) || null;
+  const linkedInUrl = buildTeamSearchUrl(orgName, platform, url);
+  const xUrl = buildXSearchUrl(orgName);
+  const websiteUrl = buildWebsiteSearchUrl(orgName);
+
+  if (!orgName && !linkedInUrl) return null;
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader>
+        <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Users className="w-3.5 h-3.5" /> Organizer / Team
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        {orgName && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{orgName}</span>
+            <span className="text-xs font-mono text-muted-foreground">{platform}</span>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {linkedInUrl && (
+            <a
+              href={linkedInUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-border bg-secondary text-xs font-mono text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Linkedin className="w-3 h-3" /> Find on LinkedIn
+            </a>
+          )}
+          {xUrl && (
+            <a
+              href={xUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-border bg-secondary text-xs font-mono text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Twitter className="w-3 h-3" /> Find on X
+            </a>
+          )}
+          {websiteUrl && (
+            <a
+              href={websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-border bg-secondary text-xs font-mono text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Globe className="w-3 h-3" /> Find Website
+            </a>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function timeLeft(deadline: string | null): string | null {
   if (!deadline) return null;
@@ -424,6 +548,9 @@ export function BountyDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Team / Organizer */}
+      <TeamCard companyName={bounty.projectName} platform={bounty.platform} url={bounty.url} />
 
       {bounty.status !== "rejected" && bounty.status !== "lost" && bounty.status !== "won" && (
         <Card className="bg-card border-border">
