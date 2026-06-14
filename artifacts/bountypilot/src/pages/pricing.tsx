@@ -294,49 +294,22 @@ export function Pricing() {
               <div className="space-y-3">
                 <div className="space-y-2">
                   <label className="text-sm font-mono text-muted-foreground">
-                    Your wallet address (for settlement)
+                    Your wallet address (for refunds)
                   </label>
                   <input
                     type="text"
-                    value={settlementAddress}
-                    onChange={(e) => {
-                      setSettlementAddress(e.target.value);
-                      if (useSameAddress) setRefundAddress(e.target.value);
-                    }}
+                    value={refundAddress}
+                    onChange={(e) => setRefundAddress(e.target.value)}
                     placeholder="0x... or your wallet address"
                     className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-mono text-muted-foreground cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={useSameAddress}
-                      onChange={(e) => {
-                        setUseSameAddress(e.target.checked);
-                        if (e.target.checked) setRefundAddress(settlementAddress);
-                      }}
-                      className="w-3.5 h-3.5 rounded border border-border accent-primary"
-                    />
-                    <span>Use same address for refunds</span>
-                  </label>
-                  {!useSameAddress && (
-                    <input
-                      type="text"
-                      value={refundAddress}
-                      onChange={(e) => setRefundAddress(e.target.value)}
-                      placeholder="Refund address (0x...)"
-                      className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
-                    />
-                  )}
                 </div>
               </div>
             )}
 
             <Button
               className="w-full font-mono uppercase tracking-wider"
-              disabled={!selectedChain || !selectedToken || !settlementAddress || (!useSameAddress && !refundAddress) || !!loading}
+              disabled={!selectedChain || !selectedToken || !refundAddress || !!loading}
               onClick={handleGenerateDeposit}
             >
               {loading === selectedTier ? (
@@ -403,7 +376,7 @@ export function Pricing() {
                 setDeposit(null);
                 setSelectedChain(null);
                 setSelectedToken(null);
-                setSettlementAddress("");
+                setRefundAddress("");
               }}
             >
               Generate New Address
