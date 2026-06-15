@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -9,9 +9,26 @@ interface AdminUser {
   username: string;
   plan: string;
   trialEndsAt: string | null;
+  subscriptionEndsAt: string | null;
   approvedAt: string | null;
   isAdmin: boolean;
   createdAt: string;
+}
+
+interface AdminPayment {
+  id: number;
+  depositId: string;
+  depositAddress: string;
+  tier: string;
+  expectedAmount: string;
+  txHash: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  userId: number;
+  username: string;
+  email: string;
+  userPlan: string;
 }
 
 interface Stats {
@@ -61,7 +78,7 @@ interface ReportData {
   topEarners: { username: string; amount: number }[];
 }
 
-const PLANS = ["beta", "trial", "expired"] as const;
+const PLANS = ["monthly", "yearly", "lifetime", "beta", "trial", "expired"] as const;
 type Plan = typeof PLANS[number];
 
 const API = "/api";
@@ -69,21 +86,31 @@ function token() { return localStorage.getItem("bountypilot_token") || ""; }
 function authHeaders() { return { "Content-Type": "application/json", Authorization: `Bearer ${token()}` }; }
 
 const PLAN_STYLE: Record<string, string> = {
-  beta:    "text-primary bg-primary/10 border-primary/30",
-  trial:   "text-green-400 bg-green-500/10 border-green-500/30",
-  expired: "text-red-400 bg-red-500/10 border-red-500/30",
+  beta:     "text-primary bg-primary/10 border-primary/30",
+  trial:    "text-green-400 bg-green-500/10 border-green-500/30",
+  expired:  "text-red-400 bg-red-500/10 border-red-500/30",
+  active:   "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  lifetime: "text-yellow-400 bg-yellow-500/10 border-yellow-500/30",
+  monthly:  "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  yearly:   "text-blue-400 bg-blue-500/10 border-blue-500/30",
 };
 
 const PLAN_BTN: Record<string, string> = {
-  beta:    "border-primary/40 text-primary hover:bg-primary/20 active:bg-primary/30",
-  trial:   "border-green-500/40 text-green-400 hover:bg-green-500/20 active:bg-green-500/30",
-  expired: "border-red-500/40 text-red-400 hover:bg-red-500/20 active:bg-red-500/30",
+  beta:     "border-primary/40 text-primary hover:bg-primary/20 active:bg-primary/30",
+  trial:    "border-green-500/40 text-green-400 hover:bg-green-500/20 active:bg-green-500/30",
+  expired:  "border-red-500/40 text-red-400 hover:bg-red-500/20 active:bg-red-500/30",
+  monthly:  "border-blue-500/40 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30",
+  yearly:   "border-blue-500/40 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30",
+  lifetime: "border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 active:bg-yellow-500/30",
 };
 
 const PLAN_LABEL: Record<string, string> = {
-  beta:    "Beta — full access, no expiry",
-  trial:   "Trial — 14-day access",
-  expired: "Expired — access revoked",
+  beta:     "Beta — full access, no expiry",
+  trial:    "Trial — 14-day access",
+  expired:  "Expired — access revoked",
+  monthly:  "Monthly — +31 days paid",
+  yearly:   "Yearly — +365 days paid",
+  lifetime: "Lifetime — permanent paid",
 };
 
 const BLANK_BOUNTY = {
@@ -106,15 +133,19 @@ interface BountyApplication {
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [userTab, setUserTab] = useState<"all" | Plan>("trial");
+  const [userTab, setUserTab] = useState<"all" | "paid" | Plan>("trial");
   const [selected, setSelected] = useState<AdminUser | null>(null);
-  const [changing, setChanging] = useState<Plan | null>(null);
+  const [changing, setChanging] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [payments, setPayments] = useState<AdminPayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [verifying, setVerifying] = useState<number | null>(null);
 
   const [bountyReports, setBountyReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
@@ -143,6 +174,7 @@ export function Admin() {
   useEffect(() => {
     if (activeTab === "reports") loadReports();
     if (activeTab === "launchpad") loadLaunchpad();
+    if (activeTab === "payments") loadPayments();
   }, [activeTab]);
 
   async function loadData() {
@@ -159,6 +191,29 @@ export function Admin() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadPayments() {
+    setPaymentsLoading(true);
+    try {
+      const res = await fetch(`${API}/admin/payments`, { headers: authHeaders() });
+      const data = await res.json();
+      setPayments(Array.isArray(data) ? data : []);
+    } catch { setPayments([]); }
+    finally { setPaymentsLoading(false); }
+  }
+
+  async function verifyPayment(paymentId: number) {
+    setVerifying(paymentId);
+    try {
+      const res = await fetch(`${API}/admin/payments/${paymentId}/verify`, {
+        method: "POST", headers: authHeaders(),
+      });
+      if (res.ok) {
+        setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, status: "COMPLETED" } : p));
+        await loadData();
+      }
+    } finally { setVerifying(null); }
   }
 
   async function loadReports() {
@@ -298,7 +353,7 @@ export function Admin() {
     }
   }
 
-  async function setPlan(userId: number, plan: Plan) {
+  async function setPlan(userId: number, plan: string) {
     setChanging(plan);
     setError("");
     try {
@@ -316,7 +371,15 @@ export function Admin() {
     }
   }
 
-  const filtered = users.filter(u => userTab === "all" ? true : u.plan === userTab);
+  const filtered = users.filter(u => {
+    const matchesTab = userTab === "all" ? true
+      : userTab === "paid" ? (u.plan === "active" || u.plan === "lifetime")
+      : u.plan === userTab;
+    if (!matchesTab) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-5 pb-24">
@@ -334,6 +397,7 @@ export function Admin() {
       <div className="flex gap-1 border-b border-border pb-1 overflow-x-auto">
         {[
           { key: "users" as const, label: "Users", icon: Users },
+          { key: "payments" as const, label: "Payments", icon: CreditCard },
           { key: "report" as const, label: "Report", icon: BarChart3 },
           { key: "reports" as const, label: "Flagged", icon: Flag },
           { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
@@ -372,7 +436,7 @@ export function Admin() {
           )}
 
           <div className="flex gap-1 overflow-x-auto pb-1">
-            {(["trial", "beta", "expired", "all"] as const).map(t => (
+            {(["trial", "beta", "paid", "expired", "all"] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setUserTab(t)}
@@ -383,6 +447,17 @@ export function Admin() {
                 {t}
               </button>
             ))}
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by username or email…"
+              className="w-full bg-card border border-border rounded-lg pl-9 pr-4 py-2 text-sm font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50"
+            />
           </div>
 
           <div className="space-y-2">
@@ -410,7 +485,19 @@ export function Admin() {
                     {u.trialEndsAt && (
                       <p className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Ends {new Date(u.trialEndsAt).toLocaleDateString()}
+                        Trial ends {new Date(u.trialEndsAt).toLocaleDateString()}
+                      </p>
+                    )}
+                    {u.subscriptionEndsAt && (u.plan === "active") && (
+                      <p className="text-[10px] text-blue-400/70 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Sub ends {new Date(u.subscriptionEndsAt).toLocaleDateString()}
+                      </p>
+                    )}
+                    {u.plan === "lifetime" && (
+                      <p className="text-[10px] text-yellow-400/70 mt-0.5 flex items-center gap-1">
+                        <Star className="w-3 h-3" />
+                        Lifetime access
                       </p>
                     )}
                   </div>
@@ -475,6 +562,80 @@ export function Admin() {
             </div>
           )}
         </>
+      )}
+
+      {activeTab === "payments" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Pending Tx Verifications</p>
+            <button onClick={loadPayments} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+              <RefreshCw className={`w-3.5 h-3.5 ${paymentsLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          {paymentsLoading ? (
+            <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+          ) : payments.length === 0 ? (
+            <div className="text-center py-14">
+              <CreditCard className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No pending payments</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {payments.map(p => (
+                <div key={p.id} className="bg-card border border-border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-semibold text-sm">@{p.username}</span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border capitalize ${
+                          p.tier === "lifetime" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/30"
+                          : "text-blue-400 bg-blue-500/10 border-blue-500/30"
+                        }`}>{p.tier}</span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                          p.status === "COMPLETED"
+                            ? "text-green-400 bg-green-500/10 border-green-500/30"
+                            : "text-yellow-400 bg-yellow-500/10 border-yellow-500/30"
+                        }`}>{p.status}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{p.email}</p>
+                      <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                        Submitted {new Date(p.updatedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-background rounded p-2 space-y-1">
+                    <p className="text-[10px] font-mono text-muted-foreground/60 uppercase">Tx Hash</p>
+                    <p className="font-mono text-xs text-foreground break-all">{p.txHash}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-muted-foreground">
+                    <div>
+                      <span className="opacity-50">Expected:</span>{" "}
+                      <span className="text-foreground">{p.expectedAmount}</span>
+                    </div>
+                    <div>
+                      <span className="opacity-50">Deposit Addr:</span>{" "}
+                      <span className="text-foreground truncate block">{p.depositAddress?.slice(0, 10)}…</span>
+                    </div>
+                  </div>
+
+                  {p.status !== "COMPLETED" && (
+                    <button
+                      onClick={() => verifyPayment(p.id)}
+                      disabled={verifying === p.id}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-mono font-semibold hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                    >
+                      {verifying === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                      Verify &amp; Activate
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === "report" && (

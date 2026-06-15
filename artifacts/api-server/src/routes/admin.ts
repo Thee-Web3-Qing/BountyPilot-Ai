@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, bountiesTable, earningsTable, bountyReportsTable } from "@workspace/db";
-import { eq, count, desc, gte, sql } from "drizzle-orm";
+import { dextopusDepositsTable } from "@workspace/db";
+import { eq, count, desc, gte, sql, isNotNull, and, ilike, or } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
@@ -166,7 +167,8 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
   try {
     const userId = parseInt(req.params.userId as string);
     const { plan } = req.body as { plan: string };
-    if (!["beta", "trial", "expired"].includes(plan)) {
+    const validPlans = ["beta", "trial", "expired", "monthly", "yearly", "lifetime"];
+    if (!validPlans.includes(plan)) {
       res.status(400).json({ error: "Invalid plan" });
       return;
     }
@@ -177,15 +179,28 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
         return;
       }
     }
-    const updates: Record<string, any> = { plan };
-    if (plan === "trial") { updates.trialEndsAt = trialEndsAt(14); updates.approvedAt = new Date(); }
-    if (plan === "beta") { updates.trialEndsAt = null; updates.approvedAt = new Date(); }
-    if (plan === "pending" || plan === "expired") { updates.trialEndsAt = null; }
+    const now = new Date();
+    const updates: Record<string, any> = {};
+    if (plan === "trial") {
+      updates.plan = "trial"; updates.trialEndsAt = trialEndsAt(14); updates.approvedAt = now;
+    } else if (plan === "beta") {
+      updates.plan = "beta"; updates.trialEndsAt = null; updates.approvedAt = now;
+    } else if (plan === "monthly") {
+      const ends = new Date(now); ends.setDate(ends.getDate() + 31);
+      updates.plan = "active"; updates.subscriptionEndsAt = ends; updates.trialEndsAt = null; updates.approvedAt = now;
+    } else if (plan === "yearly") {
+      const ends = new Date(now); ends.setDate(ends.getDate() + 365);
+      updates.plan = "active"; updates.subscriptionEndsAt = ends; updates.trialEndsAt = null; updates.approvedAt = now;
+    } else if (plan === "lifetime") {
+      updates.plan = "lifetime"; updates.subscriptionEndsAt = null; updates.trialEndsAt = null; updates.approvedAt = now;
+    } else {
+      updates.plan = "expired"; updates.trialEndsAt = null;
+    }
     const [user] = await db
       .update(usersTable)
       .set(updates)
       .where(eq(usersTable.id, userId))
-      .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
+      .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan, subscriptionEndsAt: usersTable.subscriptionEndsAt });
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -196,6 +211,75 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
   } catch (err) {
     logger.error(err, "Admin set-plan error");
     res.status(500).json({ error: "Failed to update plan" });
+  }
+});
+
+// ── Payments: list pending deposits with tx_hash submitted ─────────────────
+adminRouter.get("/payments", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const deposits = await db
+      .select({
+        id: dextopusDepositsTable.id,
+        depositId: dextopusDepositsTable.depositId,
+        depositAddress: dextopusDepositsTable.depositAddress,
+        tier: dextopusDepositsTable.tier,
+        expectedAmount: dextopusDepositsTable.expectedAmount,
+        txHash: dextopusDepositsTable.txHash,
+        status: dextopusDepositsTable.status,
+        createdAt: dextopusDepositsTable.createdAt,
+        updatedAt: dextopusDepositsTable.updatedAt,
+        userId: dextopusDepositsTable.userId,
+        username: usersTable.username,
+        email: usersTable.email,
+        userPlan: usersTable.plan,
+      })
+      .from(dextopusDepositsTable)
+      .innerJoin(usersTable, eq(usersTable.id, dextopusDepositsTable.userId))
+      .where(isNotNull(dextopusDepositsTable.txHash))
+      .orderBy(desc(dextopusDepositsTable.updatedAt));
+    res.json(deposits);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Payments: manually verify a deposit and activate user plan ─────────────
+adminRouter.post("/payments/:depositId/verify", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { depositId } = req.params;
+    const [deposit] = await db
+      .select()
+      .from(dextopusDepositsTable)
+      .where(eq(dextopusDepositsTable.id, parseInt(depositId)));
+    if (!deposit) {
+      res.status(404).json({ error: "Deposit not found" });
+      return;
+    }
+
+    // Mark deposit as COMPLETED
+    await db
+      .update(dextopusDepositsTable)
+      .set({ status: "COMPLETED" })
+      .where(eq(dextopusDepositsTable.id, deposit.id));
+
+    // Activate user plan based on tier
+    const now = new Date();
+    const planUpdates: Record<string, any> = { approvedAt: now };
+    if (deposit.tier === "monthly") {
+      const ends = new Date(now); ends.setDate(ends.getDate() + 31);
+      planUpdates.plan = "active"; planUpdates.subscriptionEndsAt = ends; planUpdates.trialEndsAt = null;
+    } else if (deposit.tier === "yearly") {
+      const ends = new Date(now); ends.setDate(ends.getDate() + 365);
+      planUpdates.plan = "active"; planUpdates.subscriptionEndsAt = ends; planUpdates.trialEndsAt = null;
+    } else if (deposit.tier === "lifetime") {
+      planUpdates.plan = "lifetime"; planUpdates.subscriptionEndsAt = null; planUpdates.trialEndsAt = null;
+    }
+
+    await db.update(usersTable).set(planUpdates).where(eq(usersTable.id, deposit.userId));
+    logger.info({ depositId: deposit.id, userId: deposit.userId, tier: deposit.tier }, "Admin manually verified payment");
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
