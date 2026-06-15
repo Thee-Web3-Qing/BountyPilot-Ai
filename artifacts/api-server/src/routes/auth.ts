@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { db } from "@workspace/db";
 import { usersTable, userProfilesTable, referralsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, ilike, or } from "drizzle-orm";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { getTrialDays, trialEndsAt, getPlanStatus } from "../lib/access.js";
@@ -13,15 +13,17 @@ import { sendOTPEmail } from "../lib/email.js";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function generateReferralCode(username: string): string {
-  // Use the username itself as the referral code (lowercase, alphanumeric + underscores only)
-  return username.toLowerCase().replace(/[^a-z0-9_]/g, "");
+  // Referral code IS the username — exact match, no transformation
+  return username;
 }
 
 async function recordReferral(refParam: string | undefined, newUserId: number) {
   if (!refParam) return;
   try {
-    // ref param is the username (e.g. ?ref=TheWeb3Qing)
-    const [referrer] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, refParam));
+    // Look up referrer by username (case-insensitive) or by referral_code (case-insensitive)
+    const [referrer] = await db.select({ id: usersTable.id }).from(usersTable).where(
+      or(ilike(usersTable.username, refParam), ilike(usersTable.referralCode, refParam))
+    );
     if (!referrer || referrer.id === newUserId) return;
     await db.insert(referralsTable).values({ referrerId: referrer.id, referredUserId: newUserId }).onConflictDoNothing();
     await db.update(usersTable).set({ referredBy: referrer.id }).where(eq(usersTable.id, newUserId));
