@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { getTrialDays, trialEndsAt, getPlanStatus } from "../lib/access.js";
+import { sendOTPEmail } from "../lib/email.js";
 
 export const authRouter = Router();
 
@@ -99,6 +100,97 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 
+// POST /auth/login-otp/request — send OTP to email
+authRouter.post("/login-otp/request", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: "Email is required" });
+      return;
+    }
+
+    const [user] = await db
+      .select({ id: usersTable.id, email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.email, email.toLowerCase()));
+
+    if (!user) {
+      res.status(404).json({ error: "No account found with that email" });
+      return;
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await db
+      .update(usersTable)
+      .set({ loginCode: code, loginCodeExpires: expiresAt })
+      .where(eq(usersTable.id, user.id));
+
+    const { sent } = await sendOTPEmail(user.email, code, "login");
+
+    logger.info({ userId: user.id, email: user.email, sent }, "Login OTP requested");
+    res.json({
+      message: "Login code sent to your email",
+      code: sent ? undefined : code, // Show code in dev mode if email didn't send
+      sent,
+    });
+  } catch (err) {
+    logger.error(err, "Login OTP request error");
+    res.status(500).json({ error: "Failed to send login code" });
+  }
+});
+
+// POST /auth/login-otp/verify — verify OTP and return token
+authRouter.post("/login-otp/verify", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      res.status(400).json({ error: "Email and code are required" });
+      return;
+    }
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email.toLowerCase()));
+
+    if (!user || user.loginCode !== code || !user.loginCodeExpires) {
+      res.status(400).json({ error: "Invalid or expired code" });
+      return;
+    }
+
+    if (new Date() > user.loginCodeExpires) {
+      res.status(400).json({ error: "Code has expired" });
+      return;
+    }
+
+    // Clear the code
+    await db
+      .update(usersTable)
+      .set({ loginCode: null, loginCodeExpires: null })
+      .where(eq(usersTable.id, user.id));
+
+    const token = signToken({ userId: user.id, email: user.email, username: user.username });
+    logger.info({ userId: user.id }, "User logged in via OTP");
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        plan: user.plan,
+        trialEndsAt: user.trialEndsAt,
+        subscriptionEndsAt: user.subscriptionEndsAt,
+        isAdmin: user.isAdmin,
+      },
+    });
+  } catch (err) {
+    logger.error(err, "Login OTP verify error");
+    res.status(500).json({ error: "Failed to verify code" });
+  }
+});
+
 // POST /auth/forgot-password
 authRouter.post("/forgot-password", async (req, res) => {
   try {
@@ -128,8 +220,10 @@ authRouter.post("/forgot-password", async (req, res) => {
       .set({ passwordResetToken: code, passwordResetExpires: expiresAt })
       .where(eq(usersTable.id, user.id));
 
-    logger.info({ userId: user.id, email: user.email }, "Password reset code generated");
-    res.json({ message: "Reset code generated", code, username: user.username });
+    const { sent } = await sendOTPEmail(user.email, code, "reset");
+
+    logger.info({ userId: user.id, email: user.email, sent }, "Password reset code generated");
+    res.json({ message: "Reset code generated", code: sent ? undefined : code, username: user.username, sent });
   } catch (err) {
     logger.error(err, "Forgot password error");
     res.status(500).json({ error: "Failed to process request" });

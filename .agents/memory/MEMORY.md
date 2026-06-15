@@ -1,5 +1,6 @@
 - [BountyPilot Auth](bountypilot-auth.md) — JWT in localStorage via setAuthTokenGetter; all routes require requireAuth middleware; signup creates empty user_profile row.
 - [BountyPilot DB migration](bountypilot-db.md) — correct push command is `cd lib/db && pnpm run push`; users/user_profiles tables added; bounties/submissions/earnings have user_id column.
 - [BountyPilot LLM config](bountypilot-llm.md) — reads QWEN_API_KEY, QWEN_MODEL, QWEN_BASE_URL env vars; falls back to rule-based mock when no key; settings/status endpoint reports provider mode.
-- [Novus AI Key Issue](novus-key-issue.md) — NOVUS_API_KEY is a Pendo Web SDK key, not a Novus MCP API key. The backend now uses Qwen (Alibaba Cloud LLM) as a fallback for AI insights when Novus is unavailable. This ensures AI insights always work regardless of Novus key status.
+- [Novus AI Key Issue](novus-key-issue.md) — NOVUS_API_KEY is a Pendo Web SDK key, not a Novus MCP API key. Backend now uses Qwen (Alibaba Cloud LLM) as fallback for AI insights when Novus is unavailable.
+- [Email Authentication](email-auth.md) — Two login methods: password + email OTP. Backend sends email codes via `lib/email.ts` (supports Resend via `RESEND_API_KEY` env var, or dev mode for testing). Forgot password sends email codes. `login_code` and `login_code_expires` columns on users table.
 - **No Stripe** — completely removed from codebase. Payments are crypto-only via Dextopus.

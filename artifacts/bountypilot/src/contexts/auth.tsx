@@ -19,6 +19,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginOTP: (email: string, code: string) => Promise<void>;
   signup: (email: string, username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -161,6 +162,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginOTP = useCallback(async (email: string, code: string) => {
+    setIsLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/auth/login-otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data.error || "Login failed");
+      }
+      const data = await resp.json();
+      const u: User = {
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
+        plan: data.user.plan ?? "pending",
+        trialEndsAt: data.user.trialEndsAt ?? null,
+        subscriptionEndsAt: data.user.subscriptionEndsAt ?? null,
+        isAdmin: data.user.isAdmin ?? false,
+      };
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+      setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+      setToken(data.token);
+      setUser(u);
+      identifyPendo(String(u.id), u.email, u.plan);
+      trackPendo("UserLoggedInOTP", { plan: u.plan });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const signup = useCallback(async (email: string, username: string, password: string) => {
     setIsLoading(true);
     try {
@@ -212,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, token, isLoading,
-      login, signup, logout,
+      login, loginOTP, signup, logout,
       isAuthenticated: !!user && !!token,
       canAccessAI,
       isPaid,

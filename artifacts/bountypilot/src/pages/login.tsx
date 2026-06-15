@@ -95,6 +95,11 @@ export function Login() {
               Forgot password?
             </button>
           </p>
+          <p className="text-muted-foreground font-mono text-sm">
+            <button onClick={() => navigate("/login-otp")} className="text-primary hover:underline">
+              Sign in with email code
+            </button>
+          </p>
         </div>
       </div>
     </div>
