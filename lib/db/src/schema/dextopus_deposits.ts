@@ -18,6 +18,7 @@ export const dextopusDepositsTable = pgTable("dextopus_deposits", {
   status: text("status").notNull().default("PENDING"),
   settlementAmount: text("settlement_amount"),
   refundTo: text("refund_to"),
+  txHash: text("tx_hash"),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

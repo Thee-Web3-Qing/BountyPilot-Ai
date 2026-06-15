@@ -269,6 +269,38 @@ router.post("/checkout", async (req: AuthRequest, res) => {
   }
 });
 
+// ── Confirm payment sent (record tx hash) ────────────────
+router.post("/confirm", async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const { depositId, txHash } = req.body;
+
+  if (!depositId || !txHash) {
+    res.status(400).json({ error: "depositId and txHash are required" });
+    return;
+  }
+
+  try {
+    const [deposit] = await db
+      .select()
+      .from(dextopusDepositsTable)
+      .where(eq(dextopusDepositsTable.depositId, String(depositId)));
+
+    if (!deposit || deposit.userId !== userId) {
+      res.status(404).json({ error: "Deposit not found" });
+      return;
+    }
+
+    await db
+      .update(dextopusDepositsTable)
+      .set({ txHash: String(txHash), notes: `User confirmed payment. TxHash: ${txHash}` })
+      .where(eq(dextopusDepositsTable.depositId, String(depositId)));
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Get user's active subscription status ───────────────
 router.get("/subscription", async (req: AuthRequest, res) => {
   const userId = req.user!.userId;

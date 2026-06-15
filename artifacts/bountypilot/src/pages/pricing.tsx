@@ -96,7 +96,9 @@ export function Pricing() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [selectedChain, setSelectedChain] = useState<number | null>(null);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
-  const [refundAddress, setRefundAddress] = useState("");
+  const [txHash, setTxHash] = useState("");
+  const [txSubmitted, setTxSubmitted] = useState(false);
+  const [txLoading, setTxLoading] = useState(false);
   const [chainsLoading, setChainsLoading] = useState(false);
   const [tokensLoading, setTokensLoading] = useState(false);
 
@@ -179,7 +181,8 @@ export function Pricing() {
     setDeposit(null);
     setSelectedChain(null);
     setSelectedToken(null);
-    setRefundAddress("");
+    setTxHash("");
+    setTxSubmitted(false);
   };
 
   const handleGenerateDeposit = async () => {
@@ -197,7 +200,6 @@ export function Pricing() {
           tier: selectedTier,
           originChainId: selectedChain,
           originAsset: selectedToken,
-          refundTo: refundAddress || undefined,
         }),
       });
       const json = await res.json();
@@ -218,6 +220,31 @@ export function Pricing() {
       navigator.clipboard.writeText(deposit.depositAddress);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!deposit || !txHash.trim()) return;
+    setTxLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/dextopus/confirm`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ depositId: deposit.depositId, txHash: txHash.trim() }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTxSubmitted(true);
+      } else {
+        alert(json.error || "Failed to confirm. Please try again.");
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setTxLoading(false);
     }
   };
 
@@ -301,26 +328,9 @@ export function Pricing() {
               </div>
             )}
 
-            {selectedToken && (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-mono text-muted-foreground">
-                    Your wallet address (for refunds)
-                  </label>
-                  <input
-                    type="text"
-                    value={refundAddress}
-                    onChange={(e) => setRefundAddress(e.target.value)}
-                    placeholder="0x... or your wallet address"
-                    className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
-                  />
-                </div>
-              </div>
-            )}
-
             <Button
               className="w-full font-mono uppercase tracking-wider"
-              disabled={!selectedChain || !selectedToken || !refundAddress || !!loading}
+              disabled={!selectedChain || !selectedToken || !!loading}
               onClick={handleGenerateDeposit}
             >
               {loading === selectedTier ? (
@@ -375,10 +385,45 @@ export function Pricing() {
               </div>
 
               <div className="text-xs font-mono text-muted-foreground pt-2 border-t border-border">
-                Send the exact amount to this address. The deposit will be auto-bridged to our treasury.
-                This page will auto-check status.
+                Send the exact amount to this address. It will be auto-bridged to our treasury wallet.
               </div>
             </div>
+
+            {txSubmitted ? (
+              <div className="flex items-center gap-2 p-3 rounded bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-mono">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Payment confirmed! We'll activate your plan once the transaction is verified.</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-mono text-muted-foreground uppercase">
+                    Transaction Hash
+                  </label>
+                  <input
+                    type="text"
+                    value={txHash}
+                    onChange={(e) => setTxHash(e.target.value)}
+                    placeholder="0x..."
+                    className="w-full p-2 rounded border border-border bg-background text-sm font-mono focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <Button
+                  className="w-full font-mono uppercase tracking-wider"
+                  disabled={!txHash.trim() || txLoading}
+                  onClick={handleConfirmPayment}
+                >
+                  {txLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      I Have Sent It
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
 
             <Button
               variant="outline"
@@ -387,7 +432,8 @@ export function Pricing() {
                 setDeposit(null);
                 setSelectedChain(null);
                 setSelectedToken(null);
-                setRefundAddress("");
+                setTxHash("");
+                setTxSubmitted(false);
               }}
             >
               Generate New Address
