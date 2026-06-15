@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
   User, Settings2, LogOut, Globe, Menu, X, ChevronDown, ChevronUp, ShieldCheck,
-  Rocket, Gift,
+  Rocket, Gift, Crown, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
@@ -22,7 +22,7 @@ const NAV_ITEMS = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, planStatus } = useAuth();
   const [open, setOpen] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(false);
 
@@ -120,6 +120,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="px-4 py-2 mb-1">
                 <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Signed in as</p>
                 <p className="font-mono text-sm font-bold text-foreground truncate">@{user?.username}</p>
+                {(planStatus === "expired" || planStatus === "pending") ? (
+                  <Link href="/pricing" onClick={close}>
+                    <span className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-sm cursor-pointer hover:bg-primary/20 transition-colors">
+                      <Sparkles className="w-3 h-3" /> Free Plan — Upgrade
+                    </span>
+                  </Link>
+                ) : planStatus === "trial" ? (
+                  <span className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-yellow-400 border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 rounded-sm">
+                    Trial
+                  </span>
+                ) : planStatus === "active" ? (
+                  <span className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-green-400 border border-green-500/30 bg-green-500/10 px-2 py-0.5 rounded-sm">
+                    <Crown className="w-3 h-3" /> Pro
+                  </span>
+                ) : null}
               </div>
 
               {/* Profile — expands to show Settings + Sign Out */}

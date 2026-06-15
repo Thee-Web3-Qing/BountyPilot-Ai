@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Activity, RefreshCw, Crown, Sparkles, Zap, Brain } from "lucide-react";
 import { getListBountiesQueryKey, getGetDashboardSummaryQueryKey, getGetRecentBountiesQueryKey, getGetPlatformBreakdownQueryKey } from "@workspace/api-client-react";
 import { API_BASE } from "@/lib/api";
+import { FreePlanPanel } from "@/components/free-plan-panel";
 
 interface CrawlerStatus {
   isRunning: boolean;
@@ -104,6 +105,8 @@ export function Dashboard() {
 
   const activePlatforms = crawlerStatus?.lastResults?.filter((r) => r.found > 0) ?? [];
 
+  const isFreeUser = user?.plan === "expired" || user?.plan === "pending";
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -127,8 +130,16 @@ export function Dashboard() {
               <Crown className="w-3 h-3" /> Active
             </span>
           )}
+          {isFreeUser && (
+            <span className="font-mono text-[10px] px-2 py-1 border border-border bg-muted text-muted-foreground rounded-sm uppercase tracking-wider">
+              Free Plan
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Free plan panel — shown when trial has ended */}
+      {isFreeUser && <FreePlanPanel />}
 
       {/* Crawler Status */}
       <Card className={`border ${crawlerStatus?.isRunning ? "border-primary/50 bg-primary/5" : "border-border bg-card"}`}>

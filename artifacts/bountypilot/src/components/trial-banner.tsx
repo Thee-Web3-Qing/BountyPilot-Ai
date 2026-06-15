@@ -106,16 +106,16 @@ export function TrialBanner() {
     );
   }
 
-  // ── Case 4: Expired ───────────────────────────────────────────────────────
+  // ── Case 4: Expired / Free Plan ──────────────────────────────────────────
   return (
-    <div className="w-full px-4 py-2 text-xs font-mono flex items-center justify-between gap-2 bg-red-500/15 text-red-400 border-b border-red-500/20">
+    <div className="w-full px-4 py-2 text-xs font-mono flex items-center justify-between gap-2 bg-muted/60 text-muted-foreground border-b border-border">
       <div className="flex items-center gap-1.5">
-        <Clock className="w-3.5 h-3.5 shrink-0" />
-        <span>Your access has ended — upgrade to continue</span>
+        <span className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 rounded-sm text-[10px] uppercase tracking-wider">Free Plan</span>
+        <span>AI features are locked — upgrade to unlock full access</span>
       </div>
       <Link href="/pricing">
-        <span className="inline-flex items-center gap-1 text-[10px] bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors">
-          <Sparkles className="w-3 h-3" /> Upgrade
+        <span className="inline-flex items-center gap-1 text-[10px] bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors shrink-0">
+          <Sparkles className="w-3 h-3" /> See plans
         </span>
       </Link>
     </div>

@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle, XCircle, Clock, Pencil, AlertCircle, Shield } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
+import { useAuth } from "@/contexts/auth";
+import { FreePlanPanel } from "@/components/free-plan-panel";
 
 const WORKFLOW_STEPS = [
   "Fetching page content...",
@@ -151,12 +153,27 @@ export function BountyAdd() {
   const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { canAccessAI } = useAuth();
 
+  // All hooks must be called unconditionally before any early returns
   const createMutation = useCreateBounty();
   const updateMutation = useUpdateBounty();
   const approveMutation = useApproveBounty();
   const rejectMutation = useRejectBounty();
   const saveMutation = useSaveBountyForLater();
+
+  // Free/expired users see an upgrade wall instead of the hunt form
+  if (!canAccessAI) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <div className="mb-4">
+          <h1 className="font-bold font-sans text-2xl uppercase tracking-tighter">Hunt Bounty</h1>
+          <p className="font-mono text-sm text-muted-foreground mt-1">AI-powered bounty analysis — paid feature</p>
+        </div>
+        <FreePlanPanel />
+      </div>
+    );
+  }
 
   const isLoading = createMutation.isPending;
 
