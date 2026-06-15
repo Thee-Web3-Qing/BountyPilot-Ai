@@ -702,7 +702,7 @@ export function Discover() {
         {platforms.map((p) => (
           <button
             key={p}
-            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setFilterType(""); setFilterBeginner(false); setForYouMode(false); }}
+            onClick={() => { setFilterPlatform(filterPlatform === p ? "" : p); setForYouMode(false); }}
             className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterPlatform === p ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
           >
             {p} ({bounties.filter((b) => b.platform === p).length})
@@ -715,7 +715,7 @@ export function Discover() {
         <div className="flex gap-1.5 flex-wrap">
           <span className="font-mono text-[11px] text-muted-foreground/60 px-1 py-1">Type:</span>
           <button
-            onClick={() => { setFilterBeginner(!filterBeginner); setFilterPlatform(""); setFilterType(""); setForYouMode(false); }}
+            onClick={() => { setFilterBeginner(!filterBeginner); setForYouMode(false); }}
             className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${filterBeginner ? "bg-green-500 text-black border-green-500" : "border-border text-muted-foreground hover:text-foreground"}`}
           >
             <Zap className="w-3 h-3" />
@@ -724,7 +724,7 @@ export function Discover() {
           {opportunityTypes.map((t) => (
             <button
               key={t}
-              onClick={() => { setFilterType(filterType === t ? "" : t); setFilterPlatform(""); setFilterBeginner(false); setForYouMode(false); }}
+              onClick={() => { setFilterType(filterType === t ? "" : t); setForYouMode(false); }}
               className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterType === t ? "bg-amber-500 text-black border-amber-500" : "border-border text-muted-foreground hover:text-foreground"}`}
             >
               {t} ({bounties.filter((b) => b.opportunityType === t).length})
