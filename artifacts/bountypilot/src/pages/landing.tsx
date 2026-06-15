@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { usePageMeta } from "@/lib/use-page-meta";
 import {
   Crosshair,
   Sparkles,
@@ -19,6 +20,14 @@ import {
 
 export function Landing() {
   const [, navigate] = useLocation();
+
+  usePageMeta({
+    title: "BountyPilot AI — AI-Powered Bug Bounty & Security Research Platform",
+    description:
+      "BountyPilot AI helps security researchers discover programs, triage scope, and draft vulnerability reports faster with AI-powered assistance. Start hunting smarter today.",
+    canonical: "https://bountypilot.xyz/",
+    ogUrl: "https://bountypilot.xyz/",
+  });
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">

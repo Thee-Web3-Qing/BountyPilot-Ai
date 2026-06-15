@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth";
 import { useState, useEffect } from "react";
+import { usePageMeta } from "@/lib/use-page-meta";
 import {
   ArrowLeft,
   Check,
@@ -86,6 +87,17 @@ const DISPLAY_TIER: Record<string, {
 export function Pricing() {
   const [, navigate] = useLocation();
   const { token, isAuthenticated, user, planStatus } = useAuth();
+
+  usePageMeta({
+    title: "Pricing — BountyPilot AI",
+    description:
+      "Choose a BountyPilot AI plan and unlock AI-powered bug bounty discovery, scope analysis, and report drafting. Free, Active, and Lifetime tiers available.",
+    canonical: "https://bountypilot.xyz/pricing",
+    ogUrl: "https://bountypilot.xyz/pricing",
+    ogTitle: "BountyPilot AI Pricing — Plans for Every Security Researcher",
+    ogDescription:
+      "Unlock AI-powered bug bounty tools with BountyPilot AI. Compare Free, Active, and Lifetime plans and start hunting smarter.",
+  });
   const [loading, setLoading] = useState<string | null>(null);
   const [userActiveTier, setUserActiveTier] = useState<string | null>(null);
   const [dextopusEnabled, setDextopusEnabled] = useState(false);
