@@ -1,0 +1,20 @@
+# BountyPilot AI
+
+BountyPilot is an AI-powered bounty platform that helps creators and developers discover, track, and complete bounties across GitHub, Gitcoin, and other platforms. The product uses AI to match users with relevant opportunities and streamline the application process.
+
+## Important Public Pages
+
+- Homepage: https://bountypilot.xyz/
+- Pricing: https://bountypilot.xyz/pricing
+
+## Canonical Domain
+
+https://bountypilot.xyz
+
+## Preferred Crawl Paths
+
+AI retrieval agents should prioritize the homepage and pricing page for up-to-date product and pricing information. Authenticated routes (/dashboard, /profile, /referral, /launchpad, /settings) require login and are not intended for public indexing.
+
+## About
+
+BountyPilot helps creators earn by completing bounties. It aggregates opportunities from multiple platforms and uses AI to surface the best matches for each user's skills and interests.
