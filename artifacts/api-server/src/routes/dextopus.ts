@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
 import { usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import {
   generateStaticAddress,
@@ -278,21 +278,31 @@ router.post("/confirm", async (req: AuthRequest, res) => {
     res.status(400).json({ error: "txHash is required" });
     return;
   }
-  if (!depositId && !depositAddress) {
-    res.status(400).json({ error: "depositId or depositAddress is required" });
-    return;
-  }
 
   try {
-    // Look up by depositId first; fall back to depositAddress (Dextopus sometimes returns empty depositId)
-    const [deposit] = await db
-      .select()
-      .from(dextopusDepositsTable)
-      .where(
-        depositId
-          ? eq(dextopusDepositsTable.depositId, String(depositId))
-          : eq(dextopusDepositsTable.depositAddress, String(depositAddress))
-      );
+    let deposit;
+
+    if (depositId) {
+      // Preferred: look up by depositId
+      [deposit] = await db
+        .select()
+        .from(dextopusDepositsTable)
+        .where(eq(dextopusDepositsTable.depositId, String(depositId)));
+    } else if (depositAddress) {
+      // Fallback: look up by deposit address
+      [deposit] = await db
+        .select()
+        .from(dextopusDepositsTable)
+        .where(eq(dextopusDepositsTable.depositAddress, String(depositAddress)));
+    } else {
+      // Last resort: most recent pending deposit for this user
+      [deposit] = await db
+        .select()
+        .from(dextopusDepositsTable)
+        .where(eq(dextopusDepositsTable.userId, userId))
+        .orderBy(desc(dextopusDepositsTable.createdAt))
+        .limit(1);
+    }
 
     if (!deposit || deposit.userId !== userId) {
       res.status(404).json({ error: "Deposit not found" });
