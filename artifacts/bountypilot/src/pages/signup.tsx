@@ -73,7 +73,7 @@ export function Signup() {
                   <div className="flex justify-center">
                     <GoogleLogin
                       onSuccess={(res) => { if (res.credential) handleGoogle(res.credential); }}
-                      onError={() => setError("Google sign-up failed")}
+                      onError={() => setError("Google sign-up failed — if you're on the dev preview, this domain may not yet be authorized. Use email/password instead.")}
                       theme="filled_black"
                       shape="rectangular"
                       text="signup_with"
