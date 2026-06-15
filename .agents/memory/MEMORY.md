@@ -1,5 +1,5 @@
 - [BountyPilot Auth](bountypilot-auth.md) — JWT in localStorage via setAuthTokenGetter; all routes require requireAuth middleware; signup creates empty user_profile row.
-- [BountyPilot DB migration](bountypilot-db.md) — drizzle-kit push needs TTY; use executeSql() in code_execution instead for schema changes.
+- [BountyPilot DB migration](bountypilot-db.md) — drizzle-kit push needs TTY; use executeSql() in code_execution instead. Schema/DB can drift — a missing column breaks ALL queries silently as a 500.
 - [BountyPilot LLM config](bountypilot-llm.md) — reads QWEN_API_KEY, QWEN_MODEL, QWEN_BASE_URL env vars; falls back to rule-based mock when no key; settings/status endpoint reports provider mode.
 - [Novus AI Key Issue](novus-key-issue.md) — NOVUS_API_KEY is a Pendo Web SDK key, not a Novus MCP API key. Backend now uses Qwen (Alibaba Cloud LLM) as fallback for AI insights when Novus is unavailable.
 - [Email Authentication](email-auth.md) — Resend SDK (EMAIL_PROVIDER=resend, FROM_EMAIL=noreply@bountypilot.xyz). OTP login + forgot-password both use sendOTPEmail(). login_code/login_code_expires columns on users.
