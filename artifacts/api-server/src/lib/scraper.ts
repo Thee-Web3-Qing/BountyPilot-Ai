@@ -385,9 +385,14 @@ function parseDevpostPrizeBreakdown(html: string): PrizeBreakdown[] | null {
     const clean = blockText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     if (clean.length < 10) continue;
 
-    // Try to find prize title
-    const titleMatch = clean.match(/(?:Grand\s+Prize|Most\s+[^\d]+|Best\s+[^\d]+|Winner|Runner[-\s]Up|Honorable\s+Mention|Bonus|Special|Pool|1st|2nd|3rd|4th|5th)/i);
-    let rank = titleMatch ? titleMatch[0] : "";
+    // Extract title: everything before the first dollar amount or winner count
+    const titleMatch = clean.match(/^(.*?)(?=\$|\d+\s*(?:winner|winners))/i);
+    let rank = titleMatch ? titleMatch[1].trim() : "";
+    if (!rank) {
+      // Try known prize names
+      const knownMatch = clean.match(/(?:Grand\s+Prize|Most\s+[^\d]+|Best\s+[^\d]+|Winner|Runner[-\s]Up|Honorable\s+Mention|Bonus|Special|Pool|1st|2nd|3rd|4th|5th)/i);
+      rank = knownMatch ? knownMatch[0] : "";
+    }
 
     // Try to find amount
     const amountMatch = clean.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:in\s*cash|USD)?/i);
