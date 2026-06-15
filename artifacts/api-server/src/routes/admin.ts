@@ -376,7 +376,11 @@ adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
       const p = b.platform ?? "Unknown";
       if (!platformMap[p]) platformMap[p] = { count: 0, reward: 0 };
       platformMap[p].count++;
-      platformMap[p].reward += parseFloat(b.rewardAmount ?? "0");
+      const rawReward = b.rewardAmount ?? "0";
+      // Strip $, commas, whitespace, and take first part of ranges (e.g. "20-11" → 20)
+      const clean = rawReward.replace(/[$,\s]/g, "").split(/[-–]/)[0];
+      const val = parseFloat(clean);
+      platformMap[p].reward += isNaN(val) ? 0 : val;
     }
     const platformBreakdown = Object.entries(platformMap)
       .map(([platform, d]) => ({ platform, count: d.count, totalReward: d.reward }))
@@ -484,14 +488,17 @@ adminRouter.get("/insights", requireAuth, requireAdmin, async (_req, res) => {
       .filter(b => b.hoursSaved && new Date(b.createdAt) >= d7)
       .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
 
-    const platformMap: Record<string, { count: number; reward: number }> = {};
+    const platformMap2: Record<string, { count: number; reward: number }> = {};
     for (const b of allBounties) {
       const p = b.platform ?? "Unknown";
-      if (!platformMap[p]) platformMap[p] = { count: 0, reward: 0 };
-      platformMap[p].count++;
-      platformMap[p].reward += parseFloat(b.rewardAmount ?? "0");
+      if (!platformMap2[p]) platformMap2[p] = { count: 0, reward: 0 };
+      platformMap2[p].count++;
+      const rawReward = b.rewardAmount ?? "0";
+      const clean = rawReward.replace(/[$,\s]/g, "").split(/[-–]/)[0];
+      const val = parseFloat(clean);
+      platformMap2[p].reward += isNaN(val) ? 0 : val;
     }
-    const platformBreakdown = Object.entries(platformMap)
+    const platformBreakdown = Object.entries(platformMap2)
       .map(([platform, d]) => ({ platform, count: d.count, totalReward: d.reward }))
       .sort((a, b) => b.count - a.count);
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -141,6 +141,7 @@ export function Admin() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [userTab, setUserTab] = useState<"all" | "paid" | Plan>("trial");
   const [selected, setSelected] = useState<AdminUser | null>(null);
@@ -191,7 +192,13 @@ export function Admin() {
       ]);
       setStats(s);
       setUsers(Array.isArray(u) ? u : []);
-      setReport(r);
+      if (r?.error) {
+        setReport(null);
+        setReportError(r.error);
+      } else {
+        setReport(r);
+        setReportError(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -650,7 +657,12 @@ export function Admin() {
         <div className="space-y-6">
           {/* AI Insights */}
           <AdminInsights />
-          {!report ? (
+          {reportError ? (
+            <div className="flex items-center justify-center py-12 text-red-400 text-sm font-mono">
+              <AlertCircle className="w-4 h-4 mr-2" />
+              {reportError}
+            </div>
+          ) : !report ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
