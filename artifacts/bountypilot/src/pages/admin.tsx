@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, Brain } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -86,10 +86,27 @@ const PLAN_LABEL: Record<string, string> = {
   expired: "Expired — access revoked",
 };
 
+const BLANK_BOUNTY = {
+  title: "", description: "", requirements: "", reward: "", rewardToken: "USDC",
+  rewardType: "crypto", category: "content", maxParticipants: "", deadline: "", featured: false,
+};
+
+interface CustomBounty {
+  id: number; title: string; description: string; requirements: string | null;
+  reward: string; rewardToken: string; rewardType: string; category: string;
+  maxParticipants: number | null; deadline: string | null; featured: boolean;
+  status: string; createdAt: string;
+}
+
+interface BountyApplication {
+  id: number; status: string; submissionNote: string | null; submissionUrl: string | null;
+  adminNote: string | null; createdAt: string; userId: number; username: string; email: string;
+}
+
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -103,6 +120,21 @@ export function Admin() {
   const [loadingReports, setLoadingReports] = useState(false);
   const [reportAction, setReportAction] = useState<number | null>(null);
 
+  // Launchpad state
+  const [launchpadBounties, setLaunchpadBounties] = useState<CustomBounty[]>([]);
+  const [loadingLaunchpad, setLoadingLaunchpad] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingBounty, setEditingBounty] = useState<CustomBounty | null>(null);
+  const [formData, setFormData] = useState({ ...BLANK_BOUNTY });
+  const [formSaving, setFormSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [viewingApps, setViewingApps] = useState<CustomBounty | null>(null);
+  const [apps, setApps] = useState<BountyApplication[]>([]);
+  const [loadingApps, setLoadingApps] = useState(false);
+  const [appAction, setAppAction] = useState<number | null>(null);
+  const [expandedApp, setExpandedApp] = useState<number | null>(null);
+  const [adminNoteInput, setAdminNoteInput] = useState<Record<number, string>>({});
+
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
     loadData();
@@ -110,6 +142,7 @@ export function Admin() {
 
   useEffect(() => {
     if (activeTab === "reports") loadReports();
+    if (activeTab === "launchpad") loadLaunchpad();
   }, [activeTab]);
 
   async function loadData() {
@@ -163,6 +196,97 @@ export function Admin() {
     }
   }
 
+  // ── Launchpad helpers ──────────────────────────────────────────────────────
+  async function loadLaunchpad() {
+    setLoadingLaunchpad(true);
+    try {
+      const res = await fetch(`${API}/custom-bounties/all`, { headers: authHeaders() });
+      const data = await res.json();
+      setLaunchpadBounties(Array.isArray(data) ? data : []);
+    } catch { setLaunchpadBounties([]); }
+    finally { setLoadingLaunchpad(false); }
+  }
+
+  function openCreateForm() {
+    setEditingBounty(null);
+    setFormData({ ...BLANK_BOUNTY });
+    setFormError("");
+    setShowCreateForm(true);
+  }
+
+  function openEditForm(b: CustomBounty) {
+    setEditingBounty(b);
+    setFormData({
+      title: b.title, description: b.description, requirements: b.requirements ?? "",
+      reward: b.reward, rewardToken: b.rewardToken, rewardType: b.rewardType,
+      category: b.category, maxParticipants: b.maxParticipants ? String(b.maxParticipants) : "",
+      deadline: b.deadline ? new Date(b.deadline).toISOString().slice(0, 16) : "",
+      featured: b.featured,
+    });
+    setFormError("");
+    setShowCreateForm(true);
+  }
+
+  async function saveBounty() {
+    if (!formData.title || !formData.description || !formData.reward) {
+      setFormError("Title, description, and reward are required"); return;
+    }
+    setFormSaving(true); setFormError("");
+    try {
+      const url = editingBounty ? `${API}/custom-bounties/${editingBounty.id}` : `${API}/custom-bounties`;
+      const method = editingBounty ? "PUT" : "POST";
+      const body = {
+        ...formData,
+        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+        maxParticipants: formData.maxParticipants ? parseInt(formData.maxParticipants) : null,
+      };
+      const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+      if (!res.ok) { const d = await res.json(); setFormError(d.error || "Failed"); return; }
+      setShowCreateForm(false);
+      await loadLaunchpad();
+    } catch { setFormError("Network error"); }
+    finally { setFormSaving(false); }
+  }
+
+  async function toggleBountyStatus(b: CustomBounty) {
+    const newStatus = b.status === "open" ? "closed" : "open";
+    await fetch(`${API}/custom-bounties/${b.id}`, {
+      method: "PUT", headers: authHeaders(), body: JSON.stringify({ status: newStatus }),
+    });
+    await loadLaunchpad();
+  }
+
+  async function deleteBounty(id: number) {
+    if (!confirm("Delete this bounty permanently?")) return;
+    await fetch(`${API}/custom-bounties/${id}`, { method: "DELETE", headers: authHeaders() });
+    await loadLaunchpad();
+  }
+
+  async function openApps(b: CustomBounty) {
+    setViewingApps(b);
+    setLoadingApps(true);
+    try {
+      const res = await fetch(`${API}/custom-bounties/${b.id}/applications`, { headers: authHeaders() });
+      const data = await res.json();
+      setApps(Array.isArray(data) ? data : []);
+      const notes: Record<number, string> = {};
+      (Array.isArray(data) ? data : []).forEach((a: BountyApplication) => { notes[a.id] = a.adminNote ?? ""; });
+      setAdminNoteInput(notes);
+    } catch { setApps([]); }
+    finally { setLoadingApps(false); }
+  }
+
+  async function updateApp(bountyId: number, appId: number, status: string) {
+    setAppAction(appId);
+    try {
+      await fetch(`${API}/custom-bounties/${bountyId}/applications/${appId}`, {
+        method: "PATCH", headers: authHeaders(),
+        body: JSON.stringify({ status, adminNote: adminNoteInput[appId] ?? "" }),
+      });
+      setApps(prev => prev.map(a => a.id === appId ? { ...a, status, adminNote: adminNoteInput[appId] ?? "" } : a));
+    } finally { setAppAction(null); }
+  }
+
   async function removeBounty(id: number) {
     if (!confirm("Delete the bounty and all its reports? This cannot be undone.")) return;
     setReportAction(id);
@@ -207,16 +331,17 @@ export function Admin() {
       </div>
 
       {/* Top tabs */}
-      <div className="flex gap-1 border-b border-border pb-1">
+      <div className="flex gap-1 border-b border-border pb-1 overflow-x-auto">
         {[
           { key: "users" as const, label: "Users", icon: Users },
-          { key: "report" as const, label: "Product Report", icon: BarChart3 },
-          { key: "reports" as const, label: "Flagged Bounties", icon: Flag },
+          { key: "report" as const, label: "Report", icon: BarChart3 },
+          { key: "reports" as const, label: "Flagged", icon: Flag },
+          { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-mono uppercase tracking-wider transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-mono uppercase tracking-wider transition-colors whitespace-nowrap ${
               activeTab === key
                 ? "text-primary border-b-2 border-primary"
                 : "text-muted-foreground hover:text-foreground"
@@ -499,6 +624,362 @@ export function Admin() {
             </div>
           )}
           </>
+          )}
+        </div>
+      )}
+
+      {activeTab === "launchpad" && (
+        <div className="space-y-4">
+          {/* Header row */}
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              {launchpadBounties.length} bounties
+            </p>
+            <button
+              onClick={openCreateForm}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-primary text-primary-foreground text-xs font-mono font-semibold hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> New Bounty
+            </button>
+          </div>
+
+          {loadingLaunchpad ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : launchpadBounties.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Rocket className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
+              <p className="font-mono text-sm">No bounties yet</p>
+              <p className="text-xs mt-1">Create your first custom bounty above.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {launchpadBounties.map(b => (
+                <div key={b.id} className="bg-card border border-border rounded-lg overflow-hidden">
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                            b.status === "open"
+                              ? "text-green-400 bg-green-500/10 border-green-500/30"
+                              : "text-muted-foreground bg-muted border-border"
+                          }`}>
+                            {b.status}
+                          </span>
+                          {b.featured && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border text-yellow-400 bg-yellow-500/10 border-yellow-500/30">
+                              featured
+                            </span>
+                          )}
+                          <span className="text-[10px] font-mono text-muted-foreground/60">{b.category}</span>
+                        </div>
+                        <p className="font-mono font-semibold text-sm">{b.title}</p>
+                        <p className="text-xs text-primary font-mono mt-0.5">
+                          {b.reward} {b.rewardToken}
+                          {b.maxParticipants && <span className="text-muted-foreground"> · max {b.maxParticipants}</span>}
+                          {b.deadline && <span className="text-muted-foreground"> · due {new Date(b.deadline).toLocaleDateString()}</span>}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Action row */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => openApps(b)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Users className="w-3 h-3" /> Applications
+                      </button>
+                      <button
+                        onClick={() => openEditForm(b)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit
+                      </button>
+                      <button
+                        onClick={() => toggleBountyStatus(b)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border transition-colors ${
+                          b.status === "open"
+                            ? "border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
+                            : "border-green-500/30 text-green-400 hover:bg-green-500/10"
+                        }`}
+                      >
+                        {b.status === "open" ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                        {b.status === "open" ? "Close" : "Reopen"}
+                      </button>
+                      <button
+                        onClick={() => deleteBounty(b.id)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors ml-auto"
+                      >
+                        <Trash2 className="w-3 h-3" /> Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Create / Edit form modal */}
+          {showCreateForm && (
+            <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowCreateForm(false)}>
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+              <div
+                className="relative w-full bg-card border-t border-border rounded-t-2xl p-5 space-y-4 max-h-[92vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-mono font-bold text-sm">{editingBounty ? "Edit Bounty" : "New Bounty"}</p>
+                  <button onClick={() => setShowCreateForm(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Title */}
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Title *</label>
+                    <input
+                      value={formData.title}
+                      onChange={e => setFormData(p => ({ ...p, title: e.target.value }))}
+                      placeholder="e.g. Create a Tweet thread about BountyPilot"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Description *</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
+                      placeholder="What do you want bounty hunters to do?"
+                      rows={3}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary resize-none"
+                    />
+                  </div>
+
+                  {/* Requirements */}
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Requirements</label>
+                    <textarea
+                      value={formData.requirements}
+                      onChange={e => setFormData(p => ({ ...p, requirements: e.target.value }))}
+                      placeholder="Specific rules or submission criteria..."
+                      rows={2}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary resize-none"
+                    />
+                  </div>
+
+                  {/* Reward row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Reward *</label>
+                      <input
+                        type="number" min="0" step="0.01"
+                        value={formData.reward}
+                        onChange={e => setFormData(p => ({ ...p, reward: e.target.value }))}
+                        placeholder="25"
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Token</label>
+                      <select
+                        value={formData.rewardToken}
+                        onChange={e => setFormData(p => ({ ...p, rewardToken: e.target.value }))}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                      >
+                        {["USDC", "USDT", "ETH", "SOL", "BNB"].map(t => <option key={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Category + Max participants */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Category</label>
+                      <select
+                        value={formData.category}
+                        onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                      >
+                        {["content", "design", "development", "marketing", "research", "other"].map(c => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Max Participants</label>
+                      <input
+                        type="number" min="1"
+                        value={formData.maxParticipants}
+                        onChange={e => setFormData(p => ({ ...p, maxParticipants: e.target.value }))}
+                        placeholder="Unlimited"
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Deadline */}
+                  <div>
+                    <label className="block font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Deadline</label>
+                    <input
+                      type="datetime-local"
+                      value={formData.deadline}
+                      onChange={e => setFormData(p => ({ ...p, deadline: e.target.value }))}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  {/* Featured toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setFormData(p => ({ ...p, featured: !p.featured }))}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-mono transition-colors w-full ${
+                      formData.featured
+                        ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Star className={`w-4 h-4 ${formData.featured ? "fill-yellow-400" : ""}`} />
+                    {formData.featured ? "Featured (pinned to top)" : "Mark as Featured"}
+                  </button>
+                </div>
+
+                {formError && (
+                  <p className="font-mono text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{formError}</p>
+                )}
+
+                <button
+                  onClick={saveBounty}
+                  disabled={formSaving}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary text-primary-foreground font-mono font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                >
+                  {formSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  {editingBounty ? "Save Changes" : "Create Bounty"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Applications drawer */}
+          {viewingApps && (
+            <div className="fixed inset-0 z-50 flex items-end" onClick={() => setViewingApps(null)}>
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+              <div
+                className="relative w-full bg-card border-t border-border rounded-t-2xl p-5 space-y-4 max-h-[92vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-mono font-bold text-sm">{viewingApps.title}</p>
+                    <p className="font-mono text-xs text-muted-foreground">Applications ({apps.length})</p>
+                  </div>
+                  <button onClick={() => setViewingApps(null)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {loadingApps ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : apps.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-6 h-6 mx-auto mb-2 text-muted-foreground/30" />
+                    <p className="font-mono text-sm">No applications yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {apps.map(a => {
+                      const isExpanded = expandedApp === a.id;
+                      return (
+                        <div key={a.id} className="bg-background border border-border rounded-lg overflow-hidden">
+                          <button
+                            className="w-full flex items-center justify-between p-3 text-left"
+                            onClick={() => setExpandedApp(isExpanded ? null : a.id)}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                                a.status === "approved" ? "text-green-400 bg-green-500/10 border-green-500/30"
+                                : a.status === "rejected" ? "text-red-400 bg-red-500/10 border-red-500/30"
+                                : "text-muted-foreground border-border"
+                              }`}>
+                                {a.status}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="font-mono text-sm font-semibold truncate">@{a.username}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{a.email}</p>
+                              </div>
+                            </div>
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground/50 shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/50 shrink-0" />}
+                          </button>
+
+                          {isExpanded && (
+                            <div className="px-3 pb-3 space-y-3 border-t border-border/50 pt-3">
+                              {a.submissionNote && (
+                                <div>
+                                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Note</p>
+                                  <p className="text-xs text-foreground bg-card border border-border/50 rounded p-2">{a.submissionNote}</p>
+                                </div>
+                              )}
+                              {a.submissionUrl && (
+                                <div>
+                                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Portfolio / URL</p>
+                                  <a href={a.submissionUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline break-all flex items-center gap-1">
+                                    <ExternalLink className="w-3 h-3 shrink-0" />{a.submissionUrl}
+                                  </a>
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Admin Note</p>
+                                <textarea
+                                  value={adminNoteInput[a.id] ?? ""}
+                                  onChange={e => setAdminNoteInput(prev => ({ ...prev, [a.id]: e.target.value }))}
+                                  placeholder="Optional note to the applicant..."
+                                  rows={2}
+                                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-primary resize-none"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => updateApp(viewingApps.id, a.id, "approved")}
+                                  disabled={appAction === a.id || a.status === "approved"}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-green-500/30 text-green-400 hover:bg-green-500/10 disabled:opacity-40 transition-colors"
+                                >
+                                  {appAction === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => updateApp(viewingApps.id, a.id, "rejected")}
+                                  disabled={appAction === a.id || a.status === "rejected"}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
+                                >
+                                  {appAction === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                                  Reject
+                                </button>
+                                <button
+                                  onClick={() => updateApp(viewingApps.id, a.id, "pending")}
+                                  disabled={appAction === a.id || a.status === "pending"}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors ml-auto"
+                                >
+                                  Reset
+                                </button>
+                              </div>
+                              <p className="font-mono text-[10px] text-muted-foreground/50">
+                                Applied {new Date(a.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}
