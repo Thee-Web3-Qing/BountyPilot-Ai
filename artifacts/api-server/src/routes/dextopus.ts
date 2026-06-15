@@ -272,18 +272,27 @@ router.post("/checkout", async (req: AuthRequest, res) => {
 // ── Confirm payment sent (record tx hash) ────────────────
 router.post("/confirm", async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
-  const { depositId, txHash } = req.body;
+  const { depositId, depositAddress, txHash } = req.body;
 
-  if (!depositId || !txHash) {
-    res.status(400).json({ error: "depositId and txHash are required" });
+  if (!txHash) {
+    res.status(400).json({ error: "txHash is required" });
+    return;
+  }
+  if (!depositId && !depositAddress) {
+    res.status(400).json({ error: "depositId or depositAddress is required" });
     return;
   }
 
   try {
+    // Look up by depositId first; fall back to depositAddress (Dextopus sometimes returns empty depositId)
     const [deposit] = await db
       .select()
       .from(dextopusDepositsTable)
-      .where(eq(dextopusDepositsTable.depositId, String(depositId)));
+      .where(
+        depositId
+          ? eq(dextopusDepositsTable.depositId, String(depositId))
+          : eq(dextopusDepositsTable.depositAddress, String(depositAddress))
+      );
 
     if (!deposit || deposit.userId !== userId) {
       res.status(404).json({ error: "Deposit not found" });
@@ -293,7 +302,7 @@ router.post("/confirm", async (req: AuthRequest, res) => {
     await db
       .update(dextopusDepositsTable)
       .set({ txHash: String(txHash), notes: `User confirmed payment. TxHash: ${txHash}` })
-      .where(eq(dextopusDepositsTable.depositId, String(depositId)));
+      .where(eq(dextopusDepositsTable.id, deposit.id));
 
     res.json({ success: true });
   } catch (e: any) {

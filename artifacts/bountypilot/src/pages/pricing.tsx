@@ -256,7 +256,7 @@ export function Pricing() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ depositId: deposit.depositId, txHash: txHash.trim() }),
+        body: JSON.stringify({ depositId: deposit.depositId || undefined, depositAddress: deposit.depositAddress, txHash: txHash.trim() }),
       });
       const json = await res.json();
       if (json.success) {
