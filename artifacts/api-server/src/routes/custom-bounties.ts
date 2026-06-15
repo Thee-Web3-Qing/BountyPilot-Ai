@@ -4,6 +4,7 @@ import { customBountiesTable, customBountyApplicationsTable, usersTable } from "
 import { eq, desc, and } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { sendLaunchpadStatusEmail } from "../lib/email.js";
 
 export const customBountiesRouter = Router();
 
@@ -176,12 +177,39 @@ customBountiesRouter.get("/:id/applications", requireAuth, async (req: AuthReque
 customBountiesRouter.patch("/:id/applications/:appId", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user!.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
   try {
+    const bountyId = parseInt(req.params.id);
+    const appId = parseInt(req.params.appId);
     const { status, adminNote } = req.body;
+
     const [updated] = await db.update(customBountyApplicationsTable)
       .set({ status, adminNote, updatedAt: new Date() })
-      .where(eq(customBountyApplicationsTable.id, parseInt(req.params.appId)))
+      .where(eq(customBountyApplicationsTable.id, appId))
       .returning();
+
     res.json(updated);
+
+    if (status === "approved" || status === "rejected") {
+      try {
+        const [bounty] = await db.select({ title: customBountiesTable.title })
+          .from(customBountiesTable)
+          .where(eq(customBountiesTable.id, bountyId));
+
+        const [applicant] = await db.select({ email: usersTable.email })
+          .from(usersTable)
+          .where(eq(usersTable.id, updated.userId));
+
+        if (bounty && applicant?.email) {
+          await sendLaunchpadStatusEmail(applicant.email, {
+            bountyTitle: bounty.title,
+            status,
+            adminNote: adminNote || null,
+          });
+          logger.info({ appId, status, to: applicant.email }, "Launchpad status email sent");
+        }
+      } catch (emailErr) {
+        logger.error({ err: emailErr, appId }, "Failed to send launchpad status email");
+      }
+    }
   } catch (err) {
     res.status(500).json({ error: "Failed to update application" });
   }

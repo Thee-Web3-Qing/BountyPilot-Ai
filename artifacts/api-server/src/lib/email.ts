@@ -90,6 +90,72 @@ export function sendOTPEmail(to: string, code: string, purpose: "login" | "signu
   return sendEmail({ to, subject: subjectMap[purpose], text, html });
 }
 
+export function sendLaunchpadStatusEmail(
+  to: string,
+  opts: { bountyTitle: string; status: "approved" | "rejected"; adminNote?: string | null }
+): Promise<{ sent: boolean }> {
+  const { bountyTitle, status, adminNote } = opts;
+
+  const isApproved = status === "approved";
+  const subject = isApproved
+    ? `Your BountyPilot application was approved!`
+    : `Update on your BountyPilot application`;
+
+  const accentColor = isApproved ? "#c8ff00" : "#ff4444";
+  const statusLabel = isApproved ? "APPROVED ✓" : "NOT SELECTED";
+  const headline = isApproved
+    ? "Congratulations — your application has been approved!"
+    : "Thank you for applying to this bounty.";
+  const body = isApproved
+    ? "The team has reviewed your submission and you're in. Keep an eye on your inbox for next steps."
+    : "The team reviewed your submission but went in a different direction this time. We encourage you to apply to future bounties — new ones drop regularly.";
+
+  const adminNoteHtml = adminNote
+    ? `<div style="background:#111;border-left:3px solid ${accentColor};border-radius:4px;padding:14px 16px;margin:20px 0">
+        <p style="margin:0 0 6px;color:#999;font-size:11px;text-transform:uppercase;letter-spacing:1px">Admin note</p>
+        <p style="margin:0;color:#ccc;font-size:13px">${adminNote}</p>
+      </div>`
+    : "";
+
+  const adminNoteText = adminNote ? `\nAdmin note: ${adminNote}\n` : "";
+
+  const html = `
+    <div style="font-family:monospace;max-width:520px;margin:0 auto;background:#0a0a0a;color:#fff;padding:32px;border-radius:8px;border:1px solid #222">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="display:inline-block;background:#c8ff00;width:48px;height:48px;border-radius:4px;line-height:48px;font-size:24px;color:#0a0a0a">⊕</div>
+        <h2 style="margin:12px 0 4px;font-size:20px;letter-spacing:2px;text-transform:uppercase">BountyPilot AI</h2>
+        <p style="margin:0;color:#666;font-size:12px">Your creator revenue autopilot</p>
+      </div>
+      <div style="background:#111;border:1px solid #222;border-radius:6px;padding:20px;margin-bottom:20px">
+        <p style="margin:0 0 8px;color:#666;font-size:11px;text-transform:uppercase;letter-spacing:1px">Bounty</p>
+        <p style="margin:0;font-size:16px;font-weight:bold;color:#fff">${bountyTitle}</p>
+        <div style="margin-top:12px;display:inline-block;background:${accentColor};color:#0a0a0a;font-size:11px;font-weight:bold;letter-spacing:2px;padding:4px 10px;border-radius:3px">${statusLabel}</div>
+      </div>
+      <p style="color:#ccc;font-size:14px;margin:0 0 8px">${headline}</p>
+      <p style="color:#888;font-size:13px;margin:0">${body}</p>
+      ${adminNoteHtml}
+      <p style="color:#555;font-size:12px;margin-top:28px">Questions? Reply to this email or visit <a href="https://bountypilot.xyz" style="color:#c8ff00;text-decoration:none">bountypilot.xyz</a>.</p>
+      <p style="color:#333;font-size:11px;margin-top:16px;border-top:1px solid #1a1a1a;padding-top:16px">— BountyPilot AI Team</p>
+    </div>
+  `;
+
+  const text = [
+    `BountyPilot AI — Launchpad Application Update`,
+    ``,
+    `Bounty: ${bountyTitle}`,
+    `Status: ${statusLabel}`,
+    ``,
+    headline,
+    body,
+    adminNoteText,
+    `Questions? Visit https://bountypilot.xyz`,
+    ``,
+    `— BountyPilot AI Team`,
+  ].join("\n");
+
+  return sendEmail({ to, subject, text, html });
+}
+
 export function getEmailProvider(): { provider: EmailProvider; ready: boolean } {
   return { provider: EMAIL_PROVIDER, ready: hasProvider() };
 }
