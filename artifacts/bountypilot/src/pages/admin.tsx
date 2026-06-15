@@ -36,6 +36,10 @@ interface Stats {
   pending: number;
   trial: number;
   expired: number;
+  monthly: number;
+  yearly: number;
+  lifetime: number;
+  paid: number;
   total: number;
 }
 
@@ -421,10 +425,14 @@ export function Admin() {
           {stats && (
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: "Trial",      value: stats.trial,  sub: "active",   color: "text-green-400" },
-                { label: "Beta",       value: stats.beta,   sub: "/ 30 max", color: "text-primary" },
-                { label: "Expired",    value: stats.expired,sub: "ended",    color: "text-red-400" },
-                { label: "Total Users",value: stats.total,  sub: "accounts", color: "text-foreground" },
+                { label: "Trial",    value: stats.trial,    sub: "active",   color: "text-green-400" },
+                { label: "Beta",     value: stats.beta,     sub: "/ 30 max", color: "text-primary" },
+                { label: "Monthly",  value: stats.monthly,  sub: "paid",     color: "text-blue-400" },
+                { label: "Yearly",   value: stats.yearly,   sub: "paid",     color: "text-blue-300" },
+                { label: "Lifetime", value: stats.lifetime, sub: "paid",     color: "text-yellow-400" },
+                { label: "Expired",  value: stats.expired,  sub: "ended",    color: "text-red-400" },
+                { label: "Total Users", value: stats.total, sub: "accounts", color: "text-foreground" },
+                { label: "Paid Total",  value: stats.paid,  sub: "subscribers", color: "text-emerald-400" },
               ].map(({ label, value, sub, color }) => (
                 <div key={label} className="bg-card border border-border rounded-lg p-3">
                   <p className={`text-2xl font-bold font-mono ${color}`}>{value}</p>

@@ -58,13 +58,30 @@ async function requireAdmin(req: AuthRequest, res: any, next: any) {
 
 adminRouter.get("/stats", requireAuth, requireAdmin, async (_req, res) => {
   try {
-    const allUsers = await db.select({ plan: usersTable.plan }).from(usersTable);
+    const allUsers = await db.select({ id: usersTable.id, plan: usersTable.plan }).from(usersTable);
+    // Count paid tiers from completed deposits (most recent per user)
+    const completedDeposits = await db
+      .select({ userId: dextopusDepositsTable.userId, tier: dextopusDepositsTable.tier })
+      .from(dextopusDepositsTable)
+      .where(eq(dextopusDepositsTable.status, "COMPLETED"))
+      .orderBy(desc(dextopusDepositsTable.updatedAt));
+    // Keep only the most-recent completed deposit per user
+    const latestTierByUser = new Map<number, string>();
+    for (const d of completedDeposits) {
+      if (d.userId !== null && !latestTierByUser.has(d.userId)) latestTierByUser.set(d.userId, d.tier ?? "");
+    }
+    const activePlanUserIds = new Set(allUsers.filter(u => u.plan === "active").map((u: any) => u.id));
+
     const stats = {
-      beta: allUsers.filter(u => u.plan === "beta").length,
-      pending: allUsers.filter(u => u.plan === "pending").length,
-      trial: allUsers.filter(u => u.plan === "trial").length,
-      expired: allUsers.filter(u => u.plan === "expired").length,
-      total: allUsers.length,
+      beta:     allUsers.filter(u => u.plan === "beta").length,
+      pending:  allUsers.filter(u => u.plan === "pending").length,
+      trial:    allUsers.filter(u => u.plan === "trial").length,
+      expired:  allUsers.filter(u => u.plan === "expired").length,
+      monthly:  [...latestTierByUser.entries()].filter(([uid, t]) => t === "monthly" && activePlanUserIds.has(uid)).length,
+      yearly:   [...latestTierByUser.entries()].filter(([uid, t]) => t === "yearly"  && activePlanUserIds.has(uid)).length,
+      lifetime: allUsers.filter(u => u.plan === "lifetime").length,
+      paid:     allUsers.filter(u => u.plan === "active" || u.plan === "lifetime").length,
+      total:    allUsers.length,
     };
     res.json(stats);
   } catch (err) {
