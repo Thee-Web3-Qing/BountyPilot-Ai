@@ -3,7 +3,10 @@ import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Rocket, Clock, Coins, Users, ExternalLink, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Rocket, Clock, Coins, Users, CheckCircle, AlertCircle, Loader2,
+  Trophy, Zap, Gift, Copy, Check, Crown, ChevronDown, ChevronUp, Star,
+} from "lucide-react";
 
 interface CustomBounty {
   id: number;
@@ -26,6 +29,30 @@ interface Application {
   status: string;
 }
 
+interface ReferralStats {
+  referralCode: string;
+  referralLink: string;
+  totalReferrals: number;
+  paidReferrals: number;
+  qualifiesCrypto: boolean;
+  qualifiesAccess: boolean;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  totalReferrals: number;
+  paidReferrals: number;
+  isWinner: boolean;
+}
+
+interface LeaderboardData {
+  paidLeaderboard: LeaderboardEntry[];
+  freeLeaderboard: LeaderboardEntry[];
+  freeLeaderboardMin: number;
+  freeLeaderboardTop: number;
+}
+
 function timeLeft(deadline: string | null) {
   if (!deadline) return null;
   const diff = new Date(deadline).getTime() - Date.now();
@@ -36,6 +63,262 @@ function timeLeft(deadline: string | null) {
   return `${hours}h left`;
 }
 
+// ── Referral Bounty Card ─────────────────────────────────────────────────────
+function ReferralBountyCard() {
+  const { token, user } = useAuth();
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"crypto" | "access">("crypto");
+  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [lb, setLb] = useState<LeaderboardData | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || lb) return;
+    setLoadingData(true);
+    Promise.all([
+      token
+        ? fetch("/api/referrals/my", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+        : Promise.resolve(null),
+      fetch("/api/referrals/leaderboard").then(r => r.json()),
+    ]).then(([myStats, lbData]) => {
+      setStats(myStats);
+      setLb(lbData);
+    }).finally(() => setLoadingData(false));
+  }, [expanded, token, lb]);
+
+  const copyLink = () => {
+    if (!stats?.referralLink) return;
+    navigator.clipboard.writeText(stats.referralLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Card className="bg-card border-primary/40 overflow-hidden">
+      {/* Featured banner */}
+      <div className="h-1 bg-primary w-full" />
+
+      <CardContent className="p-5 space-y-4">
+        {/* Header row */}
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <Badge className="bg-primary text-primary-foreground font-mono text-xs">Featured</Badge>
+              <Badge variant="outline" className="font-mono text-xs">referral</Badge>
+              <span className="font-mono text-[10px] text-primary border border-primary/30 bg-primary/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                🟢 Active
+              </span>
+            </div>
+            <h3 className="font-bold font-sans text-base uppercase tracking-tight flex items-center gap-2">
+              <Gift className="w-4 h-4 text-primary shrink-0" />
+              Refer & Earn Campaign
+            </h3>
+            <p className="font-mono text-xs text-muted-foreground mt-1 leading-relaxed">
+              Two reward tracks — refer paid users to win crypto, or refer anyone to get free access.
+            </p>
+          </div>
+
+          {/* Prize summary */}
+          <div className="text-right shrink-0 space-y-1">
+            <div>
+              <p className="font-bold font-mono text-base text-primary">$50</p>
+              <p className="font-mono text-[10px] text-muted-foreground">Crypto pool</p>
+            </div>
+            <div>
+              <p className="font-bold font-mono text-sm">2mo</p>
+              <p className="font-mono text-[10px] text-muted-foreground">Free access</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Prize track pills */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="border border-primary/30 bg-primary/5 rounded-sm px-3 py-2">
+            <p className="font-mono text-xs font-bold text-primary flex items-center gap-1">
+              <Trophy className="w-3 h-3" /> $50 Crypto
+            </p>
+            <p className="font-mono text-[10px] text-muted-foreground mt-0.5">Top 2 referrers of paid users · $25 each</p>
+          </div>
+          <div className="border border-border rounded-sm px-3 py-2">
+            <p className="font-mono text-xs font-bold flex items-center gap-1">
+              <Zap className="w-3 h-3 text-primary" /> 2 Months Free
+            </p>
+            <p className="font-mono text-[10px] text-muted-foreground mt-0.5">Top 10 referrers with 10+ total refs</p>
+          </div>
+        </div>
+
+        {/* Expand / collapse button */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-3 font-mono text-xs text-muted-foreground">
+            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Open to all</span>
+            <span className="flex items-center gap-1"><Coins className="w-3 h-3" /> Crypto + Access</span>
+          </div>
+          <Button
+            size="sm"
+            variant={expanded ? "outline" : "default"}
+            className="font-mono text-xs uppercase tracking-wider"
+            onClick={() => setExpanded(v => !v)}
+          >
+            {expanded ? (
+              <><ChevronUp className="w-3.5 h-3.5 mr-1" /> Close</>
+            ) : (
+              <><ChevronDown className="w-3.5 h-3.5 mr-1" /> View & Join</>
+            )}
+          </Button>
+        </div>
+
+        {/* Expanded section */}
+        {expanded && (
+          <div className="border-t border-border pt-4 space-y-4">
+            {loadingData ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                {/* Referral link */}
+                {stats && (
+                  <div className="space-y-2">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Your Referral Link</p>
+                    <div className="flex gap-2">
+                      <div className="flex-1 font-mono text-xs bg-background border border-border rounded-sm px-3 py-2 truncate text-muted-foreground">
+                        {stats.referralLink}
+                      </div>
+                      <Button onClick={copyLink} variant="outline" size="sm" className="shrink-0">
+                        {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                      </Button>
+                    </div>
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      Code: <span className="text-primary font-bold tracking-widest">{stats.referralCode}</span>
+                      {stats.qualifiesCrypto && <span className="ml-3 text-primary">✓ Crypto qualified</span>}
+                      {stats.qualifiesAccess && <span className="ml-3 text-green-400">✓ On access leaderboard</span>}
+                    </p>
+                  </div>
+                )}
+
+                {/* My progress quick stats */}
+                {stats && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-background border border-primary/20 rounded-sm px-3 py-2">
+                      <p className="font-mono text-lg font-bold text-primary">{stats.paidReferrals}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">Paid referrals (crypto track)</p>
+                    </div>
+                    <div className="bg-background border border-border rounded-sm px-3 py-2">
+                      <p className="font-mono text-lg font-bold">{stats.totalReferrals}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">Total referrals (access track)</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Leaderboard tabs */}
+                <div className="space-y-3">
+                  <div className="flex gap-1 border-b border-border pb-1">
+                    <button
+                      onClick={() => setActiveTab("crypto")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider transition-colors ${
+                        activeTab === "crypto"
+                          ? "text-primary border-b-2 border-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Trophy className="w-3 h-3" /> $50 Crypto
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("access")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider transition-colors ${
+                        activeTab === "access"
+                          ? "text-foreground border-b-2 border-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Zap className="w-3 h-3" /> 2 Months Free
+                    </button>
+                  </div>
+
+                  {activeTab === "crypto" && (
+                    <div className="space-y-1.5">
+                      <p className="font-mono text-[10px] text-muted-foreground">Ranked by paid referrals · Top 2 win $25 each</p>
+                      {(lb?.paidLeaderboard?.length ?? 0) === 0 ? (
+                        <p className="font-mono text-xs text-muted-foreground py-3 text-center">No paid referrals yet — be the first!</p>
+                      ) : (
+                        lb!.paidLeaderboard.slice(0, 10).map(entry => (
+                          <div
+                            key={entry.rank}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs font-mono ${
+                              entry.username === user?.username
+                                ? "border-primary/40 bg-primary/5"
+                                : entry.rank <= 2 ? "border-primary/20 bg-primary/5"
+                                : "border-border bg-background"
+                            }`}
+                          >
+                            <span className={`font-bold w-5 ${entry.rank <= 2 ? "text-primary" : "text-muted-foreground"}`}>#{entry.rank}</span>
+                            <span className="flex-1 truncate">
+                              {entry.username}
+                              {entry.username === user?.username && <span className="text-primary ml-1 text-[10px]">(you)</span>}
+                            </span>
+                            <span className="text-primary font-semibold">{entry.paidReferrals} paid</span>
+                            {entry.rank <= 2 && <Crown className="w-3 h-3 text-primary shrink-0" />}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === "access" && (
+                    <div className="space-y-1.5">
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        Ranked by total referrals · Min {lb?.freeLeaderboardMin ?? 10} refs to appear · Top {lb?.freeLeaderboardTop ?? 10} win
+                      </p>
+                      {(lb?.freeLeaderboard?.length ?? 0) === 0 ? (
+                        <div className="py-4 text-center">
+                          <p className="font-mono text-xs text-muted-foreground">Nobody has hit {lb?.freeLeaderboardMin ?? 10} referrals yet.</p>
+                          <p className="font-mono text-[10px] text-muted-foreground mt-1">Be the first to unlock this leaderboard!</p>
+                        </div>
+                      ) : (
+                        lb!.freeLeaderboard.map(entry => (
+                          <div
+                            key={entry.rank}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs font-mono ${
+                              entry.username === user?.username
+                                ? "border-foreground/40 bg-foreground/5"
+                                : "border-border bg-background"
+                            }`}
+                          >
+                            <span className={`font-bold w-5 ${entry.rank <= 3 ? "text-foreground" : "text-muted-foreground"}`}>#{entry.rank}</span>
+                            <span className="flex-1 truncate">
+                              {entry.username}
+                              {entry.username === user?.username && <span className="text-primary ml-1 text-[10px]">(you)</span>}
+                            </span>
+                            <span className="font-semibold">{entry.totalReferrals} refs</span>
+                            <Zap className="w-3 h-3 text-primary shrink-0" />
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* How to participate */}
+                <div className="bg-background border border-border rounded-sm p-3 space-y-1.5">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">How to participate</p>
+                  <div className="font-mono text-[11px] text-muted-foreground space-y-1">
+                    <p><span className="text-primary">01</span> — Copy your referral link above</p>
+                    <p><span className="text-primary">02</span> — Share it with fellow creators</p>
+                    <p><span className="text-primary">03</span> — Refer paid users → compete for <span className="text-primary font-bold">$50 crypto</span></p>
+                    <p><span className="text-primary">04</span> — Refer anyone → top 10 with 10+ refs win <span className="text-foreground font-bold">2 months free</span></p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Apply Modal ──────────────────────────────────────────────────────────────
 function ApplyModal({ bounty, onClose, onSubmit }: { bounty: CustomBounty; onClose: () => void; onSubmit: (note: string, url: string) => Promise<void> }) {
   const [note, setNote] = useState("");
   const [url, setUrl] = useState("");
@@ -102,6 +385,7 @@ function ApplyModal({ bounty, onClose, onSubmit }: { bounty: CustomBounty; onClo
   );
 }
 
+// ── Main Launchpad ───────────────────────────────────────────────────────────
 export function Launchpad() {
   const { token, isAuthenticated } = useAuth();
   const [bounties, setBounties] = useState<CustomBounty[]>([]);
@@ -133,7 +417,6 @@ export function Launchpad() {
       const d = await resp.json();
       throw new Error(d.error || "Failed to apply");
     }
-    const newApp = await resp.json();
     setMyApps(prev => [...prev, { bountyId: applying.id, status: "pending" }]);
     setSuccess(applying.id);
     setTimeout(() => setSuccess(null), 4000);
@@ -150,9 +433,9 @@ export function Launchpad() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
       {/* Header */}
-      <div>
+      <div className="mb-2">
         <h1 className="font-bold font-sans text-2xl uppercase tracking-tighter flex items-center gap-2">
           <Rocket className="w-6 h-6 text-primary" />
           Launchpad
@@ -162,26 +445,11 @@ export function Launchpad() {
         </p>
       </div>
 
-      {/* Referral bounty CTA */}
-      <div className="bg-primary/10 border border-primary/30 rounded-sm p-4 flex items-center gap-4">
-        <div className="flex-1">
-          <p className="font-bold font-mono text-sm uppercase tracking-wider text-primary">🎯 Active: Refer & Earn Campaign</p>
-          <p className="font-mono text-xs text-muted-foreground mt-1">Refer 3+ creators to win $25 + 2 months free. $50 prize pool.</p>
-        </div>
-        <Button variant="outline" size="sm" className="font-mono shrink-0" onClick={() => window.location.href = "/referral"}>
-          Join →
-        </Button>
-      </div>
+      {/* Referral bounty — always pinned first */}
+      <ReferralBountyCard />
 
-      {/* Bounties list */}
-      {bounties.length === 0 ? (
-        <Card className="bg-card border-border">
-          <CardContent className="p-12 text-center">
-            <Rocket className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-30" />
-            <p className="font-mono text-sm text-muted-foreground">No open bounties yet. Check back soon.</p>
-          </CardContent>
-        </Card>
-      ) : (
+      {/* Admin-created bounties */}
+      {bounties.length > 0 && (
         <div className="space-y-4">
           {bounties.map((bounty) => {
             const appStatus = getAppStatus(bounty.id);
@@ -259,6 +527,16 @@ export function Launchpad() {
             );
           })}
         </div>
+      )}
+
+      {/* Empty state for admin bounties — only shown when no admin bounties exist */}
+      {bounties.length === 0 && (
+        <Card className="bg-card border-border border-dashed">
+          <CardContent className="p-10 text-center">
+            <Star className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-20" />
+            <p className="font-mono text-sm text-muted-foreground">More bounties coming soon.</p>
+          </CardContent>
+        </Card>
       )}
 
       {applying && (
