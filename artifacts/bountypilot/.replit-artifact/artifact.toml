@@ -23,7 +23,75 @@ publicDir = "artifacts/bountypilot/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
-from = "/*"
+from = "/pricing"
+to = "/pricing/index.html"
+
+[[services.production.rewrites]]
+from = "/pricing/"
+to = "/pricing/index.html"
+
+[[services.production.rewrites]]
+from = "/"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/login"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/login-otp"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/signup"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/forgot-password"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/reset-password"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/discover"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/bounties"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/bounties/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/submissions"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/earnings"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/profile"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/settings"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/referral"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/launchpad"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/admin"
 to = "/index.html"
 
 [services.env]
