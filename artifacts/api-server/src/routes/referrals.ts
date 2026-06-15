@@ -8,7 +8,7 @@ import { logger } from "../lib/logger.js";
 export const referralsRouter = Router();
 
 // Qualification thresholds
-const MIN_REFERRALS = 5;
+const MIN_REFERRALS = 3;
 
 function qualifiesForReward(totalReferrals: number, hasPremiumReferral: boolean) {
   return totalReferrals >= MIN_REFERRALS || hasPremiumReferral;

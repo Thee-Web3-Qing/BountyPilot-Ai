@@ -27,7 +27,7 @@ export function Referral() {
   const { user, token } = useAuth();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [minRequired, setMinRequired] = useState(5);
+  const [minRequired, setMinRequired] = useState(3);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +38,7 @@ export function Referral() {
     ]).then(([myStats, lb]) => {
       setStats(myStats);
       setLeaderboard(lb.leaderboard ?? []);
-      setMinRequired(lb.minRequired ?? 5);
+      setMinRequired(lb.minRequired ?? 3);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [token]);
 
@@ -68,7 +68,7 @@ export function Referral() {
           Refer & Earn
         </h1>
         <p className="font-mono text-sm text-muted-foreground mt-1">
-          Refer creators to BountyPilot. Top 2 referrers win $25 each. All qualifiers get 1 month free.
+          Refer creators to BountyPilot. Top 2 referrers win $25 each. All qualifiers get 2 months free.
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export function Referral() {
           )}
 
           <div className="font-mono text-xs text-muted-foreground space-y-1">
-            <p>• Refer <strong>5+ creators</strong> (any plan) to qualify</p>
+            <p>• Refer <strong>3+ creators</strong> (any plan) to qualify</p>
             <p>• Or refer <strong>1 annual/lifetime</strong> subscriber</p>
           </div>
         </CardContent>
@@ -207,9 +207,9 @@ export function Referral() {
           <div className="space-y-2 font-mono text-sm text-muted-foreground">
             <p><span className="text-primary">01</span> — Share your referral link with fellow creators</p>
             <p><span className="text-primary">02</span> — They sign up using your link</p>
-            <p><span className="text-primary">03</span> — Refer 5 people (or 1 premium sub) to qualify</p>
+            <p><span className="text-primary">03</span> — Refer 3 people (or 1 premium sub) to qualify</p>
             <p><span className="text-primary">04</span> — Top 2 referrers win $25 each in crypto at campaign end</p>
-            <p><span className="text-primary">05</span> — All qualifiers get 1 month free access on launch</p>
+            <p><span className="text-primary">05</span> — All qualifiers get 2 months free access on launch</p>
           </div>
         </CardContent>
       </Card>
