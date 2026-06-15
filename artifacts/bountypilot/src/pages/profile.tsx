@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle, User, X, Plus, Calendar, Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import { GamificationPanel } from "@/components/GamificationPanel";
 
 interface Profile {
   fullName?: string; creatorName?: string; mainPlatforms?: string;
@@ -118,6 +119,7 @@ export function Profile() {
 
   return (
     <div className="flex flex-col gap-8 max-w-2xl">
+      <GamificationPanel />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">

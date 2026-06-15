@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { CreateEarningBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { awardPointsAndBadges } from "../lib/gamification.js";
 
 export const earningsRouter = Router();
 earningsRouter.use(requireAuth);
@@ -44,6 +45,8 @@ earningsRouter.post("/", async (req: AuthRequest, res) => {
         notes: notes ?? null,
       })
       .returning();
+
+    await awardPointsAndBadges(userId);
 
     res.status(201).json(earning);
   } catch (err) {

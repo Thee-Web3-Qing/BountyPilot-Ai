@@ -19,6 +19,7 @@ interface LeaderboardEntry {
   rank: number;
   username: string;
   totalReferrals: number;
+  points: number;
   hasPremiumReferral: boolean;
   qualifies: boolean;
 }
@@ -187,6 +188,7 @@ export function Referral() {
                     )}
                   </span>
                   <span className="font-mono text-xs text-muted-foreground">{entry.totalReferrals} refs</span>
+                  <span className="font-mono text-xs text-primary font-semibold">{(entry.points ?? 0).toLocaleString()} pts</span>
                   {entry.qualifies && (
                     <Badge className="bg-primary text-primary-foreground font-mono text-xs px-1.5">✓</Badge>
                   )}

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, referralsTable } from "@workspace/db";
-import { eq, desc, count, sql } from "drizzle-orm";
+import { eq, desc, count, sql, asc } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 
@@ -67,12 +67,13 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
       .select({
         referrerId: referralsTable.referrerId,
         username: usersTable.username,
+        points: usersTable.points,
         total: count(referralsTable.id),
         premiumCount: sql<number>`COUNT(*) FILTER (WHERE ${referralsTable.referredUserPlan} IN ('active','lifetime'))`.mapWith(Number),
       })
       .from(referralsTable)
       .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
-      .groupBy(referralsTable.referrerId, usersTable.username)
+      .groupBy(referralsTable.referrerId, usersTable.username, usersTable.points)
       .orderBy(desc(count(referralsTable.id)))
       .limit(20);
 
@@ -80,6 +81,7 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
       rank: i + 1,
       username: r.username,
       totalReferrals: Number(r.total),
+      points: r.points ?? 0,
       hasPremiumReferral: Number(r.premiumCount) > 0,
       qualifies: qualifiesForReward(Number(r.total), Number(r.premiumCount) > 0),
     }));

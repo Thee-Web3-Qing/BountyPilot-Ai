@@ -9,3 +9,4 @@ export * from "./earnings";
 export * from "./dextopus_deposits";
 export * from "./referrals";
 export * from "./custom_bounties";
+export * from "./user_badges";
