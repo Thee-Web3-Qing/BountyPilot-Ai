@@ -59,28 +59,43 @@ async function requireAdmin(req: AuthRequest, res: any, next: any) {
 adminRouter.get("/stats", requireAuth, requireAdmin, async (_req, res) => {
   try {
     const allUsers = await db.select({ id: usersTable.id, plan: usersTable.plan }).from(usersTable);
-    // Count paid tiers from completed deposits (most recent per user)
+
+    // Use deposits to distinguish monthly vs yearly for deposit-based subscribers
     const completedDeposits = await db
       .select({ userId: dextopusDepositsTable.userId, tier: dextopusDepositsTable.tier })
       .from(dextopusDepositsTable)
       .where(eq(dextopusDepositsTable.status, "COMPLETED"))
       .orderBy(desc(dextopusDepositsTable.updatedAt));
-    // Keep only the most-recent completed deposit per user
+
+    // Latest completed deposit tier per active user
     const latestTierByUser = new Map<number, string>();
     for (const d of completedDeposits) {
-      if (d.userId !== null && !latestTierByUser.has(d.userId)) latestTierByUser.set(d.userId, d.tier ?? "");
+      if (d.userId !== null && !latestTierByUser.has(d.userId)) {
+        latestTierByUser.set(d.userId, d.tier ?? "");
+      }
     }
-    const activePlanUserIds = new Set(allUsers.filter(u => u.plan === "active").map((u: any) => u.id));
+
+    const activeUsers  = allUsers.filter(u => u.plan === "active");
+    const lifetimeUsers = allUsers.filter(u => u.plan === "lifetime");
+
+    // Users with a deposit record get their tier from there; rest counted as monthly (manually activated)
+    let monthlyCount = 0;
+    let yearlyCount = 0;
+    for (const u of activeUsers) {
+      const tier = latestTierByUser.get(u.id);
+      if (tier === "yearly") yearlyCount++;
+      else monthlyCount++; // monthly deposit OR manually activated by admin
+    }
 
     const stats = {
       beta:     allUsers.filter(u => u.plan === "beta").length,
       pending:  allUsers.filter(u => u.plan === "pending").length,
       trial:    allUsers.filter(u => u.plan === "trial").length,
       expired:  allUsers.filter(u => u.plan === "expired").length,
-      monthly:  [...latestTierByUser.entries()].filter(([uid, t]) => t === "monthly" && activePlanUserIds.has(uid)).length,
-      yearly:   [...latestTierByUser.entries()].filter(([uid, t]) => t === "yearly"  && activePlanUserIds.has(uid)).length,
-      lifetime: allUsers.filter(u => u.plan === "lifetime").length,
-      paid:     allUsers.filter(u => u.plan === "active" || u.plan === "lifetime").length,
+      monthly:  monthlyCount,
+      yearly:   yearlyCount,
+      lifetime: lifetimeUsers.length,
+      paid:     activeUsers.length + lifetimeUsers.length,
       total:    allUsers.length,
     };
     res.json(stats);
