@@ -107,9 +107,15 @@ function CryptoBountyCard() {
   const [copied, setCopied] = useState(false);
   const { stats, lb, loading } = useReferralData(token, expanded);
 
+  const myReferralCode = user?.username ?? null;
+  const myReferralLink = user
+    ? `${window.location.origin}/signup?ref=${encodeURIComponent(user.username)}`
+    : null;
+
   const copyLink = () => {
-    if (!stats?.referralLink) return;
-    navigator.clipboard.writeText(stats.referralLink);
+    const link = myReferralLink ?? stats?.referralLink;
+    if (!link) return;
+    navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -181,20 +187,20 @@ function CryptoBountyCard() {
             ) : (
               <>
                 {/* Referral link */}
-                {stats && (
+                {(myReferralLink || stats) && (
                   <div className="space-y-2">
                     <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Your Referral Link</p>
                     <div className="flex gap-2">
                       <div className="flex-1 font-mono text-xs bg-background border border-border rounded-sm px-3 py-2 truncate text-muted-foreground">
-                        {stats.referralLink}
+                        {myReferralLink ?? stats?.referralLink}
                       </div>
                       <Button onClick={copyLink} variant="outline" size="sm" className="shrink-0">
                         {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                       </Button>
                     </div>
                     <p className="font-mono text-[10px] text-muted-foreground">
-                      Code: <span className="text-primary font-bold tracking-widest">{stats.referralCode}</span>
-                      {stats.qualifiesCrypto && <span className="ml-3 text-primary">✓ You qualify for this prize</span>}
+                      Code: <span className="text-primary font-bold tracking-widest">{myReferralCode ?? stats?.referralCode}</span>
+                      {stats?.qualifiesCrypto && <span className="ml-3 text-primary">✓ You qualify for this prize</span>}
                     </p>
                   </div>
                 )}
@@ -276,9 +282,15 @@ function AccessBountyCard() {
   const [copied, setCopied] = useState(false);
   const { stats, lb, loading } = useReferralData(token, expanded);
 
+  const myReferralCode = user?.username ?? null;
+  const myReferralLink = user
+    ? `${window.location.origin}/signup?ref=${encodeURIComponent(user.username)}`
+    : null;
+
   const copyLink = () => {
-    if (!stats?.referralLink) return;
-    navigator.clipboard.writeText(stats.referralLink);
+    const link = myReferralLink ?? stats?.referralLink;
+    if (!link) return;
+    navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -353,20 +365,20 @@ function AccessBountyCard() {
             ) : (
               <>
                 {/* Referral link */}
-                {stats && (
+                {(myReferralLink || stats) && (
                   <div className="space-y-2">
                     <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Your Referral Link</p>
                     <div className="flex gap-2">
                       <div className="flex-1 font-mono text-xs bg-background border border-border rounded-sm px-3 py-2 truncate text-muted-foreground">
-                        {stats.referralLink}
+                        {myReferralLink ?? stats?.referralLink}
                       </div>
                       <Button onClick={copyLink} variant="outline" size="sm" className="shrink-0">
                         {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                       </Button>
                     </div>
                     <p className="font-mono text-[10px] text-muted-foreground">
-                      Code: <span className="text-primary font-bold tracking-widest">{stats.referralCode}</span>
-                      {stats.qualifiesAccess && <span className="ml-3 text-primary">✓ You're on the leaderboard</span>}
+                      Code: <span className="text-primary font-bold tracking-widest">{myReferralCode ?? stats?.referralCode}</span>
+                      {stats?.qualifiesAccess && <span className="ml-3 text-primary">✓ You're on the leaderboard</span>}
                     </p>
                   </div>
                 )}

@@ -54,19 +54,28 @@ export function Referral() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"crypto" | "access">("crypto");
 
+  // Build referral link/code directly from auth context — always correct for the
+  // logged-in user even before the API responds.
+  const myReferralCode = user?.username ?? null;
+  const myReferralLink = user
+    ? `${window.location.origin}/signup?ref=${encodeURIComponent(user.username)}`
+    : null;
+
   useEffect(() => {
+    if (!token) return;
     Promise.all([
       fetch("/api/referrals/my", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch("/api/referrals/leaderboard").then(r => r.json()),
     ]).then(([myStats, lbData]) => {
-      setStats(myStats);
+      if (myStats && !myStats.error) setStats(myStats);
       setLb(lbData);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [token]);
 
   const copyLink = () => {
-    if (!stats) return;
-    navigator.clipboard.writeText(stats.referralLink);
+    const link = myReferralLink ?? stats?.referralLink;
+    if (!link) return;
+    navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -142,14 +151,14 @@ export function Referral() {
           <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Your Referral Link</p>
           <div className="flex gap-2">
             <div className="flex-1 font-mono text-sm bg-background border border-border rounded-sm px-3 py-2 truncate text-muted-foreground">
-              {stats?.referralLink ?? "Loading..."}
+              {myReferralLink ?? stats?.referralLink ?? "Loading..."}
             </div>
             <Button onClick={copyLink} variant="outline" size="sm" className="shrink-0 font-mono">
               {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
             </Button>
           </div>
           <p className="font-mono text-xs text-muted-foreground">
-            Code: <span className="text-primary font-bold tracking-widest">{stats?.referralCode ?? "—"}</span>
+            Code: <span className="text-primary font-bold tracking-widest">{myReferralCode ?? stats?.referralCode ?? "—"}</span>
           </p>
         </CardContent>
       </Card>
