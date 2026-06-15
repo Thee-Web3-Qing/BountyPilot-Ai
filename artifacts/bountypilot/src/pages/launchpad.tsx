@@ -166,7 +166,7 @@ export function Launchpad() {
       <div className="bg-primary/10 border border-primary/30 rounded-sm p-4 flex items-center gap-4">
         <div className="flex-1">
           <p className="font-bold font-mono text-sm uppercase tracking-wider text-primary">🎯 Active: Refer & Earn Campaign</p>
-          <p className="font-mono text-xs text-muted-foreground mt-1">Refer 5+ creators to win $25 + 1 month free. $50 prize pool.</p>
+          <p className="font-mono text-xs text-muted-foreground mt-1">Refer 3+ creators to win $25 + 2 months free. $50 prize pool.</p>
         </div>
         <Button variant="outline" size="sm" className="font-mono shrink-0" onClick={() => window.location.href = "/referral"}>
           Join →
