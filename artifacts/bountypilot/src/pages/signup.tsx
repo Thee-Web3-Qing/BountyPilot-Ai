@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,15 @@ export function Signup() {
   const { signup, loginGoogle, isLoading } = useAuth();
   const { ready: googleReady } = useGoogleAuth();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const refCode = new URLSearchParams(search).get("ref") ?? undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     try {
-      await signup(email, username, password);
+      await signup(email, username, password, refCode);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
@@ -32,7 +34,7 @@ export function Signup() {
   const handleGoogle = async (credential: string) => {
     setError("");
     try {
-      await loginGoogle(credential);
+      await loginGoogle(credential, refCode);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");

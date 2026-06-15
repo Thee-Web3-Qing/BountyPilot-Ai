@@ -7,3 +7,5 @@ export * from "./production_plans";
 export * from "./submissions";
 export * from "./earnings";
 export * from "./dextopus_deposits";
+export * from "./referrals";
+export * from "./custom_bounties";

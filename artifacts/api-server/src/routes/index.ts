@@ -13,6 +13,8 @@ import { adminRouter } from "./admin";
 import { mcpRouter } from "./mcp";
 import devpostRouter from "./devpost";
 import dextopusRouter from "./dextopus";
+import { referralsRouter } from "./referrals";
+import { customBountiesRouter } from "./custom-bounties";
 
 const router: IRouter = Router();
 
@@ -30,5 +32,7 @@ router.use("/admin", adminRouter);
 router.use("/mcp", mcpRouter);
 router.use("/devpost", devpostRouter);
 router.use("/dextopus", dextopusRouter);
+router.use("/referrals", referralsRouter);
+router.use("/custom-bounties", customBountiesRouter);
 
 export default router;

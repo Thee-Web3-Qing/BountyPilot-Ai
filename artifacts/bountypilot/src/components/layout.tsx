@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
   User, Settings2, LogOut, Globe, Menu, X, ChevronDown, ChevronUp, ShieldCheck,
+  Rocket, Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
@@ -13,8 +14,10 @@ const NAV_ITEMS = [
   { href: "/discover", label: "Discover", icon: Globe },
   { href: "/bounties", label: "My Bounties", icon: ListTodo },
   { href: "/bounties/add", label: "Hunt Bounty", icon: Plus },
+  { href: "/launchpad", label: "Launchpad", icon: Rocket },
   { href: "/submissions", label: "Submissions", icon: Award },
   { href: "/earnings", label: "Earnings", icon: Coins },
+  { href: "/referral", label: "Refer & Earn", icon: Gift },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

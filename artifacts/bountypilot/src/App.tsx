@@ -26,6 +26,8 @@ import { Discover } from "./pages/discover";
 import { Landing } from "./pages/landing";
 import { Pricing } from "./pages/pricing";
 import { Admin } from "./pages/admin";
+import { Referral } from "./pages/referral";
+import { Launchpad } from "./pages/launchpad";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +79,8 @@ function Router() {
                 <Route path="/earnings" component={Earnings} />
                 <Route path="/profile" component={Profile} />
                 <Route path="/settings" component={Settings} />
+                <Route path="/referral" component={Referral} />
+                <Route path="/launchpad" component={Launchpad} />
                 <Route path="/admin" component={Admin} />
                 <Route component={NotFound} />
               </Switch>

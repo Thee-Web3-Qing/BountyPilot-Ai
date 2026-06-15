@@ -1,6 +1,9 @@
 - [BountyPilot Auth](bountypilot-auth.md) — JWT in localStorage via setAuthTokenGetter; all routes require requireAuth middleware; signup creates empty user_profile row.
-- [BountyPilot DB migration](bountypilot-db.md) — correct push command is `cd lib/db && pnpm run push`; users/user_profiles tables added; bounties/submissions/earnings have user_id column.
+- [BountyPilot DB migration](bountypilot-db.md) — drizzle-kit push needs TTY; use executeSql() in code_execution instead for schema changes.
 - [BountyPilot LLM config](bountypilot-llm.md) — reads QWEN_API_KEY, QWEN_MODEL, QWEN_BASE_URL env vars; falls back to rule-based mock when no key; settings/status endpoint reports provider mode.
 - [Novus AI Key Issue](novus-key-issue.md) — NOVUS_API_KEY is a Pendo Web SDK key, not a Novus MCP API key. Backend now uses Qwen (Alibaba Cloud LLM) as fallback for AI insights when Novus is unavailable.
-- [Email Authentication](email-auth.md) — Two login methods: password + email OTP. Backend sends email codes via `lib/email.ts` (supports Resend via `RESEND_API_KEY` env var, or dev mode for testing). Forgot password sends email codes. `login_code` and `login_code_expires` columns on users table.
-- **No Stripe** — completely removed from codebase. Payments are crypto-only via Dextopus.
+- [Email Authentication](email-auth.md) — Resend SDK (EMAIL_PROVIDER=resend, FROM_EMAIL=noreply@bountypilot.xyz). OTP login + forgot-password both use sendOTPEmail(). login_code/login_code_expires columns on users.
+- [Google Auth](google-auth.md) — google-auth-library backend + @react-oauth/google frontend. GoogleAuthProvider fetches clientId from /api/auth/google-client-id at runtime. Conditionally renders GoogleLogin only when ready=true to avoid crash outside provider.
+- [Referral System](referral-system.md) — referral_code auto-generated on signup (4-char prefix + 6 hex). referrals table. Qualifies at 5+ referrals OR 1 active/lifetime. ?ref= param on signup/google flows. /referral page + leaderboard.
+- [Launchpad](launchpad.md) — Admin-only custom bounty posting. custom_bounties + custom_bounty_applications tables. /launchpad page for users to browse + apply. Admin CRUD at /api/custom-bounties.
+- **No Stripe** — payments are crypto-only via Dextopus.

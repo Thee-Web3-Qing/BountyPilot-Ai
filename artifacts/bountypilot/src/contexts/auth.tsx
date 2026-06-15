@@ -20,8 +20,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginOTP: (email: string, code: string) => Promise<void>;
-  loginGoogle: (credential: string) => Promise<void>;
-  signup: (email: string, username: string, password: string) => Promise<void>;
+  loginGoogle: (credential: string, refCode?: string) => Promise<void>;
+  signup: (email: string, username: string, password: string, refCode?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
   canAccessAI: boolean;
@@ -163,13 +163,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginGoogle = useCallback(async (credential: string) => {
+  const loginGoogle = useCallback(async (credential: string, refCode?: string) => {
     setIsLoading(true);
     try {
       const resp = await fetch(`${API_BASE}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify({ credential, refCode }),
       });
       if (!resp.ok) {
         const data = await resp.json();
@@ -231,13 +231,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signup = useCallback(async (email: string, username: string, password: string) => {
+  const signup = useCallback(async (email: string, username: string, password: string, refCode?: string) => {
     setIsLoading(true);
     try {
       const resp = await fetch(`${API_BASE}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
+        body: JSON.stringify({ email, username, password, refCode }),
       });
       if (!resp.ok) {
         const data = await resp.json();

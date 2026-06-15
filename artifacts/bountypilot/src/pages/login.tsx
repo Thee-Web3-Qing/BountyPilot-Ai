@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ export function Login() {
   const { login, loginGoogle, isLoading } = useAuth();
   const { ready: googleReady } = useGoogleAuth();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const refCode = new URLSearchParams(search).get("ref") ?? undefined;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +32,7 @@ export function Login() {
   const handleGoogle = async (credential: string) => {
     setError("");
     try {
-      await loginGoogle(credential);
+      await loginGoogle(credential, refCode);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");

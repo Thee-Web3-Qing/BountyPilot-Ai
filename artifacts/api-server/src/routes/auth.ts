@@ -1,8 +1,9 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { db } from "@workspace/db";
-import { usersTable, userProfilesTable } from "@workspace/db";
+import { usersTable, userProfilesTable, referralsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -10,6 +11,22 @@ import { getTrialDays, trialEndsAt, getPlanStatus } from "../lib/access.js";
 import { sendOTPEmail } from "../lib/email.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+function generateReferralCode(username: string): string {
+  const prefix = username.slice(0, 4).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const suffix = randomBytes(3).toString("hex");
+  return `${prefix}${suffix}`;
+}
+
+async function recordReferral(referralCode: string | undefined, newUserId: number) {
+  if (!referralCode) return;
+  try {
+    const [referrer] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, referralCode));
+    if (!referrer || referrer.id === newUserId) return;
+    await db.insert(referralsTable).values({ referrerId: referrer.id, referredUserId: newUserId }).onConflictDoNothing();
+    await db.update(usersTable).set({ referredBy: referrer.id }).where(eq(usersTable.id, newUserId));
+  } catch { /* non-fatal */ }
+}
 
 export const authRouter = Router();
 
@@ -48,18 +65,26 @@ authRouter.post("/signup", async (req, res) => {
     const plan = "trial";
     const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z");
     const now = new Date();
-    // Before Aug 7: open access until hackathon closes. After Aug 7: 7-day trial.
     const trialEnd = now < HACKATHON_DEADLINE
       ? HACKATHON_DEADLINE
       : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
+    // Generate unique referral code
+    let referralCode = generateReferralCode(username);
+    const codeConflict = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, referralCode));
+    if (codeConflict.length > 0) referralCode = generateReferralCode(username + Date.now());
+
     const [user] = await db
       .insert(usersTable)
-      .values({ email: email.toLowerCase(), username, passwordHash, plan, trialEndsAt: trialEnd })
+      .values({ email: email.toLowerCase(), username, passwordHash, plan, trialEndsAt: trialEnd, referralCode })
       .returning();
 
     // Create empty profile
     await db.insert(userProfilesTable).values({ userId: user.id });
+
+    // Record referral if signup came via a referral link
+    const { refCode } = req.body;
+    await recordReferral(refCode, user.id);
 
     const token = signToken({ userId: user.id, email: user.email, username: user.username });
     logger.info({ userId: user.id, plan }, "User signed up");
@@ -133,11 +158,19 @@ authRouter.post("/google", async (req, res) => {
         username = `${baseUsername}${suffix++}`;
       }
 
+      let googleReferralCode = generateReferralCode(username);
+      const gcConflict = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, googleReferralCode));
+      if (gcConflict.length > 0) googleReferralCode = generateReferralCode(username + Date.now());
+
       [user] = await db
         .insert(usersTable)
-        .values({ email: normalizedEmail, username, passwordHash: null, googleId, plan: "trial", trialEndsAt: trialEnd })
+        .values({ email: normalizedEmail, username, passwordHash: null, googleId, plan: "trial", trialEndsAt: trialEnd, referralCode: googleReferralCode })
         .returning();
       await db.insert(userProfilesTable).values({ userId: user.id, fullName: name ?? null });
+
+      const { refCode: googleRefCode } = req.body;
+      await recordReferral(googleRefCode, user.id);
+
       logger.info({ userId: user.id }, "New user created via Google");
     }
 
