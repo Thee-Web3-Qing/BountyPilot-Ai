@@ -14,6 +14,5 @@
     "prettier": "^3.8.3",
     "tsx": "catalog:",
     "typescript": "~5.9.3"
-  },
-  "dependencies": {}
+  }
 }
