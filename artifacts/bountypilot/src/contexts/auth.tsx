@@ -20,6 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginOTP: (email: string, code: string) => Promise<void>;
+  loginGoogle: (credential: string) => Promise<void>;
   signup: (email: string, username: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -162,6 +163,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginGoogle = useCallback(async (credential: string) => {
+    setIsLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data.error || "Google sign-in failed");
+      }
+      const data = await resp.json();
+      const u: User = {
+        id: data.user.id,
+        email: data.user.email,
+        username: data.user.username,
+        plan: data.user.plan ?? "pending",
+        trialEndsAt: data.user.trialEndsAt ?? null,
+        subscriptionEndsAt: data.user.subscriptionEndsAt ?? null,
+        isAdmin: data.user.isAdmin ?? false,
+      };
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+      setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+      setToken(data.token);
+      setUser(u);
+      identifyPendo(String(u.id), u.email, u.plan);
+      trackPendo("UserLoggedInGoogle", { plan: u.plan });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const loginOTP = useCallback(async (email: string, code: string) => {
     setIsLoading(true);
     try {
@@ -247,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, token, isLoading,
-      login, loginOTP, signup, logout,
+      login, loginOTP, loginGoogle, signup, logout,
       isAuthenticated: !!user && !!token,
       canAccessAI,
       isPaid,

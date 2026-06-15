@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
 import { db } from "@workspace/db";
 import { usersTable, userProfilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,8 @@ import { signToken, requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { getTrialDays, trialEndsAt, getPlanStatus } from "../lib/access.js";
 import { sendOTPEmail } from "../lib/email.js";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const authRouter = Router();
 
@@ -67,6 +70,91 @@ authRouter.post("/signup", async (req, res) => {
   }
 });
 
+// POST /auth/google — Google One Tap / OAuth token sign-in
+authRouter.post("/google", async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      res.status(400).json({ error: "Google credential is required" });
+      return;
+    }
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      res.status(503).json({ error: "Google auth not configured" });
+      return;
+    }
+
+    let payload: { sub: string; email: string; name?: string; picture?: string } | undefined;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const p = ticket.getPayload();
+      if (!p?.email) throw new Error("No email in token");
+      payload = { sub: p.sub, email: p.email, name: p.name, picture: p.picture };
+    } catch {
+      res.status(401).json({ error: "Invalid Google credential" });
+      return;
+    }
+
+    const { sub: googleId, email, name } = payload;
+    const normalizedEmail = email.toLowerCase();
+
+    // 1. Try find by googleId
+    let [user] = await db.select().from(usersTable).where(eq(usersTable.googleId, googleId));
+
+    // 2. Try find by email — link Google account to existing user
+    if (!user) {
+      const [byEmail] = await db.select().from(usersTable).where(eq(usersTable.email, normalizedEmail));
+      if (byEmail) {
+        [user] = await db
+          .update(usersTable)
+          .set({ googleId, updatedAt: new Date() })
+          .where(eq(usersTable.id, byEmail.id))
+          .returning();
+        logger.info({ userId: user.id }, "Linked Google account to existing user");
+      }
+    }
+
+    // 3. Create new user from Google
+    if (!user) {
+      const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z");
+      const now = new Date();
+      const trialEnd = now < HACKATHON_DEADLINE ? HACKATHON_DEADLINE : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      // Generate unique username from email prefix
+      const baseUsername = normalizedEmail.split("@")[0].replace(/[^a-z0-9_]/g, "").slice(0, 20) || "user";
+      let username = baseUsername;
+      let suffix = 1;
+      while (true) {
+        const [taken] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, username));
+        if (!taken) break;
+        username = `${baseUsername}${suffix++}`;
+      }
+
+      [user] = await db
+        .insert(usersTable)
+        .values({ email: normalizedEmail, username, passwordHash: null, googleId, plan: "trial", trialEndsAt: trialEnd })
+        .returning();
+      await db.insert(userProfilesTable).values({ userId: user.id, fullName: name ?? null });
+      logger.info({ userId: user.id }, "New user created via Google");
+    }
+
+    const token = signToken({ userId: user.id, email: user.email, username: user.username });
+    logger.info({ userId: user.id }, "User signed in via Google");
+    res.json({ token, user: { id: user.id, email: user.email, username: user.username, plan: user.plan, trialEndsAt: user.trialEndsAt, subscriptionEndsAt: user.subscriptionEndsAt, isAdmin: user.isAdmin } });
+  } catch (err) {
+    logger.error(err, "Google auth error");
+    res.status(500).json({ error: "Google sign-in failed" });
+  }
+});
+
+// GET /auth/google-client-id — expose client ID to frontend
+authRouter.get("/google-client-id", (_req, res) => {
+  res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
+});
+
 // POST /auth/login
 authRouter.post("/login", async (req, res) => {
   try {
@@ -82,6 +170,11 @@ authRouter.post("/login", async (req, res) => {
       .where(eq(usersTable.email, email.toLowerCase()));
     if (!user) {
       res.status(401).json({ error: "Invalid email or password" });
+      return;
+    }
+
+    if (!user.passwordHash) {
+      res.status(401).json({ error: "This account uses Google sign-in. Please use 'Continue with Google'." });
       return;
     }
 

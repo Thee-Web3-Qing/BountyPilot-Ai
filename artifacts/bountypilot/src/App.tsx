@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -93,7 +94,16 @@ function Router() {
 }
 
 function App() {
-  return (
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/google-client-id")
+      .then((r) => r.json())
+      .then((d) => { if (d.clientId) setGoogleClientId(d.clientId); })
+      .catch(() => {});
+  }, []);
+
+  const inner = (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
@@ -105,6 +115,10 @@ function App() {
       </TooltipProvider>
     </QueryClientProvider>
   );
+
+  if (!googleClientId) return inner;
+
+  return <GoogleOAuthProvider clientId={googleClientId}>{inner}</GoogleOAuthProvider>;
 }
 
 export default App;
