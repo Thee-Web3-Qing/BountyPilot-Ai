@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Crosshair, Loader2, AlertCircle } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
+import { useGoogleAuth } from "@/contexts/google-auth";
 
 export function Signup() {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ export function Signup() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { signup, loginGoogle, isLoading } = useAuth();
+  const { ready: googleReady } = useGoogleAuth();
   const [, navigate] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,22 +65,25 @@ export function Signup() {
               )}
 
               {/* Google Sign Up */}
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={(res) => { if (res.credential) handleGoogle(res.credential); }}
-                  onError={() => setError("Google sign-up failed")}
-                  theme="filled_black"
-                  shape="rectangular"
-                  text="signup_with"
-                  width="320"
-                />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border" />
-                <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
+              {googleReady && (
+                <>
+                  <div className="flex justify-center">
+                    <GoogleLogin
+                      onSuccess={(res) => { if (res.credential) handleGoogle(res.credential); }}
+                      onError={() => setError("Google sign-up failed")}
+                      theme="filled_black"
+                      shape="rectangular"
+                      text="signup_with"
+                      width="320"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                </>
+              )}
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
