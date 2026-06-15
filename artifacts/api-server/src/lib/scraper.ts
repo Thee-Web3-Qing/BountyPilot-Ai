@@ -304,6 +304,176 @@ async function trySuperteamAPI(url: string): Promise<Partial<ScrapedBounty> | nu
   }
 }
 
+/**
+ * Extract rich structured sections from a Devpost hackathon page.
+ * Devpost pages have sections like challenge-description, challenge-requirements,
+ * eligibility-list, prizes, prizes-overview, etc.
+ */
+function extractDevpostSections(html: string): {
+  description: string;
+  requirements: string;
+  eligibility: string;
+  prizes: string;
+  prizesOverview: string;
+  submission: string;
+  judging: string;
+  rules: string;
+} {
+  const result = {
+    description: "",
+    requirements: "",
+    eligibility: "",
+    prizes: "",
+    prizesOverview: "",
+    submission: "",
+    judging: "",
+    rules: "",
+  };
+
+  const extractSectionText = (id: string): string => {
+    const idx = html.indexOf(`id="${id}"`);
+    if (idx === -1) return "";
+    const start = html.lastIndexOf("<", idx);
+    const nextId = html.indexOf('id="', idx + 10);
+    const nextFooter = html.indexOf('class="footer"', idx + 10);
+    const candidates = [nextId, nextFooter].filter((x) => x > 0);
+    const end = candidates.length > 0 ? Math.min(...candidates) : idx + 8000;
+    const chunk = html.slice(start, end);
+    return stripHtml(chunk).replace(/\s+/g, " ").trim();
+  };
+
+  result.description = extractSectionText("challenge-description");
+  result.requirements = extractSectionText("challenge-requirements");
+  result.eligibility = extractSectionText("eligibility-list");
+  result.prizes = extractSectionText("prizes");
+  result.prizesOverview = extractSectionText("prizes-overview");
+  result.submission = extractSectionText("submission");
+  result.judging = extractSectionText("judging");
+  result.rules = extractSectionText("rules");
+
+  return result;
+}
+
+/**
+ * Parse Devpost prize blocks from the HTML.
+ * Devpost prize blocks have ids like "prize_95064" with title, amount, and winners.
+ */
+function parseDevpostPrizeBreakdown(html: string): PrizeBreakdown[] | null {
+  const results: PrizeBreakdown[] = [];
+  let pos = 0;
+  while (true) {
+    const match = html.slice(pos).match(/id="prize_(\d+)"/);
+    if (!match) break;
+    const contentStart = html.indexOf(">", pos + match.index! + match[0].length) + 1;
+    let depth = 1;
+    let endPos = contentStart;
+    while (depth > 0 && endPos < html.length) {
+      const openDiv = html.indexOf("<div", endPos);
+      const closeDiv = html.indexOf("</div>", endPos);
+      if (closeDiv === -1) break;
+      if (openDiv !== -1 && openDiv < closeDiv) {
+        depth++;
+        endPos = openDiv + 1;
+      } else {
+        depth--;
+        endPos = closeDiv + 6;
+      }
+    }
+    const blockText = html.slice(contentStart, endPos - 6);
+    pos = endPos;
+
+    const clean = blockText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (clean.length < 10) continue;
+
+    // Try to find prize title
+    const titleMatch = clean.match(/(?:Grand\s+Prize|Most\s+[^\d]+|Best\s+[^\d]+|Winner|Runner[-\s]Up|Honorable\s+Mention|Bonus|Special|Pool|1st|2nd|3rd|4th|5th)/i);
+    let rank = titleMatch ? titleMatch[0] : "";
+
+    // Try to find amount
+    const amountMatch = clean.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:in\s*cash|USD)?/i);
+    if (!amountMatch) continue;
+    const amount = amountMatch[1].replace(/,/g, "");
+
+    // Try to find winner count
+    const countMatch = clean.match(/(\d+)\s*(?:winner|winners|place|places)/i);
+    const count = countMatch ? Number(countMatch[1]) : undefined;
+
+    // Normalize rank
+    if (!rank) {
+      rank = `${results.length + 1}${["st", "nd", "rd"][results.length] || "th"}`;
+    }
+
+    results.push({ rank, amount, currency: "USD", count });
+  }
+
+  return results.length > 0 ? results : null;
+}
+
+/**
+ * Devpost pages have rich structured content; extract it from the HTML.
+ */
+function tryDevpostPage(html: string): Partial<ScrapedBounty> & {
+  prizeBreakdown?: PrizeBreakdown[] | null;
+  eligibilityRules?: string;
+  submissionRequirements?: string;
+  importantNotes?: string;
+} | null {
+  if (!html || html.length < 1000) return null;
+  if (!html.includes('id="challenge-description"') && !html.includes('id="challenge-requirements"')) return null;
+
+  const sections = extractDevpostSections(html);
+
+  // Build description from the challenge description
+  let description = sections.description;
+  if (sections.requirements && !description.includes("Requirements")) {
+    description += "\n\n" + sections.requirements;
+  }
+
+  // Build prize breakdown from the prizes section
+  let prizeBreakdown: PrizeBreakdown[] | null = null;
+  try {
+    const devpostBreakdown = parseDevpostPrizeBreakdown(html);
+    if (devpostBreakdown && devpostBreakdown.length > 0) {
+      prizeBreakdown = devpostBreakdown;
+    } else {
+      const textBreakdown = parsePrizeBreakdown(
+        `${sections.prizes} ${sections.prizesOverview}`
+      );
+      if (textBreakdown.length > 0) prizeBreakdown = textBreakdown;
+    }
+  } catch {}
+
+  // Build eligibility rules
+  const eligibilityRules = sections.eligibility
+    ? sections.eligibility.slice(0, 800)
+    : "Check the Devpost listing for eligibility requirements.";
+
+  // Build submission requirements
+  let submissionRequirements = sections.requirements
+    ? sections.requirements.slice(0, 800)
+    : "";
+  if (sections.submission) {
+    submissionRequirements += (submissionRequirements ? "\n\n" : "") + sections.submission.slice(0, 600);
+  }
+  if (!submissionRequirements) {
+    submissionRequirements = "Check the Devpost listing for submission requirements.";
+  }
+
+  // Build important notes
+  const notes: string[] = [];
+  if (sections.judging) notes.push("Judging: " + sections.judging.slice(0, 300));
+  if (sections.rules) notes.push("Rules: " + sections.rules.slice(0, 300));
+  const importantNotes = notes.join(". ") || "Check the Devpost listing for full details.";
+
+  return {
+    description,
+    prizeBreakdown,
+    eligibilityRules,
+    submissionRequirements,
+    importantNotes,
+  };
+}
+
 export async function scrapeBounty(
   url: string,
   type?: string,
@@ -327,6 +497,17 @@ export async function scrapeBounty(
   let apiData: Partial<ScrapedBounty> | null = null;
   if (platform === "Superteam Earn") {
     apiData = await trySuperteamAPI(url);
+  }
+
+  // Try platform-specific page extraction for rich structured content
+  let pageData: Partial<ScrapedBounty> & {
+    prizeBreakdown?: PrizeBreakdown[] | null;
+    eligibilityRules?: string;
+    submissionRequirements?: string;
+    importantNotes?: string;
+  } | null = null;
+  if (platform === "Devpost") {
+    pageData = tryDevpostPage(html);
   }
 
   // Extract from __NEXT_DATA__ if present
@@ -353,6 +534,7 @@ export async function scrapeBounty(
 
   const rawDescription =
     apiData?.description ||
+    pageData?.description ||
     nextDesc ||
     getDescription(html) ||
     "";
@@ -403,18 +585,22 @@ export async function scrapeBounty(
   const description = rawDescription || `A content creation bounty on ${platform} by ${projectName}.`;
 
   const cleanDescription = stripHtml(rawDescription);
-  const submissionRequirements = cleanDescription
-    ? `${cleanDescription.slice(0, 600)}`
-    : `Original content required for this ${platform} bounty. Check the listing page for full requirements.`;
+  const submissionRequirements =
+    pageData?.submissionRequirements ||
+    (cleanDescription
+      ? `${cleanDescription.slice(0, 600)}`
+      : `Original content required for this ${platform} bounty. Check the listing page for full requirements.`);
 
   const notesArr: string[] = [];
   if (deadline) notesArr.push(`Deadline: ${deadline}`);
   notesArr.push("Submit via the original listing page.");
   if (rewardAmount) notesArr.push(`Reward: ${rewardAmount} ${rewardCurrency}`);
+  if (pageData?.importantNotes) notesArr.push(pageData.importantNotes);
 
   // Calculate confidence score based on how many key fields were successfully extracted
   let confidence = 40;
   if (apiData) confidence += 25;
+  if (pageData?.prizeBreakdown || pageData?.description) confidence += 15;
   if (rewardAmount) confidence += 10;
   if (deadline) confidence += 10;
   if (contentFormat && contentFormat !== "Article / Thread") confidence += 5;
@@ -425,8 +611,8 @@ export async function scrapeBounty(
   // Extract prize breakdown from the page text
   let prizeBreakdown: PrizeBreakdown[] | null = null;
   try {
-    const breakdowns = parsePrizeBreakdown(searchText);
-    if (breakdowns.length > 0) prizeBreakdown = breakdowns;
+    const breakdowns = pageData?.prizeBreakdown || parsePrizeBreakdown(searchText);
+    if (breakdowns && breakdowns.length > 0) prizeBreakdown = breakdowns;
   } catch {}
 
   return {
@@ -442,7 +628,9 @@ export async function scrapeBounty(
     submissionRequirements,
     deliverables: contentFormat,
     submissionLink: url,
-    eligibilityRules: "Open to all creators — check platform listing for specific eligibility.",
+    eligibilityRules:
+      pageData?.eligibilityRules ||
+      "Open to all creators — check platform listing for specific eligibility.",
     importantNotes: notesArr.join(". "),
     platform,
     opportunityType: type || detectOpportunityType(url, searchText),

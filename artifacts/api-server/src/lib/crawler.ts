@@ -377,6 +377,22 @@ async function fetchGitcoin(): Promise<PlatformBountyHint[]> {
 }
 
 // ─── Devpost — public hackathons API ────────────────────────
+/**
+ * Parse Devpost submission_period_dates like "May 19 - Aug 17, 2026" or "May 19 \u2013 Aug 17, 2026"
+ * into an ISO date string (YYYY-MM-DD) from the end date.
+ */
+function parseDevpostDeadline(period: string | undefined): string | undefined {
+  if (!period) return undefined;
+  const match = period.match(/\w+\s+\d+\s*[\-\u2013\u2014]\s*(\w+\s+\d+,?\s*\d{4})/);
+  if (!match) return undefined;
+  const endDate = match[1];
+  try {
+    const d = new Date(endDate);
+    if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  } catch {}
+  return undefined;
+}
+
 async function fetchDevpost(): Promise<PlatformBountyHint[]> {
   try {
     const url = `https://devpost.com/api/hackathons?status=open&per_page=40&page=1`;
@@ -394,10 +410,12 @@ async function fetchDevpost(): Promise<PlatformBountyHint[]> {
       const title = (h.title as string) || "";
       const rawReward = (h.prize_amount as string) || (h.total_prize_value as string) || undefined;
       const tags = Array.isArray(h.themes) ? (h.themes as Array<Record<string, unknown>>).map((t) => t.name as string).filter(Boolean) : [];
+      const periodDates = (h.submission_period_dates as string) || undefined;
+      const deadline = parseDevpostDeadline(periodDates) || (h.deadline as string) || undefined;
       return {
         url: (h.url as string) || "",
         title,
-        deadline: (h.submission_period_ends_at as string) || (h.deadline as string) || undefined,
+        deadline,
         rewardAmount: rawReward ? stripHtml(rawReward) : undefined,
         rewardCurrency: "USD",
         projectName: (h.organization_name as string) || (h.displayed_location as Record<string, unknown>)?.location as string || "Devpost",
