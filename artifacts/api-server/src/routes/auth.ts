@@ -13,9 +13,8 @@ import { sendOTPEmail } from "../lib/email.js";
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function generateReferralCode(username: string): string {
-  const prefix = username.slice(0, 4).toLowerCase().replace(/[^a-z0-9]/g, "");
-  const suffix = randomBytes(3).toString("hex");
-  return `${prefix}${suffix}`;
+  // Use the username itself as the referral code (lowercase, alphanumeric + underscores only)
+  return username.toLowerCase().replace(/[^a-z0-9_]/g, "");
 }
 
 async function recordReferral(referralCode: string | undefined, newUserId: number) {
@@ -69,10 +68,10 @@ authRouter.post("/signup", async (req, res) => {
       ? HACKATHON_DEADLINE
       : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    // Generate unique referral code
+    // Referral code = username (lowercase). Append random suffix only on the rare collision.
     let referralCode = generateReferralCode(username);
     const codeConflict = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, referralCode));
-    if (codeConflict.length > 0) referralCode = generateReferralCode(username + Date.now());
+    if (codeConflict.length > 0) referralCode = `${generateReferralCode(username)}_${randomBytes(2).toString("hex")}`;
 
     const [user] = await db
       .insert(usersTable)
@@ -160,7 +159,7 @@ authRouter.post("/google", async (req, res) => {
 
       let googleReferralCode = generateReferralCode(username);
       const gcConflict = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, googleReferralCode));
-      if (gcConflict.length > 0) googleReferralCode = generateReferralCode(username + Date.now());
+      if (gcConflict.length > 0) googleReferralCode = `${generateReferralCode(username)}_${randomBytes(2).toString("hex")}`;
 
       [user] = await db
         .insert(usersTable)
