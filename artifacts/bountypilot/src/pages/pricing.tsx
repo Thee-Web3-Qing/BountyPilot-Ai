@@ -15,6 +15,8 @@ import {
   Copy,
   CheckCircle2,
   Settings2,
+  Gift,
+  RefreshCw,
 } from "lucide-react";
 
 interface Chain {
@@ -83,8 +85,9 @@ const DISPLAY_TIER: Record<string, {
 
 export function Pricing() {
   const [, navigate] = useLocation();
-  const { token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated, user, planStatus } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
+  const [userActiveTier, setUserActiveTier] = useState<string | null>(null);
   const [dextopusEnabled, setDextopusEnabled] = useState(false);
   const [deposit, setDeposit] = useState<DepositResult | null>(null);
   const [copied, setCopied] = useState(false);
@@ -117,6 +120,26 @@ export function Pricing() {
       cancelled = true;
     };
   }, []);
+
+  // Fetch active subscription tier for paid users
+  useEffect(() => {
+    if (!isAuthenticated || !token || planStatus !== "active") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/dextopus/subscription`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (!cancelled && json.subscription?.tier) {
+          setUserActiveTier(json.subscription.tier);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, token, planStatus]);
 
   useEffect(() => {
     if (!showCheckout) return;
@@ -246,6 +269,22 @@ export function Pricing() {
     } finally {
       setTxLoading(false);
     }
+  };
+
+  // Derive trial end display
+  const trialEndDate = user?.trialEndsAt
+    ? new Date(user.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  // Button props for paid tier cards
+  const getPaidButtonProps = (tier: string) => {
+    if (planStatus === "active") {
+      if (userActiveTier === tier || (tier === "lifetime" && user?.plan === "lifetime")) {
+        return { label: "Your Current Plan", disabled: true, variant: "outline" as const, icon: <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> };
+      }
+      return { label: "Switch to Plan", disabled: false, variant: "outline" as const, icon: <RefreshCw className="w-3.5 h-3.5 mr-1" /> };
+    }
+    return { label: "Pay with Crypto", disabled: !dextopusEnabled || !!loading, variant: "outline" as const, icon: <Wallet className="w-3.5 h-3.5 mr-1" /> };
   };
 
   const renderCheckout = () => (
@@ -465,6 +504,54 @@ export function Pricing() {
           Lock in launch pricing before we go live. Pay with any crypto — Dextopus auto-bridges.
         </p>
 
+        {/* Free tier card */}
+        <div className="w-full border border-border rounded-lg p-5 flex flex-col sm:flex-row sm:items-center gap-4 bg-card/20 mb-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Gift className="w-5 h-5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-sans font-bold text-base">Free</h3>
+                <span className="text-xs font-mono text-muted-foreground">$0 / forever</span>
+              </div>
+              <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                Browse bounties · No AI scoring · Limited access
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            {planStatus === "trial" ? (
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  disabled
+                  className="font-mono text-xs uppercase tracking-wider bg-foreground text-background opacity-100 cursor-not-allowed min-w-[180px]"
+                >
+                  <Gift className="w-3.5 h-3.5 mr-1.5" /> Free Trial Active
+                </Button>
+                {trialEndDate && (
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    Trial ends {trialEndDate}
+                  </span>
+                )}
+              </div>
+            ) : planStatus === "expired" || (planStatus === null && !isAuthenticated) ? (
+              <Button
+                disabled={planStatus === "expired"}
+                variant="outline"
+                className="font-mono text-xs uppercase tracking-wider min-w-[180px]"
+                onClick={() => !isAuthenticated && navigate("/signup")}
+              >
+                {planStatus === "expired" ? (
+                  <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Your Current Plan</>
+                ) : (
+                  "Get Started Free"
+                )}
+              </Button>
+            ) : planStatus === "active" ? (
+              <span className="text-xs font-mono text-muted-foreground italic">You're on a paid plan</span>
+            ) : null}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
           {/* Monthly */}
           <div className="border border-border rounded-lg p-6 flex flex-col gap-4 bg-card/30 hover:bg-card/50 transition-colors">
@@ -484,14 +571,13 @@ export function Pricing() {
               ))}
             </ul>
             <div className="flex flex-col gap-2 mt-auto">
-              <Button
-                variant="outline"
-                className="font-mono text-xs uppercase tracking-wider"
-                onClick={() => handleStartCheckout("monthly")}
-                disabled={!!loading || !dextopusEnabled}
-              >
-                <Wallet className="w-3.5 h-3.5 mr-1" /> Pay with Crypto
-              </Button>
+              {(() => { const p = getPaidButtonProps("monthly"); return (
+                <Button variant={p.variant} className="font-mono text-xs uppercase tracking-wider"
+                  onClick={() => !p.disabled && handleStartCheckout("monthly")}
+                  disabled={p.disabled}>
+                  {p.icon}{p.label}
+                </Button>
+              ); })()}
             </div>
           </div>
 
@@ -517,14 +603,13 @@ export function Pricing() {
               ))}
             </ul>
             <div className="flex flex-col gap-2 mt-auto">
-              <Button
-                variant="outline"
-                className="font-mono text-xs uppercase tracking-wider"
-                onClick={() => handleStartCheckout("yearly")}
-                disabled={!!loading || !dextopusEnabled}
-              >
-                <Wallet className="w-3.5 h-3.5 mr-1" /> Pay with Crypto
-              </Button>
+              {(() => { const p = getPaidButtonProps("yearly"); return (
+                <Button variant={p.variant} className="font-mono text-xs uppercase tracking-wider"
+                  onClick={() => !p.disabled && handleStartCheckout("yearly")}
+                  disabled={p.disabled}>
+                  {p.icon}{p.label}
+                </Button>
+              ); })()}
             </div>
           </div>
 
@@ -550,14 +635,13 @@ export function Pricing() {
               ))}
             </ul>
             <div className="flex flex-col gap-2 mt-auto">
-              <Button
-                variant="outline"
-                className="font-mono text-xs uppercase tracking-wider"
-                onClick={() => handleStartCheckout("lifetime")}
-                disabled={!!loading || !dextopusEnabled}
-              >
-                <Wallet className="w-3.5 h-3.5 mr-1" /> Pay with Crypto
-              </Button>
+              {(() => { const p = getPaidButtonProps("lifetime"); return (
+                <Button variant={p.variant} className="font-mono text-xs uppercase tracking-wider"
+                  onClick={() => !p.disabled && handleStartCheckout("lifetime")}
+                  disabled={p.disabled}>
+                  {p.icon}{p.label}
+                </Button>
+              ); })()}
             </div>
           </div>
         </div>
