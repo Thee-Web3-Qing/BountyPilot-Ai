@@ -17,10 +17,11 @@ function generateReferralCode(username: string): string {
   return username.toLowerCase().replace(/[^a-z0-9_]/g, "");
 }
 
-async function recordReferral(referralCode: string | undefined, newUserId: number) {
-  if (!referralCode) return;
+async function recordReferral(refParam: string | undefined, newUserId: number) {
+  if (!refParam) return;
   try {
-    const [referrer] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, referralCode));
+    // ref param is the username (e.g. ?ref=TheWeb3Qing)
+    const [referrer] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, refParam));
     if (!referrer || referrer.id === newUserId) return;
     await db.insert(referralsTable).values({ referrerId: referrer.id, referredUserId: newUserId }).onConflictDoNothing();
     await db.update(usersTable).set({ referredBy: referrer.id }).where(eq(usersTable.id, newUserId));

@@ -49,7 +49,7 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
     const hasPremiumReferral = paidReferrals > 0;
 
     const baseUrl = process.env.APP_URL || "https://bountypilot.xyz";
-    const referralLink = `${baseUrl}/signup?ref=${user.referralCode}`;
+    const referralLink = `${baseUrl}/signup?ref=${user.username}`;
 
     res.json({
       referralCode: user.referralCode,
