@@ -6,6 +6,7 @@ import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
 import { analyzeAdminInsights } from "../lib/novus.js";
+import { awardPointsAndBadges } from "../lib/gamification.js";
 
 function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -487,5 +488,44 @@ adminRouter.delete("/bounty-reports/:id/remove-bounty", requireAuth, requireAdmi
   } catch (err) {
     logger.error(err, "Admin remove bounty error");
     res.status(500).json({ error: "Failed to remove" });
+  }
+});
+
+// POST /admin/backfill-gamification
+// One-time (but idempotent) backfill: awards correct points + badges to every user
+// who has at least one earning. Safe to call multiple times — awardPointsAndBadges()
+// never inserts duplicate badges.
+adminRouter.post("/backfill-gamification", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const usersWithEarnings = await db
+      .selectDistinct({ userId: earningsTable.userId })
+      .from(earningsTable);
+
+    const userIds = usersWithEarnings
+      .map((r) => r.userId)
+      .filter((id): id is number => id !== null);
+
+    logger.info({ count: userIds.length }, "Starting gamification backfill");
+
+    const results: { userId: number; status: "ok" | "error" }[] = [];
+
+    for (const userId of userIds) {
+      try {
+        await awardPointsAndBadges(userId);
+        results.push({ userId, status: "ok" });
+      } catch (err) {
+        logger.error({ userId, err }, "Backfill failed for user");
+        results.push({ userId, status: "error" });
+      }
+    }
+
+    const succeeded = results.filter((r) => r.status === "ok").length;
+    const failed = results.filter((r) => r.status === "error").length;
+
+    logger.info({ succeeded, failed }, "Gamification backfill complete");
+    res.json({ ok: true, processed: userIds.length, succeeded, failed, results });
+  } catch (err) {
+    logger.error(err, "Backfill gamification error");
+    res.status(500).json({ error: "Backfill failed" });
   }
 });
