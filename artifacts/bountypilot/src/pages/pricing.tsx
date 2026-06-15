@@ -154,7 +154,9 @@ export function Pricing() {
         });
         const json = await res.json();
         if (!cancelled && json.data) {
-          setTokens(json.data);
+          // Only show tokens that support static deposit addresses
+          const filtered = (json.data as Token[]).filter(t => t.supportsStaticAddress !== false);
+          setTokens(filtered.length > 0 ? filtered : json.data);
         }
       } catch {
         // ignore

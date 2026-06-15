@@ -106,10 +106,19 @@ export async function listChains(): Promise<Array<{ chainId: number; name: strin
 }
 
 // ── List tokens for a chain ──────────────────────────────────────
+// Correct Dextopus endpoint: /deposit/tokens?chainId=N
+// Response shape: { success: true, chainId: N, tokens: [...] }
 export async function listTokens(chainId: number): Promise<Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>> {
-  const data = await dextopusFetch(`/tokens?chainId=${chainId}`);
-  const inner = (data.data as Record<string, unknown> | undefined) || data;
-  return (inner.tokens || inner.data || []) as Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>;
+  const data = await dextopusFetch(`/deposit/tokens?chainId=${chainId}`);
+  // tokens are at the root of the response (not nested under data.data)
+  if (Array.isArray(data.tokens)) {
+    return data.tokens as Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>;
+  }
+  // fallback for any other shape
+  if (Array.isArray(data.data)) {
+    return data.data as Array<{ address: string; symbol: string; name: string; decimals: number; supportsStaticAddress: boolean }>;
+  }
+  return [];
 }
 
 // ── Get destinations for an origin token ─────────────────────────

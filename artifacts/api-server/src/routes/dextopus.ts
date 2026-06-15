@@ -144,10 +144,7 @@ router.post("/webhook", async (req, res) => {
   }
 });
 
-// ── Auth required from here ───────────────────────────────────
-router.use(requireAuth);
-
-// ── List supported chains ─────────────────────────────────────
+// ── Public: supported chains ──────────────────────────────────
 router.get("/chains", async (_req, res) => {
   try {
     const chains = await listChains();
@@ -158,7 +155,7 @@ router.get("/chains", async (_req, res) => {
   }
 });
 
-// ── List tokens for a chain ───────────────────────────────────
+// ── Public: tokens for a chain ────────────────────────────────
 router.get("/tokens", async (req, res) => {
   const chainId = Number(req.query.chainId);
   if (!chainId) {
@@ -174,6 +171,9 @@ router.get("/tokens", async (req, res) => {
     return;
   }
 });
+
+// ── Auth required from here ───────────────────────────────────
+router.use(requireAuth);
 
 // ── Get destinations for an origin token ──────────────────────
 router.get("/destinations", async (req, res) => {
