@@ -86,7 +86,8 @@ export async function callQwen(
     signal: AbortSignal.timeout(timeout),
   });
   if (!resp.ok) throw new Error(`Qwen API error ${resp.status}: ${await resp.text()}`);
-  const data = (await resp.json()) as { choices: { message: { content: string } }[] };
+  const data = (await resp.json()) as { choices: { message: { content: string } }[]; code?: string; message?: string };
+  if (data.code) throw new Error(`Qwen API error [${data.code}]: ${data.message ?? "Unknown error"}`);
   return data.choices[0]?.message?.content || "";
 }
 
@@ -114,7 +115,9 @@ export async function callQwenWithTool<T>(
   if (!resp.ok) throw new Error(`Qwen tool-call error ${resp.status}: ${await resp.text()}`);
   const data = (await resp.json()) as {
     choices: Array<{ message: { tool_calls?: QwenToolCall[]; content?: string } }>;
+    code?: string; message?: string;
   };
+  if (data.code) throw new Error(`Qwen API error [${data.code}]: ${data.message ?? "Unknown error"}`);
   const toolCall = data.choices[0]?.message?.tool_calls?.[0];
   if (!toolCall) return null;
   return JSON.parse(toolCall.function.arguments) as T;
@@ -151,7 +154,9 @@ export async function runQwenAgentLoop(
 
     const data = (await resp.json()) as {
       choices: Array<{ message: { role: string; content: string | null; tool_calls?: QwenToolCall[] }; finish_reason: string }>;
+      code?: string; message?: string;
     };
+    if (data.code) throw new Error(`Qwen API error [${data.code}]: ${data.message ?? "Unknown error"}`);
     const choice = data.choices[0];
     const msg = choice.message;
 

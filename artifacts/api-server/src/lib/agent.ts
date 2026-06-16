@@ -404,19 +404,34 @@ Work through the pipeline step by step using the available tools.`,
       durationMs,
     };
   } catch (err) {
-    logger.error({ err }, "Agent pipeline error — falling back to direct calls");
+    const errMsg = (err as Error).message ?? "Unknown error";
+    logger.error({ err }, "Qwen agent loop failed — switching to rule-based fallback");
 
+    // Determine if this is a quota/billing/auth error and surface a clear message
+    const isQuotaErr = /Arrearage|quota|billing|balance|credit|insufficient|payment|402|403|InvalidApiKey/i.test(errMsg);
+    emit?.({
+      type: "no_key",
+    });
+
+    // Run rule-based pipeline so the user still gets a result
+    emit?.({ type: "tool_call", step: ++stepCount, tool: "score_bounty", label: isQuotaErr ? "Scoring (quota exhausted — rule-based)" : "Scoring (fallback)" });
+    const t1 = Date.now();
     const analysis = await analyzeBounty(scraped);
+    opportunityScore = analysis.opportunityScore;
+    scoreExplanation = analysis.scoreExplanation;
+    emit?.({ type: "tool_result", step: stepCount, tool: "score_bounty", durationMs: Date.now() - t1, preview: `Score: ${opportunityScore}/10 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
+
+    const durationMs = Date.now() - start;
+    agentDecision = isQuotaErr
+      ? "Qwen API quota exhausted — rule-based score returned. Top up your DashScope balance to enable full AI analysis."
+      : `Qwen unavailable (${errMsg.slice(0, 120)}) — rule-based score returned.`;
+
+    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated: false, planGenerated: false, draftGenerated: false, agentDecision, durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
+
     return {
-      scraped,
-      opportunityScore: analysis.opportunityScore,
-      scoreExplanation: analysis.scoreExplanation,
-      briefGenerated: false,
-      planGenerated: false,
-      draftGenerated: false,
-      agentDecision: "Fallback mode — agent loop encountered an error",
-      toolCallLog: [],
-      durationMs: Date.now() - start,
+      scraped, opportunityScore, scoreExplanation,
+      briefGenerated: false, planGenerated: false, draftGenerated: false,
+      agentDecision, toolCallLog: [], durationMs,
     };
   }
 }
