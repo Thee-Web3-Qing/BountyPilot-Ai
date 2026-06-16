@@ -36,6 +36,33 @@ function validateBountyUrl(raw: string): { ok: true; url: string } | { ok: false
   return { ok: true, url: u.href };
 }
 
+// ── Post-scrape bounty page detection ─────────────────────────
+
+function looksLikeBountyPage(scraped: ScrapedBounty): { ok: true } | { ok: false; reason: string } {
+  const title = (scraped.title ?? "").toLowerCase();
+  const desc  = (scraped.description ?? "").toLowerCase();
+
+  // Reject obviously generic / error pages
+  const genericTitles = ["home", "404", "not found", "page not found", "error", "access denied", "forbidden", "just a moment", "attention required", "cloudflare"];
+  if (genericTitles.some((g) => title.includes(g)) || title.length < 5) {
+    return { ok: false, reason: `That page doesn't look like a bounty listing (title: "${scraped.title?.slice(0, 60)}"). Paste a direct listing URL.` };
+  }
+
+  // Description must be substantive
+  if (desc.length < 80) {
+    return { ok: false, reason: "That page has too little content to analyse. Make sure you're linking to the individual bounty listing, not a homepage or profile." };
+  }
+
+  // At least one bounty signal: reward, deadline, or relevant keyword
+  const bountyKeywords = ["reward", "prize", "bounty", "earn", "submit", "deadline", "winner", "apply", "grant", "hackathon", "challenge", "task", "deliverable", "bounties", "usdc", "sol", "eth", "$"];
+  const hasSignal = scraped.rewardAmount != null || scraped.deadline != null || bountyKeywords.some((k) => desc.includes(k) || title.includes(k));
+  if (!hasSignal) {
+    return { ok: false, reason: "This page doesn't appear to be a bounty or challenge listing. Paste the direct listing URL from Superteam Earn, Devpost, Dework, or similar." };
+  }
+
+  return { ok: true };
+}
+
 // ── Stream event types ────────────────────────────────────────
 
 export type AgentStreamEvent =
@@ -196,6 +223,13 @@ export async function runBountyAgentPipeline(
     scraped = urlOrScraped;
   }
   emit?.({ type: "scraped", title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
+
+  // 1b. Verify the scraped page actually looks like a bounty listing
+  const pageCheck = looksLikeBountyPage(scraped);
+  if (!pageCheck.ok) {
+    emit?.({ type: "error", message: pageCheck.reason });
+    throw new Error(pageCheck.reason);
+  }
 
   // Collect results as the agent calls tools
   let opportunityScore = 5;
