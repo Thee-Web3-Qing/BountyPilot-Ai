@@ -13,6 +13,9 @@ interface CheckinStatus {
   bonusDaysLeft: number;
   isPaid: boolean;
   totalStars: number;
+  lastRedeemedAt: string | null;
+  nextRedeemAt: string | null;
+  canRedeem: boolean;
 }
 
 export function DailyCheckIn() {
@@ -200,6 +203,13 @@ export function DailyCheckIn() {
           {justChecked && (
             <p className="font-mono text-xs text-green-400 text-center animate-pulse">
               +{status.starsEarned} stars earned! Total: {status.totalStars}
+            </p>
+          )}
+
+          {/* Cooldown info */}
+          {status.lastRedeemedAt && !status.canRedeem && status.nextRedeemAt && (
+            <p className="font-mono text-[10px] text-muted-foreground text-center">
+              Next redeem available: {new Date(status.nextRedeemAt).toLocaleDateString()}
             </p>
           )}
         </CardContent>

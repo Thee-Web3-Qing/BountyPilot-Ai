@@ -20,6 +20,7 @@ export const usersTable = pgTable("users", {
   loginCode: text("login_code"),
   loginCodeExpires: timestamp("login_code_expires", { withTimezone: true }),
   points: integer("points").notNull().default(0),
+  lastRedeemedAt: timestamp("last_redeemed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

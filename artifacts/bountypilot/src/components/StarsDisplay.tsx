@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, ArrowUpRight, ArrowDownRight, Gift, Coins, Loader2, Info } from "lucide-react";
+import { Star, ArrowUpRight, ArrowDownRight, Gift, Coins, Loader2, Info, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Transaction {
@@ -16,6 +16,9 @@ interface Transaction {
 interface StarsData {
   balance: number;
   transactions: Transaction[];
+  lastRedeemedAt: string | null;
+  nextRedeemAt: string | null;
+  canRedeem: boolean;
 }
 
 export function StarsDisplay() {
@@ -24,6 +27,7 @@ export function StarsDisplay() {
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState(false);
   const [redeemMsg, setRedeemMsg] = useState("");
+  const [redeemStars, setRedeemStars] = useState<string>("50");
 
   useEffect(() => {
     if (!token) return;
@@ -34,25 +38,47 @@ export function StarsDisplay() {
     try {
       const res = await fetch("/api/checkin/stars", { headers: { Authorization: `Bearer ${token}` } });
       const d = await res.json();
-      if (!d.error) setData(d);
+      if (!d.error) {
+        setData(d);
+        // Default to the user's balance or 50
+        if (d.balance >= 50) setRedeemStars("50");
+      }
     } catch {}
     finally { setLoading(false); }
   }
 
-  async function handleRedeem() {
-    if (!token || !data || data.balance < 100) return;
+  async function handleRedeem(mode: "sub" | "cash") {
+    if (!token || !data) return;
+    const stars = parseInt(redeemStars, 10);
+    if (!stars || stars < 50) {
+      setRedeemMsg("Minimum 50 stars required");
+      return;
+    }
+    if (stars > data.balance) {
+      setRedeemMsg("Not enough stars");
+      return;
+    }
     setRedeeming(true);
     setRedeemMsg("");
     try {
       const res = await fetch("/api/checkin/stars/redeem", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ stars: 100 }),
+        body: JSON.stringify({ stars, mode }),
       });
       const d = await res.json();
       if (d.ok) {
-        setData((prev) => prev ? { ...prev, balance: d.newBalance } : null);
-        setRedeemMsg(`Redeemed ${d.starsRedeemed} stars for $${d.dollars} credit!`);
+        setData((prev) => prev ? {
+          ...prev,
+          balance: d.newBalance,
+          lastRedeemedAt: new Date().toISOString(),
+          nextRedeemAt: d.nextRedeemAt,
+          canRedeem: false,
+        } : null);
+        const label = mode === "sub" ? "subscription credit" : "cash";
+        setRedeemMsg(`Redeemed ${d.starsRedeemed} stars for $${d.dollars} ${label}!`);
+      } else if (res.status === 429) {
+        setRedeemMsg(d.error || "Redeem cooldown active.");
       } else {
         setRedeemMsg(d.error || "Failed to redeem");
       }
@@ -76,8 +102,9 @@ export function StarsDisplay() {
 
   if (!data) return null;
 
-  const earning = data.transactions.filter((t) => t.amount > 0);
-  const spending = data.transactions.filter((t) => t.amount < 0);
+  const starsNum = parseInt(redeemStars, 10) || 0;
+  const subValue = starsNum * 0.1;
+  const cashValue = starsNum * 0.02;
 
   return (
     <div className="flex flex-col gap-4">
@@ -96,18 +123,45 @@ export function StarsDisplay() {
             </div>
             <div className="flex flex-col items-end gap-1">
               <span className="font-mono text-[10px] text-muted-foreground flex items-center gap-1">
-                <Info className="w-3 h-3" /> 100 stars = $10 sub
+                <Info className="w-3 h-3" /> 50 stars = $5 sub
               </span>
               <span className="font-mono text-[10px] text-muted-foreground">
                 Cash out: 20% value
               </span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                Redeem once per 3 months
+              </span>
             </div>
           </div>
 
+          {/* Amount input */}
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-muted-foreground">Stars:</span>
+            <input
+              type="number"
+              min={50}
+              max={data.balance}
+              value={redeemStars}
+              onChange={(e) => setRedeemStars(e.target.value)}
+              className="w-20 bg-background border border-border rounded-lg px-2 py-1 text-sm font-mono focus:outline-none focus:border-primary"
+            />
+            <span className="font-mono text-[10px] text-muted-foreground">
+              Sub: ${subValue.toFixed(2)} | Cash: ${cashValue.toFixed(2)}
+            </span>
+          </div>
+
+          {/* Cooldown banner */}
+          {!data.canRedeem && data.nextRedeemAt && (
+            <div className="flex items-center gap-2 font-mono text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+              <Clock className="w-3 h-3" />
+              Next redeem available: {new Date(data.nextRedeemAt).toLocaleDateString()}
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button
-              onClick={handleRedeem}
-              disabled={data.balance < 100 || redeeming}
+              onClick={() => handleRedeem("sub")}
+              disabled={!data.canRedeem || starsNum < 50 || starsNum > data.balance || redeeming}
               className="flex-1 font-mono text-xs font-bold uppercase tracking-wider h-10"
               variant="outline"
             >
@@ -119,10 +173,10 @@ export function StarsDisplay() {
               Redeem for Subscription
             </Button>
             <Button
-              disabled={data.balance < 50}
+              onClick={() => handleRedeem("cash")}
+              disabled={!data.canRedeem || starsNum < 50 || starsNum > data.balance || redeeming}
               className="flex-1 font-mono text-xs font-bold uppercase tracking-wider h-10"
               variant="outline"
-              onClick={() => setRedeemMsg("Cash out coming soon! Stars value: $0.02 each")}
             >
               <Coins className="w-4 h-4 mr-2" /> Cash Out
             </Button>

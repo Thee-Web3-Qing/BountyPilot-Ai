@@ -72,7 +72,7 @@ checkinRouter.get("/status", requireAuth, async (req: AuthRequest, res) => {
       .orderBy(desc(userCheckinsTable.checkinDate));
 
     const [userRow] = await db
-      .select({ plan: usersTable.plan, points: usersTable.points })
+      .select({ plan: usersTable.plan, points: usersTable.points, lastRedeemedAt: usersTable.lastRedeemedAt })
       .from(usersTable)
       .where(eq(usersTable.id, userId));
 
@@ -94,6 +94,8 @@ checkinRouter.get("/status", requireAuth, async (req: AuthRequest, res) => {
 
     const starsEarned = checkedInToday ? (checkins[0]?.starsEarned ?? 1) : multiplier;
 
+    const cooldown = canRedeem(userRow?.lastRedeemedAt ?? null);
+
     res.json({
       checkedInToday,
       streak,
@@ -102,6 +104,9 @@ checkinRouter.get("/status", requireAuth, async (req: AuthRequest, res) => {
       bonusDaysLeft,
       isPaid,
       totalStars: userRow?.points ?? 0,
+      lastRedeemedAt: userRow?.lastRedeemedAt ?? null,
+      nextRedeemAt: cooldown.nextRedeemAt,
+      canRedeem: cooldown.ok,
     });
   } catch (err) {
     logger.error(err, "Error fetching checkin status");
@@ -143,7 +148,9 @@ checkinRouter.post("/", requireAuth, async (req: AuthRequest, res) => {
       if (bonusDaysUsed < 7) multiplier = 2;
     }
 
-    const starsEarned = Math.round(multiplier * (1 + streak * 0.1));
+    // Base 1 star + 0.01 per streak day (max ~2.7 over 90 days)
+    // Paid multiplier doubles this during the 7 boost days
+    const starsEarned = Math.round(multiplier * (1 + streak * 0.01));
 
     await db.insert(userCheckinsTable).values({
       userId,
@@ -209,7 +216,7 @@ checkinRouter.get("/stars", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const [userRow] = await db
-      .select({ points: usersTable.points })
+      .select({ points: usersTable.points, lastRedeemedAt: usersTable.lastRedeemedAt })
       .from(usersTable)
       .where(eq(usersTable.id, userId));
 
@@ -219,9 +226,14 @@ checkinRouter.get("/stars", requireAuth, async (req: AuthRequest, res) => {
       .where(eq(userStarTransactionsTable.userId, userId))
       .orderBy(desc(userStarTransactionsTable.createdAt));
 
+    const cooldown = canRedeem(userRow?.lastRedeemedAt ?? null);
+
     res.json({
       balance: userRow?.points ?? 0,
       transactions: transactions.slice(0, 50),
+      lastRedeemedAt: userRow?.lastRedeemedAt ?? null,
+      nextRedeemAt: cooldown.nextRedeemAt,
+      canRedeem: cooldown.ok,
     });
   } catch (err) {
     logger.error(err, "Error fetching stars");
@@ -229,18 +241,28 @@ checkinRouter.get("/stars", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-// POST /checkin/stars/redeem — redeem stars for subscription credit
+const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+
+function canRedeem(lastRedeemedAt: Date | null): { ok: boolean; nextRedeemAt: Date | null } {
+  if (!lastRedeemedAt) return { ok: true, nextRedeemAt: null };
+  const next = new Date(lastRedeemedAt.getTime() + THREE_MONTHS_MS);
+  if (next.getTime() > Date.now()) return { ok: false, nextRedeemAt: next };
+  return { ok: true, nextRedeemAt: null };
+}
+
+// POST /checkin/stars/redeem — redeem stars for subscription credit or cash out
+// Body: { stars: number, mode: "sub" | "cash" } (default: "sub")
 checkinRouter.post("/stars/redeem", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const { stars } = req.body;
-    if (!stars || stars < 100) {
-      res.status(400).json({ error: "Minimum 100 stars required to redeem" });
+    const { stars, mode = "sub" } = req.body;
+    if (!stars || stars < 50) {
+      res.status(400).json({ error: "Minimum 50 stars required to redeem" });
       return;
     }
 
     const [userRow] = await db
-      .select({ points: usersTable.points })
+      .select({ points: usersTable.points, lastRedeemedAt: usersTable.lastRedeemedAt })
       .from(usersTable)
       .where(eq(usersTable.id, userId));
 
@@ -250,26 +272,47 @@ checkinRouter.post("/stars/redeem", requireAuth, async (req: AuthRequest, res) =
       return;
     }
 
-    // Deduct stars
+    // 3-month cooldown check
+    const cooldown = canRedeem(userRow?.lastRedeemedAt ?? null);
+    if (!cooldown.ok) {
+      res.status(429).json({
+        error: "You can only redeem once every 3 months.",
+        nextRedeemAt: cooldown.nextRedeemAt,
+      });
+      return;
+    }
+
+    // Math
+    const isSub = mode === "sub";
+    const subscriptionCost = 50; // 50 stars = $5 sub
+    const cashOutRate = 0.02; // $0.02 per star (40 stars = $0.80)
+    const dollars = isSub ? stars * 0.1 : stars * cashOutRate;
+
+    // Deduct stars and record last redeemed
     await db
       .update(usersTable)
-      .set({ points: sql`${usersTable.points} - ${stars}` })
+      .set({
+        points: sql`${usersTable.points} - ${stars}`,
+        lastRedeemedAt: new Date(),
+      })
       .where(eq(usersTable.id, userId));
 
     // Record transaction
-    const dollars = stars >= 100 ? 10 : stars * 0.1;
     await db.insert(userStarTransactionsTable).values({
       userId,
       amount: -stars,
-      reason: "redeemed",
-      description: `Redeemed ${stars} stars for $${dollars} subscription credit`,
+      reason: isSub ? "redeemed" : "cashed",
+      description: isSub
+        ? `Redeemed ${stars} stars for $${dollars.toFixed(2)} subscription credit`
+        : `Cashed out ${stars} stars for $${dollars.toFixed(2)}`,
     });
 
     res.json({
       ok: true,
       starsRedeemed: stars,
-      dollars,
+      dollars: Math.round(dollars * 100) / 100,
       newBalance: currentPoints - stars,
+      nextRedeemAt: new Date(Date.now() + THREE_MONTHS_MS),
     });
   } catch (err) {
     logger.error(err, "Error redeeming stars");
