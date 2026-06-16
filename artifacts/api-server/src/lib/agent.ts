@@ -14,6 +14,17 @@ import { scrapeBounty, type ScrapedBounty } from "./scraper.js";
 import { logger } from "./logger.js";
 import type { QwenMessage } from "./qwen.js";
 
+// ── Stream event types ────────────────────────────────────────
+
+export type AgentStreamEvent =
+  | { type: "scraping"; url: string }
+  | { type: "scraped"; title: string; platform: string }
+  | { type: "no_key" }
+  | { type: "tool_call"; step: number; tool: string; label: string }
+  | { type: "tool_result"; step: number; tool: string; durationMs: number; preview: string; score?: number }
+  | { type: "done"; opportunityScore: number; scoreExplanation: string; briefGenerated: boolean; planGenerated: boolean; agentDecision: string; durationMs: number; title: string; platform: string }
+  | { type: "error"; message: string }
+
 // ── Result types ──────────────────────────────────────────────
 
 export interface AgentPipelineResult {
@@ -119,17 +130,20 @@ const AGENT_TOOLS = [
 
 export async function runBountyAgentPipeline(
   urlOrScraped: string | ScrapedBounty,
-  profile?: Record<string, unknown>
+  profile?: Record<string, unknown>,
+  emit?: (event: AgentStreamEvent) => void
 ): Promise<AgentPipelineResult> {
   const start = Date.now();
 
   // 1. Scrape bounty if URL provided
   let scraped: ScrapedBounty;
   if (typeof urlOrScraped === "string") {
+    emit?.({ type: "scraping", url: urlOrScraped });
     scraped = await scrapeBounty(urlOrScraped);
   } else {
     scraped = urlOrScraped;
   }
+  emit?.({ type: "scraped", title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
 
   // Collect results as the agent calls tools
   let opportunityScore = 5;
@@ -139,35 +153,43 @@ export async function runBountyAgentPipeline(
   let researchBrief: AgentPipelineResult["researchBrief"];
   let productionPlan: AgentPipelineResult["productionPlan"];
   let agentDecision = "";
+  let stepCount = 0;
 
   // 2. If no API key, fall back to direct sequential calls
   if (!hasKey()) {
+    emit?.({ type: "no_key" });
+
+    emit?.({ type: "tool_call", step: ++stepCount, tool: "score_bounty", label: "Scoring Opportunity (rule-based)" });
+    const t1 = Date.now();
     const analysis = await analyzeBounty(scraped);
     opportunityScore = analysis.opportunityScore;
     scoreExplanation = analysis.scoreExplanation;
+    emit?.({ type: "tool_result", step: stepCount, tool: "score_bounty", durationMs: Date.now() - t1, preview: `Score: ${opportunityScore}/10 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
 
     if (opportunityScore >= 5) {
+      emit?.({ type: "tool_call", step: ++stepCount, tool: "generate_research_brief", label: "Generating Research Brief" });
+      const t2 = Date.now();
       const brief = await generateResearchBrief(scraped);
       researchBrief = brief;
       briefGenerated = true;
+      emit?.({ type: "tool_result", step: stepCount, tool: "generate_research_brief", durationMs: Date.now() - t2, preview: brief.summary?.slice(0, 100) ?? "Brief generated" });
 
+      emit?.({ type: "tool_call", step: ++stepCount, tool: "generate_production_plan", label: "Building Production Plan" });
+      const t3 = Date.now();
       const plan = await generateProductionPlan(scraped);
       productionPlan = plan;
       planGenerated = true;
+      emit?.({ type: "tool_result", step: stepCount, tool: "generate_production_plan", durationMs: Date.now() - t3, preview: `~${plan.estimatedHours}h estimated · ${scraped.contentFormat} format` });
     }
 
-    return {
-      scraped,
-      opportunityScore,
-      scoreExplanation,
-      briefGenerated,
-      planGenerated,
-      researchBrief,
-      productionPlan,
+    const result: AgentPipelineResult = {
+      scraped, opportunityScore, scoreExplanation, briefGenerated, planGenerated,
+      researchBrief, productionPlan,
       agentDecision: opportunityScore >= 5 ? "Pursued — score meets threshold" : "Skipped brief — low score",
-      toolCallLog: [],
-      durationMs: Date.now() - start,
+      toolCallLog: [], durationMs: Date.now() - start,
     };
+    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, agentDecision: result.agentDecision, durationMs: result.durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
+    return result;
   }
 
   // 3. Run the Qwen agent loop

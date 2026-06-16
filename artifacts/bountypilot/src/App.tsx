@@ -21,7 +21,6 @@ import { Signup } from "./pages/signup";
 import { ForgotPassword } from "./pages/forgot-password";
 import { ResetPassword } from "./pages/reset-password";
 import { Profile } from "./pages/profile";
-import { EditProfile } from "./pages/edit-profile";
 import { Stars } from "./pages/stars";
 import { Settings } from "./pages/settings";
 import { Discover } from "./pages/discover";
