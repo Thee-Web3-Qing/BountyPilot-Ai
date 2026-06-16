@@ -239,8 +239,9 @@ function MilestoneBar({
 
 export function LaunchpadCampaign() {
   const params = useParams<{ slug: string }>();
-  const slug = params.slug;
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  // useParams() is unreliable inside Wouter's nest context — parse from URL directly
+  const slug = params.slug || location.split("/").filter(Boolean).pop() || "";
   const { token, user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
