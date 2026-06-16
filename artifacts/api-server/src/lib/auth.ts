@@ -37,6 +37,17 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   }
 }
 
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+
+export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  if (!req.user) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [user] = await db.select({ isAdmin: usersTable.isAdmin }).from(usersTable).where(eq(usersTable.id, req.user.userId));
+  if (!user?.isAdmin) { res.status(403).json({ error: "Admin access required" }); return; }
+  next();
+}
+
 export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) {

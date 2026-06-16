@@ -4,9 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, User, X, Plus, Calendar, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle, User, X, Plus, Calendar, Sparkles, Pencil, Star, Award, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { GamificationPanel } from "@/components/GamificationPanel";
+import { DailyCheckIn } from "@/components/DailyCheckIn";
+import { StarsDisplay } from "@/components/StarsDisplay";
+import { cn } from "@/lib/utils";
 
 interface Profile {
   fullName?: string; creatorName?: string; mainPlatforms?: string;
@@ -16,6 +19,8 @@ interface Profile {
   creatorStrengths?: string; creatorWeaknesses?: string;
   portfolioLinks?: string; notes?: string;
 }
+
+type TabKey = "overview" | "edit" | "achievements" | "stars";
 
 const PLATFORMS = [
   "YouTube", "Twitter / X", "LinkedIn", "Instagram", "TikTok",
@@ -81,6 +86,7 @@ export function Profile() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
   const subStatus = computeSubscriptionStatus(user);
 
@@ -105,6 +111,7 @@ export function Profile() {
         body: JSON.stringify(profile),
       });
       setSaved(true);
+      setActiveTab("overview");
       setTimeout(() => setSaved(false), 3000);
     } finally {
       setSaving(false);
@@ -117,19 +124,24 @@ export function Profile() {
     </div>
   );
 
+  const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    { key: "overview", label: "Overview", icon: User },
+    { key: "stars", label: "Stars", icon: Star },
+    { key: "achievements", label: "Achievements", icon: Trophy },
+    { key: "edit", label: "Edit", icon: Pencil },
+  ];
+
   return (
-    <div className="flex flex-col gap-8 max-w-2xl">
-      <GamificationPanel />
+    <div className="flex flex-col gap-6 max-w-2xl">
+      {/* Profile Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
-            <User className="w-6 h-6 text-primary" />
+          <div className="w-14 h-14 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
+            <User className="w-7 h-7 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">Creator Profile</h1>
-            <p className="text-muted-foreground font-mono text-sm mt-0.5">
-              @{user?.username} · {user?.email}
-            </p>
+            <h1 className="text-2xl font-bold font-sans uppercase tracking-tight">@{user?.username}</h1>
+            <p className="text-muted-foreground font-mono text-sm">{user?.email}</p>
           </div>
         </div>
         {subStatus && (
@@ -143,94 +155,168 @@ export function Profile() {
                 <Calendar className="w-3 h-3 inline mr-1" />ends {subStatus.endsAt}
               </p>
             )}
-            {(user?.plan === "trial" || user?.plan === "pending" || user?.plan === "expired") && (
-              <Link href="/pricing">
-                <span className="inline-flex items-center gap-1 text-[10px] bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2 py-0.5 rounded-sm cursor-pointer transition-colors mt-1">
-                  <Sparkles className="w-3 h-3" /> Upgrade
-                </span>
-              </Link>
-            )}
           </div>
         )}
       </div>
 
-      <p className="text-muted-foreground font-mono text-xs border-l-2 border-primary/50 pl-3">
-        Your profile personalises opportunity scoring — the more you fill in, the better the AI understands your strengths and goals.
-      </p>
+      {/* Tab Bar */}
+      <div className="flex items-center gap-1 border-b border-border pb-0 overflow-x-auto">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap",
+                activeTab === t.key
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="w-4 h-4" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <form onSubmit={handleSave} className="flex flex-col gap-6">
-        <Section title="Identity">
-          <Row2>
-            <Field label="Full Name" value={profile.fullName} onChange={(v) => set("fullName", v)} placeholder="Your real name" />
-            <Field label="Creator Name / Handle" value={profile.creatorName} onChange={(v) => set("creatorName", v)} placeholder="@yourhandle" />
-          </Row2>
-        </Section>
-
-        <Section title="Creator Focus">
-          <MultiChipSelect
-            label="Main Platforms"
-            options={PLATFORMS}
-            value={profile.mainPlatforms || ""}
-            onChange={(v) => set("mainPlatforms", v)}
-          />
-          <MultiChipSelect
-            label="Content Formats"
-            options={CONTENT_FORMATS}
-            value={profile.contentFormats || ""}
-            onChange={(v) => set("contentFormats", v)}
-          />
-          <MultiChipSelect
-            label="Niche"
-            options={NICHES}
-            value={profile.niche || ""}
-            onChange={(v) => set("niche", v)}
-          />
-          <Row2>
-            <SingleChipSelect
-              label="Skill Level"
-              options={SKILL_LEVELS}
-              value={profile.skillLevel || ""}
-              onChange={(v) => set("skillLevel", v)}
-            />
-            <MultiChipSelect
-              label="Preferred Bounty Types"
-              options={BOUNTY_TYPES}
-              value={profile.preferredBountyTypes || ""}
-              onChange={(v) => set("preferredBountyTypes", v)}
-            />
-          </Row2>
-        </Section>
-
-        <Section title="Goals & Capacity">
-          <Row2>
-            <Field label="Minimum Reward ($)" value={profile.minimumReward?.toString()} onChange={(v) => set("minimumReward", parseFloat(v) || 0)} placeholder="e.g. 200" type="number" />
-            <Field label="Weekly Content Capacity (hrs)" value={profile.weeklyContentCapacity?.toString()} onChange={(v) => set("weeklyContentCapacity", parseInt(v) || 0)} placeholder="e.g. 10" type="number" />
-          </Row2>
-          <Field label="Target Monthly Earnings ($)" value={profile.targetMonthlyEarnings?.toString()} onChange={(v) => set("targetMonthlyEarnings", parseFloat(v) || 0)} placeholder="e.g. 2000" type="number" />
-        </Section>
-
-        <Section title="Self Assessment">
-          <TextareaField label="Creator Strengths" value={profile.creatorStrengths} onChange={(v) => set("creatorStrengths", v)} placeholder="e.g. Strong research skills, can produce videos quickly, existing audience in DeFi..." />
-          <TextareaField label="Creator Weaknesses" value={profile.creatorWeaknesses} onChange={(v) => set("creatorWeaknesses", v)} placeholder="e.g. Limited technical knowledge, no podcast setup..." />
-        </Section>
-
-        <Section title="Portfolio & Notes">
-          <TextareaField label="Portfolio Links" value={profile.portfolioLinks} onChange={(v) => set("portfolioLinks", v)} placeholder="YouTube channel, Mirror, Twitter, personal site..." />
-          <TextareaField label="Additional Notes" value={profile.notes} onChange={(v) => set("notes", v)} placeholder="Anything else about your creator setup..." />
-        </Section>
-
-        <div className="flex items-center gap-4">
-          <Button type="submit" disabled={saving} className="font-mono uppercase tracking-wider">
-            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save Profile
-          </Button>
-          {saved && (
-            <span className="flex items-center gap-2 text-green-400 font-mono text-sm">
-              <CheckCircle className="w-4 h-4" /> Saved
-            </span>
-          )}
+      {/* Tab Content */}
+      {activeTab === "overview" && (
+        <div className="flex flex-col gap-6">
+          <DailyCheckIn />
+          <div className="flex flex-col gap-4">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Profile Summary</p>
+            <Card className="bg-card border-border">
+              <CardContent className="p-5 flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Full Name</p>
+                    <p className="font-mono text-sm font-semibold text-foreground">{profile.fullName || "Not set"}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Creator Name</p>
+                    <p className="font-mono text-sm font-semibold text-foreground">{profile.creatorName || "Not set"}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Platforms</p>
+                    <p className="font-mono text-sm text-foreground">{profile.mainPlatforms || "Not set"}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Niche</p>
+                    <p className="font-mono text-sm text-foreground">{profile.niche || "Not set"}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Skill Level</p>
+                    <p className="font-mono text-sm text-foreground">{profile.skillLevel || "Not set"}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Target Earnings</p>
+                    <p className="font-mono text-sm text-foreground">{profile.targetMonthlyEarnings ? `$${profile.targetMonthlyEarnings}` : "Not set"}</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setActiveTab("edit")}
+                  className="w-full font-mono text-xs font-bold uppercase tracking-wider h-10"
+                  variant="outline"
+                >
+                  <Pencil className="w-4 h-4 mr-2" /> Edit Profile
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </form>
+      )}
+
+      {activeTab === "stars" && (
+        <StarsDisplay />
+      )}
+
+      {activeTab === "achievements" && (
+        <GamificationPanel />
+      )}
+
+      {activeTab === "edit" && (
+        <div className="flex flex-col gap-6">
+          <p className="text-muted-foreground font-mono text-xs border-l-2 border-primary/50 pl-3">
+            Your profile personalises opportunity scoring — the more you fill in, the better the AI understands your strengths and goals.
+          </p>
+
+          <form onSubmit={handleSave} className="flex flex-col gap-6">
+            <Section title="Identity">
+              <Row2>
+                <Field label="Full Name" value={profile.fullName} onChange={(v) => set("fullName", v)} placeholder="Your real name" />
+                <Field label="Creator Name / Handle" value={profile.creatorName} onChange={(v) => set("creatorName", v)} placeholder="@yourhandle" />
+              </Row2>
+            </Section>
+
+            <Section title="Creator Focus">
+              <MultiChipSelect
+                label="Main Platforms"
+                options={PLATFORMS}
+                value={profile.mainPlatforms || ""}
+                onChange={(v) => set("mainPlatforms", v)}
+              />
+              <MultiChipSelect
+                label="Content Formats"
+                options={CONTENT_FORMATS}
+                value={profile.contentFormats || ""}
+                onChange={(v) => set("contentFormats", v)}
+              />
+              <MultiChipSelect
+                label="Niche"
+                options={NICHES}
+                value={profile.niche || ""}
+                onChange={(v) => set("niche", v)}
+              />
+              <Row2>
+                <SingleChipSelect
+                  label="Skill Level"
+                  options={SKILL_LEVELS}
+                  value={profile.skillLevel || ""}
+                  onChange={(v) => set("skillLevel", v)}
+                />
+                <MultiChipSelect
+                  label="Preferred Bounty Types"
+                  options={BOUNTY_TYPES}
+                  value={profile.preferredBountyTypes || ""}
+                  onChange={(v) => set("preferredBountyTypes", v)}
+                />
+              </Row2>
+            </Section>
+
+            <Section title="Goals & Capacity">
+              <Row2>
+                <Field label="Minimum Reward ($)" value={profile.minimumReward?.toString()} onChange={(v) => set("minimumReward", parseFloat(v) || 0)} placeholder="e.g. 200" type="number" />
+                <Field label="Weekly Content Capacity (hrs)" value={profile.weeklyContentCapacity?.toString()} onChange={(v) => set("weeklyContentCapacity", parseInt(v) || 0)} placeholder="e.g. 10" type="number" />
+              </Row2>
+              <Field label="Target Monthly Earnings ($)" value={profile.targetMonthlyEarnings?.toString()} onChange={(v) => set("targetMonthlyEarnings", parseFloat(v) || 0)} placeholder="e.g. 2000" type="number" />
+            </Section>
+
+            <Section title="Self Assessment">
+              <TextareaField label="Creator Strengths" value={profile.creatorStrengths} onChange={(v) => set("creatorStrengths", v)} placeholder="e.g. Strong research skills, can produce videos quickly, existing audience in DeFi..." />
+              <TextareaField label="Creator Weaknesses" value={profile.creatorWeaknesses} onChange={(v) => set("creatorWeaknesses", v)} placeholder="e.g. Limited technical knowledge, no podcast setup..." />
+            </Section>
+
+            <Section title="Portfolio & Notes">
+              <TextareaField label="Portfolio Links" value={profile.portfolioLinks} onChange={(v) => set("portfolioLinks", v)} placeholder="YouTube channel, Mirror, Twitter, personal site..." />
+              <TextareaField label="Additional Notes" value={profile.notes} onChange={(v) => set("notes", v)} placeholder="Anything else about your creator setup..." />
+            </Section>
+
+            <div className="flex items-center gap-4">
+              <Button type="submit" disabled={saving} className="font-mono uppercase tracking-wider">
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save Profile
+              </Button>
+              {saved && (
+                <span className="flex items-center gap-2 text-green-400 font-mono text-sm">
+                  <CheckCircle className="w-4 h-4" /> Saved
+                </span>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

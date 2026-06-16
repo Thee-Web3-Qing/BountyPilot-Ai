@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
 import { TrialBanner } from "@/components/trial-banner";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -53,13 +54,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-bold font-sans text-base uppercase tracking-tighter">BountyPilot</span>
           </div>
         </Link>
-        <button
-          onClick={() => setOpen(true)}
-          className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Open menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <button
+            onClick={() => setOpen(true)}
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       {/* ── Drawer overlay ──────────────────────────────────── */}

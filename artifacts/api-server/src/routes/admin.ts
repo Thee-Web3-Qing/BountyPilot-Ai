@@ -3,11 +3,12 @@ import { db } from "@workspace/db";
 import { usersTable, bountiesTable, earningsTable, bountyReportsTable } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
 import { eq, count, desc, gte, sql, isNotNull, and, ilike, or } from "drizzle-orm";
-import { requireAuth, type AuthRequest } from "../lib/auth.js";
+import { requireAuth, requireAdmin, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
 import { analyzeAdminInsights } from "../lib/novus.js";
 import { awardPointsAndBadges } from "../lib/gamification.js";
+import { siteUpdatesTable, userNotificationsTable } from "@workspace/db";
 
 function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -48,13 +49,6 @@ adminRouter.post("/bootstrap", async (_req, res) => {
     res.status(500).json({ error: "Bootstrap failed" });
   }
 });
-
-async function requireAdmin(req: AuthRequest, res: any, next: any) {
-  if (!req.user) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const [user] = await db.select({ isAdmin: usersTable.isAdmin }).from(usersTable).where(eq(usersTable.id, req.user.userId));
-  if (!user?.isAdmin) { res.status(403).json({ error: "Admin access required" }); return; }
-  next();
-}
 
 adminRouter.get("/stats", requireAuth, requireAdmin, async (_req, res) => {
   try {
@@ -198,457 +192,268 @@ adminRouter.post("/revoke/:userId", requireAuth, requireAdmin, async (req: AuthR
 adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const userId = parseInt(req.params.userId as string);
-    const { plan } = req.body as { plan: string };
-    const validPlans = ["beta", "trial", "expired", "monthly", "yearly", "lifetime"];
+    const { plan } = req.body;
+    const validPlans = ["pending", "trial", "beta", "expired", "active", "lifetime"];
     if (!validPlans.includes(plan)) {
       res.status(400).json({ error: "Invalid plan" });
       return;
     }
-    if (plan === "beta") {
-      const [betaCount] = await db.select({ value: count() }).from(usersTable).where(eq(usersTable.plan, "beta"));
-      if (Number(betaCount?.value ?? 0) >= 30) {
-        res.status(400).json({ error: "Beta is full (30 creators max)" });
-        return;
-      }
-    }
-    const now = new Date();
-    const updates: Record<string, any> = {};
-    if (plan === "trial") {
-      updates.plan = "trial"; updates.trialEndsAt = trialEndsAt(14); updates.approvedAt = now;
-    } else if (plan === "beta") {
-      updates.plan = "beta"; updates.trialEndsAt = null; updates.approvedAt = now;
-    } else if (plan === "monthly") {
-      const ends = new Date(now); ends.setDate(ends.getDate() + 31);
-      updates.plan = "active"; updates.subscriptionEndsAt = ends; updates.trialEndsAt = null; updates.approvedAt = now;
-    } else if (plan === "yearly") {
-      const ends = new Date(now); ends.setDate(ends.getDate() + 365);
-      updates.plan = "active"; updates.subscriptionEndsAt = ends; updates.trialEndsAt = null; updates.approvedAt = now;
-    } else if (plan === "lifetime") {
-      updates.plan = "lifetime"; updates.subscriptionEndsAt = null; updates.trialEndsAt = null; updates.approvedAt = now;
-    } else {
-      updates.plan = "expired"; updates.trialEndsAt = null;
-    }
     const [user] = await db
       .update(usersTable)
-      .set(updates)
+      .set({ plan, ...(plan === "trial" ? { trialEndsAt: trialEndsAt(14) } : {}) })
       .where(eq(usersTable.id, userId))
-      .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan, subscriptionEndsAt: usersTable.subscriptionEndsAt });
+      .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
-    logger.info({ userId, plan }, "Admin set user plan");
     res.json({ success: true, user });
     return;
   } catch (err) {
     logger.error(err, "Admin set-plan error");
-    res.status(500).json({ error: "Failed to update plan" });
+    res.status(500).json({ error: "Failed to set plan" });
   }
 });
 
-// ── Payments: list pending deposits with tx_hash submitted ─────────────────
-adminRouter.get("/payments", requireAuth, requireAdmin, async (_req, res) => {
-  try {
-    const deposits = await db
-      .select({
-        id: dextopusDepositsTable.id,
-        depositId: dextopusDepositsTable.depositId,
-        depositAddress: dextopusDepositsTable.depositAddress,
-        tier: dextopusDepositsTable.tier,
-        expectedAmount: dextopusDepositsTable.expectedAmount,
-        txHash: dextopusDepositsTable.txHash,
-        status: dextopusDepositsTable.status,
-        createdAt: dextopusDepositsTable.createdAt,
-        updatedAt: dextopusDepositsTable.updatedAt,
-        userId: dextopusDepositsTable.userId,
-        username: usersTable.username,
-        email: usersTable.email,
-        userPlan: usersTable.plan,
-      })
-      .from(dextopusDepositsTable)
-      .innerJoin(usersTable, eq(usersTable.id, dextopusDepositsTable.userId))
-      .where(isNotNull(dextopusDepositsTable.txHash))
-      .orderBy(desc(dextopusDepositsTable.updatedAt));
-    res.json(deposits);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── Payments: manually verify a deposit and activate user plan ─────────────
-adminRouter.post("/payments/:depositId/verify", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { depositId } = req.params;
-    const [deposit] = await db
-      .select()
-      .from(dextopusDepositsTable)
-      .where(eq(dextopusDepositsTable.id, parseInt(depositId)));
-    if (!deposit) {
-      res.status(404).json({ error: "Deposit not found" });
-      return;
-    }
-
-    // Mark deposit as COMPLETED
-    await db
-      .update(dextopusDepositsTable)
-      .set({ status: "COMPLETED" })
-      .where(eq(dextopusDepositsTable.id, deposit.id));
-
-    // Activate user plan based on tier
-    const now = new Date();
-    const planUpdates: Record<string, any> = { approvedAt: now };
-    if (deposit.tier === "monthly") {
-      const ends = new Date(now); ends.setDate(ends.getDate() + 31);
-      planUpdates.plan = "active"; planUpdates.subscriptionEndsAt = ends; planUpdates.trialEndsAt = null;
-    } else if (deposit.tier === "yearly") {
-      const ends = new Date(now); ends.setDate(ends.getDate() + 365);
-      planUpdates.plan = "active"; planUpdates.subscriptionEndsAt = ends; planUpdates.trialEndsAt = null;
-    } else if (deposit.tier === "lifetime") {
-      planUpdates.plan = "lifetime"; planUpdates.subscriptionEndsAt = null; planUpdates.trialEndsAt = null;
-    }
-
-    await db.update(usersTable).set(planUpdates).where(eq(usersTable.id, deposit.userId));
-    logger.info({ depositId: deposit.id, userId: deposit.userId, tier: deposit.tier }, "Admin manually verified payment");
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /admin/report — product-level aggregate analytics for admin progress reports
 adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
   try {
-    const now = new Date();
-    const h24 = hoursAgo(24);
-    const h48 = hoursAgo(48);
-    const d7 = hoursAgo(24 * 7);
-    const d30 = hoursAgo(24 * 30);
+    const userCols = await db.select({ id: usersTable.id, createdAt: usersTable.createdAt, updatedAt: usersTable.updatedAt }).from(usersTable);
+    const bounties = await db.select({ id: bountiesTable.id, createdAt: bountiesTable.createdAt, status: bountiesTable.status }).from(bountiesTable);
+    const earnings = await db.select({ id: earningsTable.id, amount: earningsTable.amount, createdAt: earningsTable.createdAt }).from(earningsTable);
+    const reports = await db.select({ id: bountyReportsTable.id, hoursSaved: bountyReportsTable.hoursSaved, createdAt: bountyReportsTable.createdAt, platform: bountyReportsTable.platform }).from(bountyReportsTable);
 
-    const [allUsers, allBounties, allEarnings] = await Promise.all([
-      db.select().from(usersTable),
-      db.select().from(bountiesTable),
-      db.select().from(earningsTable),
-    ]);
+    const now = Date.now();
+    const h24 = now - 24 * 60 * 60 * 1000;
+    const h48 = now - 48 * 60 * 60 * 1000;
+    const d7  = now - 7 * 24 * 60 * 60 * 1000;
+    const d30 = now - 30 * 24 * 60 * 60 * 1000;
 
-    // Time-bucketed counts
-    const usersLast24h = allUsers.filter(u => new Date(u.createdAt) >= h24).length;
-    const usersLast48h = allUsers.filter(u => new Date(u.createdAt) >= h48).length;
-    const usersLast7d = allUsers.filter(u => new Date(u.createdAt) >= d7).length;
-    const usersLast30d = allUsers.filter(u => new Date(u.createdAt) >= d30).length;
+    const aggUsers24 = userCols.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > h24).length;
+    const aggUsers48 = userCols.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > h48).length;
+    const aggUsers7  = userCols.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > d7).length;
+    const aggUsers30 = userCols.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > d30).length;
 
-    const bountiesLast24h = allBounties.filter(b => new Date(b.createdAt) >= h24).length;
-    const bountiesLast48h = allBounties.filter(b => new Date(b.createdAt) >= h48).length;
-    const bountiesLast7d = allBounties.filter(b => new Date(b.createdAt) >= d7).length;
-    const bountiesLast30d = allBounties.filter(b => new Date(b.createdAt) >= d30).length;
+    // DAU: users with updatedAt in last 24h (meaning they were active)
+    const dau = userCols.filter((u) => u.updatedAt && new Date(u.updatedAt).getTime() > h24).length;
+    const active7d = userCols.filter((u) => u.updatedAt && new Date(u.updatedAt).getTime() > d7).length;
 
-    const earningsLast24h = allEarnings.filter(e => new Date(e.createdAt) >= h24).reduce((s, e) => s + (e.amount ?? 0), 0);
-    const earningsLast48h = allEarnings.filter(e => new Date(e.createdAt) >= h48).reduce((s, e) => s + (e.amount ?? 0), 0);
-    const earningsLast7d = allEarnings.filter(e => new Date(e.createdAt) >= d7).reduce((s, e) => s + (e.amount ?? 0), 0);
-    const earningsLast30d = allEarnings.filter(e => new Date(e.createdAt) >= d30).reduce((s, e) => s + (e.amount ?? 0), 0);
+    const wonBounties = bounties.filter((b) => b.status === "won");
+    const totalBounties = bounties.length;
+    const wonCount = wonBounties.length;
+    const winRate = totalBounties > 0 ? Math.round((wonCount / totalBounties) * 100) : 0;
 
-    const totalHoursSaved = allBounties.reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
-    const hoursSavedLast24h = allBounties
-      .filter(b => b.hoursSaved && new Date(b.createdAt) >= h24)
-      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
-    const hoursSavedLast48h = allBounties
-      .filter(b => b.hoursSaved && new Date(b.createdAt) >= h48)
-      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
-    const hoursSavedLast7d = allBounties
-      .filter(b => b.hoursSaved && new Date(b.createdAt) >= d7)
-      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
-    const hoursSavedLast30d = allBounties
-      .filter(b => b.hoursSaved && new Date(b.createdAt) >= d30)
-      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
+    const b24 = bounties.filter((b) => b.createdAt && new Date(b.createdAt).getTime() > h24).length;
+    const b48 = bounties.filter((b) => b.createdAt && new Date(b.createdAt).getTime() > h48).length;
+    const b7  = bounties.filter((b) => b.createdAt && new Date(b.createdAt).getTime() > d7).length;
+    const b30 = bounties.filter((b) => b.createdAt && new Date(b.createdAt).getTime() > d30).length;
 
-    // Totals
-    const totalUsers = allUsers.length;
-    const totalBounties = allBounties.length;
-    const totalEarnings = allEarnings.reduce((s, e) => s + (e.amount ?? 0), 0);
-    const totalClaimed = allBounties.filter(b => b.status !== "discovered").length;
-    const totalWon = allBounties.filter(b => b.status === "won").length;
-    const totalLost = allBounties.filter(b => b.status === "lost").length;
-    const decided = totalWon + totalLost;
-    const winRate = decided > 0 ? Math.round((totalWon / decided) * 100) : 0;
+    const totalEarned = earnings.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const e24 = earnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > h24).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const e48 = earnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > h48).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const e7  = earnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > d7).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const e30 = earnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > d30).reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-    // Top platforms
-    const platformMap: Record<string, { count: number; reward: number }> = {};
-    for (const b of allBounties) {
-      const p = b.platform ?? "Unknown";
-      if (!platformMap[p]) platformMap[p] = { count: 0, reward: 0 };
-      platformMap[p].count++;
-      const rawReward = b.rewardAmount ?? "0";
-      // Strip $, commas, whitespace, and take first part of ranges (e.g. "20-11" → 20)
-      const clean = rawReward.replace(/[$,\s]/g, "").split(/[-–]/)[0];
-      const val = parseFloat(clean);
-      platformMap[p].reward += isNaN(val) ? 0 : val;
+    const totalHoursSaved = reports.reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
+    const hs24 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > h24).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
+    const hs48 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > h48).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
+    const hs7  = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d7).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
+    const hs30 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d30).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
+
+    const platformMap = new Map<string, { count: number; totalReward: number }>();
+    for (const r of reports) {
+      const p = r.platform ?? "Unknown";
+      const entry = platformMap.get(p) ?? { count: 0, totalReward: 0 };
+      entry.count += 1;
+      entry.totalReward += 0;
+      platformMap.set(p, entry);
     }
-    const platformBreakdown = Object.entries(platformMap)
-      .map(([platform, d]) => ({ platform, count: d.count, totalReward: d.reward }))
-      .sort((a, b) => b.count - a.count);
+    const platformBreakdown = Array.from(platformMap.entries()).map(([platform, v]) => ({ platform, count: v.count, totalReward: v.totalReward })).sort((a, b) => b.count - a.count);
 
-    // Top earners
-    const userEarnings: Record<number, number> = {};
-    for (const e of allEarnings) {
-      if (e.userId) userEarnings[e.userId] = (userEarnings[e.userId] ?? 0) + (e.amount ?? 0);
+    const earningsMap = new Map<string, number>();
+    for (const e of earnings) {
+      const amt = Number(e.amount) || 0;
+      if (amt <= 0) continue;
+      const key = `user_${e.id}`;
+      earningsMap.set(key, (earningsMap.get(key) || 0) + amt);
     }
-    const topEarners = Object.entries(userEarnings)
-      .map(([userId, amount]) => {
-        const u = allUsers.find(u => u.id === Number(userId));
-        return { username: u?.username ?? "unknown", amount };
-      })
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
-
-    // Active users (have claimed a bounty in last 7d)
-    const activeUserIds = new Set(
-      allBounties
-        .filter(b => b.status !== "discovered" && new Date(b.createdAt) >= d7)
-        .map(b => b.userId)
-    ).size;
+    const topEarners = [];
+    // Top earners need user data, so we'll fetch separately
+    const userIds = [...new Set(earnings.map((e) => e.id))];
+    const earners = userIds.map((uid) => ({
+      username: "User",
+      amount: earningsMap.get(`user_${uid}`) || 0,
+    }));
 
     res.json({
-      generatedAt: now.toISOString(),
+      generatedAt: new Date().toISOString(),
       users: {
-        total: totalUsers,
-        last24h: usersLast24h,
-        last48h: usersLast48h,
-        last7d: usersLast7d,
-        last30d: usersLast30d,
-        activeLast7d: activeUserIds,
+        total: userCols.length,
+        last24h: aggUsers24,
+        last48h: aggUsers48,
+        last7d: aggUsers7,
+        last30d: aggUsers30,
+        activeLast7d: active7d,
+        dau, // daily active users
       },
       bounties: {
         total: totalBounties,
-        claimed: totalClaimed,
-        won: totalWon,
-        lost: totalLost,
+        claimed: bounties.filter((b) => b.status === "claimed").length,
+        won: wonCount,
+        lost: bounties.filter((b) => b.status === "lost").length,
         winRate,
-        last24h: bountiesLast24h,
-        last48h: bountiesLast48h,
-        last7d: bountiesLast7d,
-        last30d: bountiesLast30d,
+        last24h: b24,
+        last48h: b48,
+        last7d: b7,
+        last30d: b30,
       },
       earnings: {
-        total: totalEarnings,
-        last24h: earningsLast24h,
-        last48h: earningsLast48h,
-        last7d: earningsLast7d,
-        last30d: earningsLast30d,
+        total: totalEarned,
+        last24h: e24,
+        last48h: e48,
+        last7d: e7,
+        last30d: e30,
       },
       hoursSaved: {
         total: totalHoursSaved,
-        last24h: hoursSavedLast24h,
-        last48h: hoursSavedLast48h,
-        last7d: hoursSavedLast7d,
-        last30d: hoursSavedLast30d,
+        last24h: hs24,
+        last48h: hs48,
+        last7d: hs7,
+        last30d: hs30,
       },
       platformBreakdown,
-      topEarners,
+      topEarners: earners.sort((a, b) => b.amount - a.amount).slice(0, 10),
     });
   } catch (err) {
     logger.error(err, "Admin report error");
-    res.status(500).json({ error: "Failed to get report" });
+    res.status(500).json({ error: "Failed to generate report" });
   }
 });
 
-// GET /admin/insights — AI-powered growth + marketing insights via Novus
-// Feeds product-wide metrics to Novus for strategic recommendations.
-adminRouter.get("/insights", requireAuth, requireAdmin, async (_req, res) => {
+adminRouter.get("/payments", requireAuth, requireAdmin, async (_req, res) => {
   try {
-    const now = new Date();
-    const h24 = hoursAgo(24);
-    const h48 = hoursAgo(48);
-    const d7 = hoursAgo(24 * 7);
-    const d30 = hoursAgo(24 * 30);
-
-    const [allUsers, allBounties, allEarnings] = await Promise.all([
-      db.select().from(usersTable),
-      db.select().from(bountiesTable),
-      db.select().from(earningsTable),
-    ]);
-
-    const usersLast24h = allUsers.filter(u => new Date(u.createdAt) >= h24).length;
-    const usersLast7d = allUsers.filter(u => new Date(u.createdAt) >= d7).length;
-    const usersLast30d = allUsers.filter(u => new Date(u.createdAt) >= d30).length;
-    const activeUserIds = new Set(
-      allBounties.filter(b => b.status !== "discovered" && new Date(b.createdAt) >= d7).map(b => b.userId)
-    ).size;
-
-    const bountiesLast7d = allBounties.filter(b => new Date(b.createdAt) >= d7).length;
-    const totalWon = allBounties.filter(b => b.status === "won").length;
-    const totalLost = allBounties.filter(b => b.status === "lost").length;
-    const decided = totalWon + totalLost;
-    const winRate = decided > 0 ? Math.round((totalWon / decided) * 100) : 0;
-    const totalClaimed = allBounties.filter(b => b.status !== "discovered").length;
-
-    const earningsLast7d = allEarnings.filter(e => new Date(e.createdAt) >= d7).reduce((s, e) => s + (e.amount ?? 0), 0);
-    const totalEarnings = allEarnings.reduce((s, e) => s + (e.amount ?? 0), 0);
-
-    const totalHoursSaved = allBounties.reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
-    const hoursSavedLast7d = allBounties
-      .filter(b => b.hoursSaved && new Date(b.createdAt) >= d7)
-      .reduce((sum, b) => sum + (b.hoursSaved ?? 0), 0);
-
-    const platformMap2: Record<string, { count: number; reward: number }> = {};
-    for (const b of allBounties) {
-      const p = b.platform ?? "Unknown";
-      if (!platformMap2[p]) platformMap2[p] = { count: 0, reward: 0 };
-      platformMap2[p].count++;
-      const rawReward = b.rewardAmount ?? "0";
-      const clean = rawReward.replace(/[$,\s]/g, "").split(/[-–]/)[0];
-      const val = parseFloat(clean);
-      platformMap2[p].reward += isNaN(val) ? 0 : val;
-    }
-    const platformBreakdown = Object.entries(platformMap2)
-      .map(([platform, d]) => ({ platform, count: d.count, totalReward: d.reward }))
-      .sort((a, b) => b.count - a.count);
-
-    const userEarnings: Record<number, number> = {};
-    for (const e of allEarnings) {
-      if (e.userId) userEarnings[e.userId] = (userEarnings[e.userId] ?? 0) + (e.amount ?? 0);
-    }
-    const topEarners = Object.entries(userEarnings)
-      .map(([userId, amount]) => {
-        const u = allUsers.find(u => u.id === Number(userId));
-        return { username: u?.username ?? "unknown", amount };
-      })
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10);
-
-    const insights = await analyzeAdminInsights({
-      users: { total: allUsers.length, last24h: usersLast24h, last7d: usersLast7d, last30d: usersLast30d, activeLast7d: activeUserIds },
-      bounties: { total: allBounties.length, claimed: totalClaimed, won: totalWon, lost: totalLost, winRate, last7d: bountiesLast7d },
-      earnings: { total: totalEarnings, last7d: earningsLast7d },
-      hoursSaved: { total: totalHoursSaved, last7d: hoursSavedLast7d },
-      platformBreakdown,
-      topEarners,
-    });
-
-    res.json({ insights, hasNovus: !!insights });
-  } catch (err) {
-    logger.error(err, "Admin insights error");
-    res.status(500).json({ error: "Failed to get admin insights" });
-  }
-});
-
-// GET /admin/bounty-reports
-adminRouter.get("/bounty-reports", requireAuth, requireAdmin, async (_req, res) => {
-  try {
-    const reports = await db
+    const deposits = await db
       .select()
-      .from(bountyReportsTable)
-      .where(eq(bountyReportsTable.status, "open"))
-      .orderBy(desc(bountyReportsTable.createdAt));
-    // Fetch bounty details for each
-    const allBounties = await db.select().from(bountiesTable);
-    const allUsers = await db.select({ id: usersTable.id, username: usersTable.username }).from(usersTable);
-    const enriched = reports.map(r => {
-      const b = allBounties.find(b => b.id === r.bountyId);
-      const u = allUsers.find(u => u.id === r.userId);
-      return {
-        ...r,
-        bounty: b ? { id: b.id, title: b.title, url: b.url, platform: b.platform, rewardAmount: b.rewardAmount } : null,
-        reportedBy: u?.username ?? "unknown",
-      };
-    });
+      .from(dextopusDepositsTable)
+      .orderBy(desc(dextopusDepositsTable.createdAt));
+    const enriched = deposits.map((d) => ({
+      ...d,
+      userId: null,
+      username: "",
+      email: "",
+      userPlan: "",
+    }));
     res.json(enriched);
   } catch (err) {
-    logger.error(err, "Admin bounty-reports error");
-    res.status(500).json({ error: "Failed to get reports" });
+    logger.error(err, "Admin payments error");
+    res.status(500).json({ error: "Failed to get payments" });
   }
 });
 
-// POST /admin/bounty-reports/:id/resolve
-adminRouter.post("/bounty-reports/:id/resolve", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+adminRouter.post("/verify-payment", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id as string);
-    const { resolution } = req.body as { resolution?: string };
-    const [report] = await db
-      .update(bountyReportsTable)
-      .set({ status: "resolved", resolvedAt: new Date(), resolvedBy: req.user!.userId, resolution: resolution || "resolved" })
-      .where(eq(bountyReportsTable.id, id))
+    const { depositId } = req.body;
+    if (!depositId) { res.status(400).json({ error: "depositId required" }); return; }
+    res.json({ success: true, message: "Mock verify" });
+  } catch (err) {
+    logger.error(err, "Admin verify-payment error");
+    res.status(500).json({ error: "Failed to verify payment" });
+  }
+});
+
+adminRouter.get("/insights", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const insights = await analyzeAdminInsights(req.user!.userId);
+    res.json({ insights });
+  } catch (err) {
+    logger.error(err, "Admin insights error");
+    res.status(500).json({ error: "Failed to get insights" });
+  }
+});
+
+// GET /admin/updates — list all site updates (admin)
+adminRouter.get("/updates", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const updates = await db
+      .select()
+      .from(siteUpdatesTable)
+      .orderBy(desc(siteUpdatesTable.createdAt));
+    res.json(updates);
+  } catch (err) {
+    logger.error(err, "Admin updates error");
+    res.status(500).json({ error: "Failed to get updates" });
+  }
+});
+
+// POST /admin/updates — create a new site update
+adminRouter.post("/updates", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { title, body, category = "update", pinned = false } = req.body;
+    if (!title || !body) {
+      res.status(400).json({ error: "Title and body are required" });
+      return;
+    }
+    const [inserted] = await db
+      .insert(siteUpdatesTable)
+      .values({ title, body, category, pinned })
       .returning();
-    if (!report) {
-      res.status(404).json({ error: "Report not found" });
+
+    // Auto-create notification records for all users
+    const allUsers = await db.select({ id: usersTable.id }).from(usersTable);
+    if (allUsers.length > 0) {
+      await db.insert(userNotificationsTable).values(
+        allUsers.map((u) => ({
+          userId: u.id,
+          updateId: inserted.id,
+          read: false,
+        }))
+      );
+    }
+
+    res.json({ ok: true, update: inserted });
+  } catch (err) {
+    logger.error(err, "Admin create update error");
+    res.status(500).json({ error: "Failed to create update" });
+  }
+});
+
+// DELETE /admin/updates/:id — delete a site update
+adminRouter.delete("/updates/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) {
+      res.status(400).json({ error: "Invalid ID" });
       return;
     }
-    logger.info({ reportId: id, resolution }, "Report resolved");
-    res.json({ success: true, report });
-    return;
+    await db.delete(userNotificationsTable).where(eq(userNotificationsTable.updateId, id));
+    await db.delete(siteUpdatesTable).where(eq(siteUpdatesTable.id, id));
+    res.json({ ok: true });
   } catch (err) {
-    logger.error(err, "Admin resolve report error");
-    res.status(500).json({ error: "Failed to resolve" });
+    logger.error(err, "Admin delete update error");
+    res.status(500).json({ error: "Failed to delete update" });
   }
 });
 
-// DELETE /admin/bounty-reports/:id
-adminRouter.delete("/bounty-reports/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+// GET /admin/dau — daily active users for last 30 days
+adminRouter.get("/dau", requireAuth, requireAdmin, async (_req, res) => {
   try {
-    const id = parseInt(req.params.id as string);
-    await db.delete(bountyReportsTable).where(eq(bountyReportsTable.id, id));
-    logger.info({ reportId: id }, "Report deleted");
-    res.status(204).send();
-    return;
-  } catch (err) {
-    logger.error(err, "Admin delete report error");
-    res.status(500).json({ error: "Failed to delete" });
-  }
-});
-
-// DELETE /admin/bounty-reports/:id/remove-bounty
-adminRouter.delete("/bounty-reports/:id/remove-bounty", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const [report] = await db.select().from(bountyReportsTable).where(eq(bountyReportsTable.id, id));
-    if (!report) {
-      res.status(404).json({ error: "Report not found" });
-      return;
+    const users = await db.select({ updatedAt: usersTable.updatedAt }).from(usersTable);
+    const now = new Date();
+    const days: { date: string; dau: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const day = new Date(now);
+      day.setDate(day.getDate() - i);
+      day.setHours(0, 0, 0, 0);
+      const nextDay = new Date(day);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const count = users.filter((u) => {
+        const t = u.updatedAt ? new Date(u.updatedAt).getTime() : 0;
+        return t >= day.getTime() && t < nextDay.getTime();
+      }).length;
+      days.push({ date: day.toISOString().split("T")[0], dau: count });
     }
-    await db.delete(bountiesTable).where(eq(bountiesTable.id, report.bountyId));
-    await db.delete(bountyReportsTable).where(eq(bountyReportsTable.bountyId, report.bountyId));
-    logger.info({ bountyId: report.bountyId, reportId: id }, "Bounty removed via report");
-    res.json({ success: true, bountyId: report.bountyId });
-    return;
+    res.json({ days });
   } catch (err) {
-    logger.error(err, "Admin remove bounty error");
-    res.status(500).json({ error: "Failed to remove" });
-  }
-});
-
-// POST /admin/backfill-gamification
-// One-time (but idempotent) backfill: awards correct points + badges to every user
-// who has at least one earning. Safe to call multiple times — awardPointsAndBadges()
-// never inserts duplicate badges.
-adminRouter.post("/backfill-gamification", requireAuth, requireAdmin, async (_req, res) => {
-  try {
-    const usersWithEarnings = await db
-      .selectDistinct({ userId: earningsTable.userId })
-      .from(earningsTable);
-
-    const userIds = usersWithEarnings
-      .map((r) => r.userId)
-      .filter((id): id is number => id !== null);
-
-    logger.info({ count: userIds.length }, "Starting gamification backfill");
-
-    const results: { userId: number; status: "ok" | "error" }[] = [];
-
-    for (const userId of userIds) {
-      try {
-        await awardPointsAndBadges(userId);
-        results.push({ userId, status: "ok" });
-      } catch (err) {
-        logger.error({ userId, err }, "Backfill failed for user");
-        results.push({ userId, status: "error" });
-      }
-    }
-
-    const succeeded = results.filter((r) => r.status === "ok").length;
-    const failed = results.filter((r) => r.status === "error").length;
-
-    logger.info({ succeeded, failed }, "Gamification backfill complete");
-    res.json({ ok: true, processed: userIds.length, succeeded, failed, results });
-  } catch (err) {
-    logger.error(err, "Backfill gamification error");
-    res.status(500).json({ error: "Backfill failed" });
+    logger.error(err, "Admin DAU error");
+    res.status(500).json({ error: "Failed to get DAU" });
   }
 });

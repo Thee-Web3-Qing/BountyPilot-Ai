@@ -16,6 +16,8 @@ import dextopusRouter from "./dextopus";
 import { referralsRouter } from "./referrals";
 import { customBountiesRouter } from "./custom-bounties";
 import { gamificationRouter } from "./gamification";
+import { checkinRouter } from "./checkin";
+import { notificationsRouter } from "./notifications";
 
 const router: IRouter = Router();
 
@@ -36,5 +38,7 @@ router.use("/dextopus", dextopusRouter);
 router.use("/referrals", referralsRouter);
 router.use("/custom-bounties", customBountiesRouter);
 router.use("/gamification", gamificationRouter);
+router.use("/checkin", checkinRouter);
+router.use("/notifications", notificationsRouter);
 
 export default router;

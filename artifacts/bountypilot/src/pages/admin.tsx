@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -52,6 +52,7 @@ interface ReportData {
     last7d: number;
     last30d: number;
     activeLast7d: number;
+    dau: number;
   };
   bounties: {
     total: number;
@@ -137,7 +138,7 @@ interface BountyApplication {
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -171,6 +172,12 @@ export function Admin() {
   const [expandedApp, setExpandedApp] = useState<number | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<Record<number, string>>({});
 
+  // Updates state
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [loadingUpdates, setLoadingUpdates] = useState(false);
+  const [updateForm, setUpdateForm] = useState({ title: "", body: "", category: "update", pinned: false });
+  const [postingUpdate, setPostingUpdate] = useState(false);
+
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
     loadData();
@@ -180,6 +187,7 @@ export function Admin() {
     if (activeTab === "reports") loadReports();
     if (activeTab === "launchpad") loadLaunchpad();
     if (activeTab === "payments") loadPayments();
+    if (activeTab === "updates") loadUpdates();
   }, [activeTab]);
 
   async function loadData() {
@@ -212,6 +220,40 @@ export function Admin() {
       setPayments(Array.isArray(data) ? data : []);
     } catch { setPayments([]); }
     finally { setPaymentsLoading(false); }
+  }
+
+  async function loadUpdates() {
+    setLoadingUpdates(true);
+    try {
+      const res = await fetch(`${API}/admin/updates`, { headers: authHeaders() });
+      const data = await res.json();
+      setUpdates(Array.isArray(data) ? data : []);
+    } catch { setUpdates([]); }
+    finally { setLoadingUpdates(false); }
+  }
+
+  async function postUpdate() {
+    if (!updateForm.title.trim() || !updateForm.body.trim()) return;
+    setPostingUpdate(true);
+    try {
+      const res = await fetch(`${API}/admin/updates`, {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify(updateForm),
+      });
+      if (res.ok) {
+        setUpdateForm({ title: "", body: "", category: "update", pinned: false });
+        await loadUpdates();
+      }
+    } catch {}
+    setPostingUpdate(false);
+  }
+
+  async function deleteUpdate(id: number) {
+    if (!confirm("Delete this update?")) return;
+    try {
+      await fetch(`${API}/admin/updates/${id}`, { method: "DELETE", headers: authHeaders() });
+      await loadUpdates();
+    } catch {}
   }
 
   async function verifyPayment(paymentId: number) {
@@ -412,6 +454,7 @@ export function Admin() {
           { key: "report" as const, label: "Report", icon: BarChart3 },
           { key: "reports" as const, label: "Flagged", icon: Flag },
           { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
+          { key: "updates" as const, label: "Updates", icon: BellDot },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -683,11 +726,12 @@ export function Admin() {
             </div>
           </div>
 
-          {/* All-Time Totals */}
+          {/* All-Time Totals + DAU */}
           <div className="space-y-3">
             <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">All-Time Totals</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <KPICard icon={Users} label="Total Users" value={report.users.total} suffix="" color="text-foreground" />
+              <KPICard icon={BarChart3} label="DAU (24h)" value={report.users.dau} suffix="" color="text-orange-400" />
               <KPICard icon={Target} label="Total Bounties" value={report.bounties.total} suffix="" color="text-foreground" />
               <KPICard icon={DollarSign} label="Total Earnings" value={`$${report.earnings.total.toLocaleString()}`} suffix="" color="text-green-400" />
               <KPICard icon={Hourglass} label="Total Hours Saved" value={report.hoursSaved.total} suffix="h" color="text-primary" />
@@ -1241,6 +1285,105 @@ export function Admin() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === "updates" && (
+        <div className="space-y-6">
+          {/* Post Update Form */}
+          <div className="bg-card border border-border rounded-lg p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Send className="w-4 h-4 text-primary" />
+              <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-foreground">Post Founder Update</h3>
+            </div>
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <input
+                  value={updateForm.title}
+                  onChange={e => setUpdateForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="Title"
+                  className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                />
+                <select
+                  value={updateForm.category}
+                  onChange={e => setUpdateForm(p => ({ ...p, category: e.target.value }))}
+                  className="bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary"
+                >
+                  <option value="update">Update</option>
+                  <option value="feature">Feature</option>
+                  <option value="fix">Fix</option>
+                  <option value="announcement">Announcement</option>
+                </select>
+              </div>
+              <textarea
+                value={updateForm.body}
+                onChange={e => setUpdateForm(p => ({ ...p, body: e.target.value }))}
+                placeholder="What's new?"
+                rows={3}
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-primary resize-none"
+              />
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 font-mono text-xs text-muted-foreground cursor-pointer">
+                  <input type="checkbox" checked={updateForm.pinned} onChange={e => setUpdateForm(p => ({ ...p, pinned: e.target.checked }))} className="accent-primary" />
+                  Pin to top
+                </label>
+                <button
+                  onClick={postUpdate}
+                  disabled={postingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded bg-primary text-primary-foreground text-xs font-mono font-bold hover:bg-primary/90 transition-colors disabled:opacity-40"
+                >
+                  {postingUpdate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Post Update
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Existing Updates */}
+          <div className="space-y-3">
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-muted-foreground">Published Updates</h3>
+            {loadingUpdates ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : updates.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <BellDot className="w-6 h-6 mx-auto mb-2 text-muted-foreground/40" />
+                <p className="font-mono text-xs">No updates posted yet.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {updates.map((u) => (
+                  <div key={u.id} className="bg-card border border-border rounded-lg p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          {u.pinned && <Pin className="w-3 h-3 text-primary" />}
+                          <span className="font-mono text-xs font-bold text-foreground">{u.title}</span>
+                          <span className={`font-mono text-[9px] uppercase px-1.5 py-0.5 rounded border ${
+                            u.category === "feature" ? "text-green-400 border-green-500/30 bg-green-500/10" :
+                            u.category === "fix" ? "text-yellow-400 border-yellow-500/30 bg-yellow-500/10" :
+                            u.category === "announcement" ? "text-blue-400 border-blue-500/30 bg-blue-500/10" :
+                            "text-primary border-primary/30 bg-primary/10"
+                          }`}>{u.category}</span>
+                        </div>
+                        <p className="font-mono text-xs text-muted-foreground mt-1">{u.body}</p>
+                        <p className="font-mono text-[10px] text-muted-foreground/60 mt-1">
+                          {new Date(u.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteUpdate(u.id)}
+                        className="p-1 text-muted-foreground hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

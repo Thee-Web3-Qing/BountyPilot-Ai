@@ -10,3 +10,7 @@ export * from "./dextopus_deposits";
 export * from "./referrals";
 export * from "./custom_bounties";
 export * from "./user_badges";
+export * from "./site_updates";
+export * from "./user_notifications";
+export * from "./user_checkins";
+export * from "./user_star_transactions";
