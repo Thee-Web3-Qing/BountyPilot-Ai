@@ -91,6 +91,18 @@ const ROLE_CONFIGS: Record<RoleKey, RoleConfig> = {
 
 const SKILL_LEVELS = ["Beginner", "Intermediate", "Expert"];
 
+const DEV_LANGUAGES = [
+  "Solidity", "Rust", "TypeScript", "JavaScript", "Python", "Go",
+  "C++", "Cairo", "Move", "Vyper", "Java", "Haskell",
+];
+
+const VIBE_AI_TOOLS = [
+  "Cursor", "Windsurf", "Bolt.new", "Lovable", "v0", "Replit",
+  "Claude", "ChatGPT", "Gemini", "GitHub Copilot",
+  "LangChain", "CrewAI", "n8n", "Make.com", "Zapier",
+  "Midjourney", "Runway", "ElevenLabs",
+];
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProfileData {
@@ -109,6 +121,7 @@ interface ProfileData {
   portfolioLinks?: string;
   notes?: string;
   roleType?: string;
+  languages?: string;
 }
 
 function formatDate(date: string | null): string {
@@ -219,6 +232,7 @@ export function Profile() {
   const niches = chipList(profile.niche);
   const formats = chipList(profile.contentFormats);
   const bountyTypes = chipList(profile.preferredBountyTypes);
+  const languages = chipList(profile.languages);
 
   // ── View mode ─────────────────────────────────────────────────────────────
   if (mode === "view") {
@@ -296,6 +310,12 @@ export function Profile() {
               <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{cfg.sectionTitle}</p>
               <div className="flex flex-col gap-3">
                 <ChipGroup label={cfg.platformsLabel} chips={platforms} icon={Globe} />
+                {role === "developer" && languages.length > 0 && (
+                  <ChipGroup label="Languages & Frameworks" chips={languages} icon={Code2} />
+                )}
+                {role === "vibecoder" && languages.length > 0 && (
+                  <ChipGroup label="AI Tools" chips={languages} icon={Bot} />
+                )}
                 <ChipGroup label={cfg.formatsLabel} chips={formats} icon={Zap} />
                 <ChipGroup label="Niche" chips={niches} icon={Gift} />
                 <ChipGroup label="Bounty Types" chips={bountyTypes} icon={Target} />
@@ -409,6 +429,22 @@ export function Profile() {
             value={profile.mainPlatforms || ""}
             onChange={(v) => setField("mainPlatforms", v)}
           />
+          {role === "developer" && (
+            <MultiChipSelect
+              label="Languages & Frameworks"
+              options={DEV_LANGUAGES}
+              value={profile.languages || ""}
+              onChange={(v) => setField("languages", v)}
+            />
+          )}
+          {role === "vibecoder" && (
+            <MultiChipSelect
+              label="AI Tools You Use"
+              options={VIBE_AI_TOOLS}
+              value={profile.languages || ""}
+              onChange={(v) => setField("languages", v)}
+            />
+          )}
           <MultiChipSelect
             label={cfg.formatsLabel}
             options={cfg.formats}

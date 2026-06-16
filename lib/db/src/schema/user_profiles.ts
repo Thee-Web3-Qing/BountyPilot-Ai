@@ -20,6 +20,7 @@ export const userProfilesTable = pgTable("user_profiles", {
   portfolioLinks: text("portfolio_links"),
   notes: text("notes"),
   roleType: text("role_type"),
+  languages: text("languages"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

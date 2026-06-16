@@ -433,7 +433,7 @@ authRouter.put("/profile", requireAuth, async (req: AuthRequest, res) => {
       fullName, creatorName, mainPlatforms, contentFormats, niche,
       skillLevel, preferredBountyTypes, minimumReward, weeklyContentCapacity,
       targetMonthlyEarnings, creatorStrengths, creatorWeaknesses,
-      portfolioLinks, notes, roleType,
+      portfolioLinks, notes, roleType, languages,
     } = req.body;
 
     const existing = await db
@@ -447,7 +447,7 @@ authRouter.put("/profile", requireAuth, async (req: AuthRequest, res) => {
       minimumReward: minimumReward ? parseFloat(minimumReward) : undefined,
       weeklyContentCapacity: weeklyContentCapacity ? parseInt(weeklyContentCapacity) : undefined,
       targetMonthlyEarnings: targetMonthlyEarnings ? parseFloat(targetMonthlyEarnings) : undefined,
-      creatorStrengths, creatorWeaknesses, portfolioLinks, notes, roleType,
+      creatorStrengths, creatorWeaknesses, portfolioLinks, notes, roleType, languages,
     };
 
     if (existing.length > 0) {
