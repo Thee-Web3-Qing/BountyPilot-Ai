@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/submissions", label: "Submissions", icon: Award },
   { href: "/earnings", label: "Earnings", icon: Coins },
   { href: "/referral", label: "Refer & Earn", icon: Gift },
+  { href: "/stars", label: "Stars", icon: Sparkles },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
