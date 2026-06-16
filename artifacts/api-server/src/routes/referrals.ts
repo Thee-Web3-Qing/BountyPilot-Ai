@@ -228,7 +228,7 @@ referralsRouter.get("/campaigns/:slug/leaderboard", async (req: AuthRequest, res
       });
 
     } else if (slug === "free-access") {
-      // Free signups: not active or lifetime
+      // All referrals — matches the "2 months free" track on the referral page
       const rows = await db
         .select({
           referrerId: referralsTable.referrerId,
@@ -237,7 +237,6 @@ referralsRouter.get("/campaigns/:slug/leaderboard", async (req: AuthRequest, res
         })
         .from(referralsTable)
         .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
-        .where(sql`${referralsTable.referredUserPlan} NOT IN ('active', 'lifetime')`)
         .groupBy(referralsTable.referrerId, usersTable.username)
         .orderBy(desc(count(referralsTable.id)))
         .limit(100);
@@ -380,6 +379,7 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
         paidReferrals: Number(r.premiumCount),
         points: r.points ?? 0,
       }))
+      .filter(r => r.paidReferrals > 0)
       .sort((a, b) => b.paidReferrals - a.paidReferrals || b.totalReferrals - a.totalReferrals)
       .map((r, i) => ({
         rank: i + 1,
