@@ -484,8 +484,8 @@ function LiveAgentPanel({ token }: { token: string | null }) {
       pendingBufferRef.current.push(ev);
     } else {
       setEvents((prev) => [...prev, ev]);
-      // After scoring, pause if score < 8 for HITL
-      if (ev.type === "tool_result" && ev.tool === "score_bounty" && ev.score != null && ev.score < 8) {
+      // After scoring, always pause for HITL confirmation before continuing
+      if (ev.type === "tool_result" && ev.tool === "score_bounty" && ev.score != null) {
         waitingForConfirmRef.current = true;
         setConfirmScore(ev.score);
       }
