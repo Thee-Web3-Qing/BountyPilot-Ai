@@ -87,7 +87,7 @@ export function Bounties() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">All Bounties</h1>
+          <h1 className="text-xl md:text-3xl font-bold font-sans uppercase tracking-tight">All Bounties</h1>
           <p className="text-muted-foreground font-mono mt-1 text-sm">
             {bounties?.length ?? 0} bounties found
           </p>

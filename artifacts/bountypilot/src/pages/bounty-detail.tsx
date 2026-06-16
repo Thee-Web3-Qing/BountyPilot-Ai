@@ -434,10 +434,10 @@ export function BountyDetail() {
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-start md:items-end gap-2">
           {bounty.opportunityScore != null && (
             <div className="flex items-baseline gap-1">
-              <span className={`text-5xl font-bold font-mono ${SCORE_COLOR(bounty.opportunityScore)}`}>
+              <span className={`text-3xl md:text-5xl font-bold font-mono ${SCORE_COLOR(bounty.opportunityScore)}`}>
                 {bounty.opportunityScore}
               </span>
               <span className="text-muted-foreground font-mono text-lg">/10</span>
@@ -485,10 +485,10 @@ export function BountyDetail() {
         {bounty.opportunityScore != null && bounty.scoreExplanation && (
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
-                  <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+                  <span className="hidden sm:inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
                 </div>
                 <Button
                   variant="outline"
@@ -499,7 +499,7 @@ export function BountyDetail() {
                 >
                   {draftingApp
                     ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Drafting…</>
-                    : <><Bot className="w-3 h-3 mr-1.5" />Draft Application</>}
+                    : <><Bot className="w-3 h-3 mr-1.5" />Draft</>}
                 </Button>
               </div>
               <p className="text-sm">{bounty.scoreExplanation}</p>
@@ -514,16 +514,16 @@ export function BountyDetail() {
                     <div className="mt-3 space-y-2">
                       <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
                       {breakdown.map((c, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase">{c.label}</span>
-                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="w-16 font-mono text-[10px] text-muted-foreground uppercase flex-shrink-0">{c.label}</span>
+                          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden min-w-0">
                             <div
                               className="h-full rounded-full bg-primary"
                               style={{ width: `${(c.score / 10) * 100}%` }}
                             />
                           </div>
-                          <span className="w-6 font-mono text-xs font-bold text-right">{c.score}</span>
-                          <span className="flex-1 text-xs text-muted-foreground">{c.note}</span>
+                          <span className="w-5 font-mono text-xs font-bold text-right flex-shrink-0">{c.score}</span>
+                          <span className="hidden sm:block flex-1 text-xs text-muted-foreground">{c.note}</span>
                         </div>
                       ))}
                     </div>
@@ -908,7 +908,7 @@ export function BountyDetail() {
             {bounty.opportunityScore != null && (
               <div className="flex items-center gap-4 p-3 rounded-sm border border-primary/30 bg-primary/5">
                 <div className="text-center">
-                  <p className={`text-4xl font-bold font-mono ${bounty.opportunityScore >= 7 ? "text-green-400" : bounty.opportunityScore >= 5 ? "text-yellow-400" : "text-red-400"}`}>
+                  <p className={`text-3xl font-bold font-mono ${bounty.opportunityScore >= 7 ? "text-green-400" : bounty.opportunityScore >= 5 ? "text-yellow-400" : "text-red-400"}`}>
                     {bounty.opportunityScore}
                   </p>
                   <p className="text-xs text-muted-foreground font-mono">/10</p>
@@ -928,13 +928,13 @@ export function BountyDetail() {
                   <div className="space-y-2">
                     <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
                     {bd.map((c, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase flex-shrink-0">{c.label}</span>
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="w-16 font-mono text-[10px] text-muted-foreground uppercase flex-shrink-0">{c.label}</span>
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden min-w-0">
                           <div className="h-full rounded-full bg-primary" style={{ width: `${(c.score / 10) * 100}%` }} />
                         </div>
                         <span className="w-5 font-mono text-xs font-bold text-right flex-shrink-0">{c.score}</span>
-                        <span className="flex-1 text-xs text-muted-foreground min-w-0 truncate">{c.note}</span>
+                        <span className="hidden sm:block flex-1 text-xs text-muted-foreground min-w-0 truncate">{c.note}</span>
                       </div>
                     ))}
                   </div>

@@ -102,7 +102,7 @@ export function Submissions() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">Submissions</h1>
+          <h1 className="text-xl md:text-3xl font-bold font-sans uppercase tracking-tight">Submissions</h1>
           <p className="text-muted-foreground font-mono mt-1 text-sm">Track your bounty submissions and results.</p>
         </div>
         <Button onClick={() => setShowForm(!showForm)} className="font-mono uppercase tracking-wider">

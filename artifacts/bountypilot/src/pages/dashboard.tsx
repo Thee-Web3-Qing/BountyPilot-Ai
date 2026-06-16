@@ -111,7 +111,7 @@ export function Dashboard() {
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
+          <h1 className="text-xl md:text-3xl font-bold font-sans uppercase tracking-tight text-foreground">Mission Control</h1>
           <p className="text-muted-foreground font-mono mt-2">Welcome back, <span className="text-foreground font-bold">@{user?.username}</span></p>
         </div>
         <div className="flex items-center gap-2">

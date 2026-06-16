@@ -206,9 +206,9 @@ export function Agent() {
                     {b.platform} · {b.status.replace(/_/g, " ")} · {new Date(b.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   {b.opportunityScore != null && b.opportunityScore >= 7 && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-green-500/40 bg-green-500/10 text-green-400 uppercase tracking-wider">
+                    <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded border border-green-500/40 bg-green-500/10 text-green-400 uppercase tracking-wider">
                       High Match
                     </span>
                   )}
