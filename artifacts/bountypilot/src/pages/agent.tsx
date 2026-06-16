@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bot, Cpu, Zap, ShieldCheck, ChevronRight, CheckCircle2, Circle,
   Loader2, RefreshCw, Brain, Crosshair, BookOpen, FileText,
-  Link2, AlertTriangle, ExternalLink,
+  Link2, AlertTriangle, ChevronDown, ChevronUp, Plus, Check,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { usePageMeta } from "@/lib/use-page-meta";
@@ -24,13 +24,28 @@ type StreamEvent =
   | { type: "done"; opportunityScore: number; scoreExplanation: string; briefGenerated: boolean; planGenerated: boolean; agentDecision: string; durationMs: number; title: string; platform: string }
   | { type: "error"; message: string }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // ── Tool metadata ─────────────────────────────────────────────────────────────
 
-const TOOL_META: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
-  score_bounty:            { icon: Crosshair,    color: "text-primary",    bg: "bg-primary/10 border-primary/30" },
-  generate_research_brief: { icon: BookOpen,     color: "text-blue-400",   bg: "bg-blue-500/10 border-blue-500/30" },
-  generate_production_plan:{ icon: FileText,     color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/30" },
-  finalize_pipeline:       { icon: CheckCircle2, color: "text-green-400",  bg: "bg-green-500/10 border-green-500/30" },
+const TOOL_META: Record<string, { icon: React.ElementType; color: string; bg: string; label: string }> = {
+  score_bounty:            { icon: Crosshair,    color: "text-primary",    bg: "bg-primary/10 border-primary/30",       label: "Score Bounty" },
+  generate_research_brief: { icon: BookOpen,     color: "text-blue-400",   bg: "bg-blue-500/10 border-blue-500/30",     label: "Research Brief" },
+  generate_production_plan:{ icon: FileText,     color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/30", label: "Production Plan" },
+  finalize_pipeline:       { icon: CheckCircle2, color: "text-green-400",  bg: "bg-green-500/10 border-green-500/30",   label: "Finalize" },
 };
 
 // ── Icon pill ─────────────────────────────────────────────────────────────────
@@ -81,9 +96,75 @@ function ActionStrip({ events, running }: { events: StreamEvent[]; running: bool
   );
 }
 
+// ── Save-to-bounties button (inside done card) ────────────────────────────────
+
+function SaveButton({ url, token }: { url: string; token: string | null }) {
+  const [state, setState] = useState<"idle" | "loading" | "saved" | "error">("idle");
+
+  const save = async () => {
+    if (!token || !url || state !== "idle") return;
+    setState("loading");
+    try {
+      const r = await fetch("/api/bounties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ url }),
+      });
+      if (r.status === 403) {
+        const data = await r.json();
+        if (data.error === "free_limit") {
+          alert("Free plan limit reached (3 bounties). Upgrade to add more.");
+          setState("idle");
+          return;
+        }
+      }
+      if (!r.ok) throw new Error("Failed");
+      setState("saved");
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 2500);
+    }
+  };
+
+  if (state === "saved") {
+    return (
+      <div className="flex items-center gap-1.5 font-mono text-xs text-green-400">
+        <Check className="w-3.5 h-3.5" /> Saved to My Bounties
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={save}
+      disabled={state === "loading"}
+      className={cn(
+        "flex items-center gap-1.5 font-mono text-xs px-3 py-1.5 rounded-sm border transition-colors",
+        state === "error"
+          ? "border-red-500/40 text-red-400 bg-red-500/5"
+          : "border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 active:bg-primary/15",
+        state === "loading" && "opacity-60 cursor-not-allowed"
+      )}
+    >
+      {state === "loading"
+        ? <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
+        : state === "error"
+        ? "Error — retry"
+        : <><Plus className="w-3 h-3" /> Save to My Bounties</>
+      }
+    </button>
+  );
+}
+
 // ── Individual event row ──────────────────────────────────────────────────────
 
-function EventRow({ event }: { event: StreamEvent }) {
+function EventRow({ event, token, bountyUrl }: {
+  event: StreamEvent;
+  token?: string | null;
+  bountyUrl?: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
   switch (event.type) {
     case "scraping":
       return (
@@ -125,26 +206,73 @@ function EventRow({ event }: { event: StreamEvent }) {
       const meta = TOOL_META[event.tool];
       const Icon = meta?.icon ?? Bot;
       const secs = (event.durationMs / 1000).toFixed(1);
+      const cleanPreview = stripHtml(event.preview);
+      const isLong = cleanPreview.length > 120;
+
       return (
-        <div className="flex flex-col gap-0.5 pl-0">
-          <div className="flex items-center gap-2 font-mono text-xs">
+        <div className="flex flex-col gap-0">
+          {/* Clickable header row */}
+          <button
+            type="button"
+            onClick={() => isLong && setExpanded((v) => !v)}
+            className={cn(
+              "flex items-center gap-2 font-mono text-xs w-full text-left rounded-sm px-0 py-1 transition-colors",
+              isLong && "hover:bg-white/[0.03] cursor-pointer",
+              !isLong && "cursor-default"
+            )}
+          >
             <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", meta?.color ?? "text-primary")} />
-            <span className="text-foreground font-semibold">{TOOL_META[event.tool] ? event.tool.replace(/_/g, " ") : event.tool}</span>
+            <span className="text-foreground font-semibold">
+              {meta?.label ?? event.tool.replace(/_/g, " ")}
+            </span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">{secs}s</span>
             {event.score != null && (
               <span className={cn(
-                "font-bold ml-1",
+                "font-bold ml-0.5",
                 event.score >= 7 ? "text-green-400" : event.score >= 5 ? "text-yellow-400" : "text-red-400"
               )}>
                 {event.score}/10
               </span>
             )}
-          </div>
-          {event.preview && (
-            <p className="font-mono text-xs text-muted-foreground pl-5 leading-relaxed line-clamp-2">
-              {event.preview}
+            {isLong && (
+              <span className="ml-auto text-muted-foreground/60 flex-shrink-0">
+                {expanded
+                  ? <ChevronUp className="w-3 h-3" />
+                  : <ChevronDown className="w-3 h-3" />
+                }
+              </span>
+            )}
+          </button>
+
+          {/* Preview content */}
+          {cleanPreview && (
+            <p className={cn(
+              "font-mono text-xs text-muted-foreground pl-5 leading-relaxed transition-all",
+              !expanded && "line-clamp-2"
+            )}>
+              {cleanPreview}
             </p>
+          )}
+
+          {/* Expand hint */}
+          {isLong && !expanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="pl-5 mt-0.5 font-mono text-[10px] text-primary/70 hover:text-primary transition-colors text-left"
+            >
+              Show more ↓
+            </button>
+          )}
+          {isLong && expanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="pl-5 mt-0.5 font-mono text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors text-left"
+            >
+              Show less ↑
+            </button>
           )}
         </div>
       );
@@ -154,7 +282,7 @@ function EventRow({ event }: { event: StreamEvent }) {
       const secs = (event.durationMs / 1000).toFixed(1);
       return (
         <div className={cn(
-          "rounded-sm border p-3 flex flex-col gap-1.5 mt-1",
+          "rounded-sm border p-3 flex flex-col gap-2 mt-1",
           event.opportunityScore >= 7
             ? "border-green-500/40 bg-green-500/5"
             : event.opportunityScore >= 5
@@ -184,9 +312,16 @@ function EventRow({ event }: { event: StreamEvent }) {
             </div>
           </div>
           {event.scoreExplanation && (
-            <p className="font-mono text-xs text-muted-foreground pl-6 leading-relaxed">
-              {event.scoreExplanation.slice(0, 180)}
-            </p>
+            <ExpandableText text={event.scoreExplanation} maxLen={180} className="pl-6" />
+          )}
+          {event.agentDecision && (
+            <ExpandableText text={stripHtml(event.agentDecision)} maxLen={160} className="pl-6" />
+          )}
+          {/* Save to bounties */}
+          {bountyUrl && token && (
+            <div className="pl-6 pt-1 border-t border-border/50 mt-1">
+              <SaveButton url={bountyUrl} token={token} />
+            </div>
           )}
         </div>
       );
@@ -203,6 +338,29 @@ function EventRow({ event }: { event: StreamEvent }) {
     default:
       return null;
   }
+}
+
+// ── Expandable text helper ────────────────────────────────────────────────────
+
+function ExpandableText({ text, maxLen, className }: { text: string; maxLen: number; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > maxLen;
+  return (
+    <div className={className}>
+      <p className={cn("font-mono text-xs text-muted-foreground leading-relaxed", !expanded && isLong && "line-clamp-3")}>
+        {text}
+      </p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="font-mono text-[10px] text-primary/70 hover:text-primary transition-colors mt-0.5"
+        >
+          {expanded ? "Show less ↑" : "Show more ↓"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ── Live Agent Panel ──────────────────────────────────────────────────────────
@@ -320,9 +478,11 @@ function LiveAgentPanel({ token }: { token: string | null }) {
             {/* Event log */}
             <div
               ref={logRef}
-              className="px-4 py-3 flex flex-col gap-2.5 max-h-72 overflow-y-auto"
+              className="px-4 py-3 flex flex-col gap-2.5 max-h-[26rem] overflow-y-auto"
             >
-              {events.map((ev, i) => <EventRow key={i} event={ev} />)}
+              {events.map((ev, i) => (
+                <EventRow key={i} event={ev} token={token} bountyUrl={url.trim()} />
+              ))}
               {running && events.length === 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground font-mono text-xs">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -529,53 +689,16 @@ export function Agent() {
                     {b.platform} · {b.status.replace(/_/g, " ")} · {new Date(b.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {b.opportunityScore != null && b.opportunityScore >= 7 && (
-                    <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded border border-green-500/40 bg-green-500/10 text-green-400 uppercase tracking-wider">
-                      High Match
-                    </span>
-                  )}
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </div>
+                {b.opportunityScore != null && b.opportunityScore >= 7 && (
+                  <span className="font-mono text-[10px] text-green-400 border border-green-500/30 bg-green-500/10 px-1.5 py-0.5 rounded-sm flex-shrink-0">
+                    High
+                  </span>
+                )}
               </button>
             ))}
           </div>
         )}
       </div>
-
-      {/* How it works */}
-      <Card className="bg-card border-primary/20">
-        <CardContent className="p-4">
-          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">How the Autopilot works</p>
-          <ol className="space-y-2.5 text-sm">
-            {[
-              ["Discover", "The agent crawls Web3 bounty platforms (Superteam Earn, Devpost, Dework, etc.) for new opportunities continuously."],
-              ["Score with Qwen AI", "Each bounty is evaluated by Qwen using native tool-calling — structured 1-10 score with breakdown: reward, deadline, format fit, and creator fit."],
-              ["Match", "High-scoring bounties (7+/10) are surfaced as strong picks in your Discover feed and trigger notifications."],
-              ["Human-in-the-Loop Checkpoint", "Before you commit to pursuing a bounty, the agent shows its full AI reasoning. You review it and confirm — only then is the action logged."],
-            ].map(([title, desc], i) => (
-              <li key={i} className="flex gap-3">
-                <span className="font-mono text-primary font-bold text-xs mt-0.5 w-5 flex-shrink-0">{i + 1}.</span>
-                <div>
-                  <span className="font-medium">{title}</span>
-                  <span className="text-muted-foreground"> — {desc}</span>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
-            <ExternalLink className="w-3 h-3 text-muted-foreground" />
-            <a
-              href="https://github.com/bountypilot/bountypilot/blob/main/ALIBABA_CLOUD.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-[11px] text-muted-foreground hover:text-primary transition-colors"
-            >
-              Powered by Alibaba Cloud · Qwen API (dashscope.aliyuncs.com)
-            </a>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
