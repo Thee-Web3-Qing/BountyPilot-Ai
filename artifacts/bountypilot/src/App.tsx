@@ -34,6 +34,12 @@ import { LaunchpadCampaign } from "./pages/launchpad-campaign";
 
 const queryClient = new QueryClient();
 
+function ProfileEditRedirect() {
+  const [, nav] = useLocation();
+  useEffect(() => { nav("/profile"); }, []);
+  return null;
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
@@ -80,7 +86,7 @@ function Router() {
                 <Route path="/bounties/:id" component={BountyDetail} />
                 <Route path="/submissions" component={Submissions} />
                 <Route path="/earnings" component={Earnings} />
-                <Route path="/profile/edit" component={EditProfile} />
+                <Route path="/profile/edit" component={ProfileEditRedirect} />
                 <Route path="/profile" component={Profile} />
                 <Route path="/stars" component={Stars} />
                 <Route path="/settings" component={Settings} />
