@@ -12,6 +12,7 @@ interface User {
   trialEndsAt: string | null;
   subscriptionEndsAt: string | null;
   isAdmin: boolean;
+  createdAt?: string | null;
 }
 
 interface AuthContextType {
