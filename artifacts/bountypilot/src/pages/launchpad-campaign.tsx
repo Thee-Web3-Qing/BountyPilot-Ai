@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, Trophy, Gift, Calendar, Star, Users, Copy, Check,
-  Crown, Loader2, Lock, CheckCircle2, Zap,
+  Crown, Loader2, Lock, CheckCircle2, Zap, Clock,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
