@@ -40,14 +40,14 @@ function ProfileEditRedirect() {
   return null;
 }
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated } = useAuth();
+function RedirectToLogin() {
+  const [location] = useLocation();
   const [, navigate] = useLocation();
-  if (!isAuthenticated) {
-    navigate("/login");
-    return null;
-  }
-  return <Component />;
+  useEffect(() => {
+    const redirect = location !== "/" ? `?redirect=${encodeURIComponent(location)}` : "";
+    navigate(`/login${redirect}`);
+  }, []);
+  return null;
 }
 
 function PageTracker() {
@@ -101,7 +101,7 @@ function Router() {
           ) : (
             <Switch>
               <Route path="/" component={Landing} />
-              <Route component={NotFound} />
+              <Route component={RedirectToLogin} />
             </Switch>
           )}
         </Route>

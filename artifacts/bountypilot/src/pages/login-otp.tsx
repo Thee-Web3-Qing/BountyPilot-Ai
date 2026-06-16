@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ export function LoginOTP() {
   const [isLoading, setIsLoading] = useState(false);
   const { loginOTP } = useAuth();
   const [, navigate] = useLocation();
+  const search = useSearch();
+  const redirectTo = new URLSearchParams(search).get("redirect") ?? "/";
 
   const handleRequestCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +43,7 @@ export function LoginOTP() {
     setError("");
     try {
       await loginOTP(email, code);
-      navigate("/");
+      navigate(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     }

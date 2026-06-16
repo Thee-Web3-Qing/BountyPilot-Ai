@@ -17,14 +17,16 @@ export function Login() {
   const { ready: googleReady } = useGoogleAuth();
   const [, navigate] = useLocation();
   const search = useSearch();
-  const refCode = new URLSearchParams(search).get("ref") ?? undefined;
+  const params = new URLSearchParams(search);
+  const refCode = params.get("ref") ?? undefined;
+  const redirectTo = params.get("redirect") ?? "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     try {
       await login(email, password);
-      navigate("/");
+      navigate(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     }
@@ -34,7 +36,7 @@ export function Login() {
     setError("");
     try {
       await loginGoogle(credential, refCode);
-      navigate("/");
+      navigate(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed");
     }
