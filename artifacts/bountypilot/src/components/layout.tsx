@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
-  User, Settings2, LogOut, Globe, Menu, X, ChevronDown, ChevronUp, ShieldCheck,
+  User, Settings2, LogOut, Globe, Menu, X, ShieldCheck,
   Rocket, Gift, Crown, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,12 +25,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout, planStatus } = useAuth();
   const [open, setOpen] = useState(false);
-  const [profileExpanded, setProfileExpanded] = useState(false);
 
-  const close = () => {
-    setOpen(false);
-    setProfileExpanded(false);
-  };
+  const close = () => setOpen(false);
 
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -137,103 +133,57 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </nav>
 
             {/* Account section */}
-            <div className="border-t border-border px-3 py-4 shrink-0">
-              {/* Signed in as */}
+            <div className="border-t border-border px-3 py-4 shrink-0 flex flex-col gap-0.5">
+              {/* Plan badge */}
               <div className="px-4 py-2 mb-1">
-                <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Signed in as</p>
-                <p className="font-mono text-sm font-bold text-foreground truncate">@{user?.username}</p>
                 {(planStatus === "expired" || planStatus === "pending") ? (
                   <Link href="/pricing" onClick={close}>
-                    <span className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-sm cursor-pointer hover:bg-primary/20 transition-colors">
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] text-primary border border-primary/30 bg-primary/10 px-2 py-0.5 rounded-sm cursor-pointer hover:bg-primary/20 transition-colors">
                       <Sparkles className="w-3 h-3" /> Free Plan — Upgrade
                     </span>
                   </Link>
                 ) : planStatus === "trial" ? (
-                  <span className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-yellow-400 border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 rounded-sm">
+                  <span className="inline-flex items-center gap-1 font-mono text-[10px] text-yellow-400 border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 rounded-sm">
                     Trial
                   </span>
                 ) : planStatus === "active" ? (
-                  <span className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-green-400 border border-green-500/30 bg-green-500/10 px-2 py-0.5 rounded-sm">
+                  <span className="inline-flex items-center gap-1 font-mono text-[10px] text-green-400 border border-green-500/30 bg-green-500/10 px-2 py-0.5 rounded-sm">
                     <Crown className="w-3 h-3" /> Pro
                   </span>
                 ) : null}
               </div>
 
-              {/* Profile — expands to show Profile + Stars + Settings + Sign Out */}
-              <button
-                onClick={() => setProfileExpanded((v) => !v)}
-                className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors",
-                  location === "/profile" || location === "/profile/edit" || location === "/stars"
+              <Link href="/settings" onClick={close}>
+                <div className={cn(
+                  "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
+                  location === "/settings"
                     ? "bg-primary text-primary-foreground font-bold"
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                )}
-              >
-                <User className="w-4 h-4 shrink-0" />
-                <span className="flex-1 text-left">Profile</span>
-                {profileExpanded
-                  ? <ChevronUp className="w-3.5 h-3.5" />
-                  : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
-
-              {/* Expanded: Profile + Stars + Settings + Sign Out */}
-              {profileExpanded && (
-                <div className="mt-0.5 pl-4 flex flex-col gap-0.5">
-                  <Link href="/profile" onClick={close}>
-                    <div className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
-                      location === "/profile" && !location.includes("/edit")
-                        ? "text-primary font-bold"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                    )}>
-                      <User className="w-3.5 h-3.5 shrink-0" />
-                      View Profile
-                    </div>
-                  </Link>
-                  <Link href="/stars" onClick={close}>
-                    <div className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
-                      location === "/stars"
-                        ? "text-primary font-bold"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                    )}>
-                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                      Stars
-                    </div>
-                  </Link>
-                  <Link href="/settings" onClick={close}>
-                    <div className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
-                      location === "/settings"
-                        ? "text-primary font-bold"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                    )}>
-                      <Settings2 className="w-3.5 h-3.5 shrink-0" />
-                      Settings
-                    </div>
-                  </Link>
-                  {user?.isAdmin && (
-                    <Link href="/admin" onClick={close}>
-                      <div className={cn(
-                        "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
-                        location === "/admin"
-                          ? "text-primary font-bold"
-                          : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                      )}>
-                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                        Admin
-                      </div>
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => { logout(); close(); }}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors text-muted-foreground hover:bg-red-500/10 hover:text-red-400 w-full text-left"
-                  >
-                    <LogOut className="w-3.5 h-3.5 shrink-0" />
-                    Sign Out
-                  </button>
+                )}>
+                  <Settings2 className="w-4 h-4 shrink-0" />
+                  Settings
                 </div>
+              </Link>
+              {user?.isAdmin && (
+                <Link href="/admin" onClick={close}>
+                  <div className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
+                    location === "/admin"
+                      ? "bg-primary text-primary-foreground font-bold"
+                      : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                  )}>
+                    <ShieldCheck className="w-4 h-4 shrink-0" />
+                    Admin
+                  </div>
+                </Link>
               )}
+              <button
+                onClick={() => { logout(); close(); }}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors text-muted-foreground hover:bg-red-500/10 hover:text-red-400 w-full text-left"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                Sign Out
+              </button>
             </div>
           </div>
         </div>

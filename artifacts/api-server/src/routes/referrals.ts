@@ -13,6 +13,25 @@ const FREE_LEADERBOARD_MIN = 10;       // minimum total referrals to appear on a
 const FREE_LEADERBOARD_TOP = 10;       // top N get 2 months free
 const CRYPTO_PRIZE_TOP = 2;            // top N split the $50 pool
 
+// Challenge campaigns
+const YEARLY_CHALLENGE = {
+  prizePool: 200,
+  minQualify: 3,
+  milestone1: { qualified: 5, unlockPercent: 50, unlockAmount: 100 },
+  milestone2: { qualified: 10, unlockPercent: 100, unlockAmount: 200 },
+  rewards50: { first: 50, second: 25, restShare: 25 },
+  rewards100: { first: 100, second: 50, thirdToTenth: 20 },
+};
+
+const LIFETIME_CHALLENGE = {
+  prizePool: 500,
+  minQualify: 3,
+  milestone1: { qualified: 5, unlockPercent: 50, unlockAmount: 250 },
+  milestone2: { qualified: 10, unlockPercent: 100, unlockAmount: 500 },
+  rewards50: { first: 125, second: 75, restShare: 50 },
+  rewards100: { first: 250, second: 150, thirdToTenth: 50 },
+};
+
 function qualifiesForCryptoPrize(paidReferrals: number) {
   return paidReferrals >= MIN_PAID_REFERRALS;
 }
@@ -200,5 +219,90 @@ referralsRouter.patch("/:referredUserId/plan", async (req, res) => {
   } catch (err) {
     logger.error(err, "Update referral plan error");
     res.status(500).json({ error: "Failed to update" });
+  }
+});
+
+// GET /referrals/challenges — yearly + lifetime challenge leaderboards
+referralsRouter.get("/challenges", async (_req, res) => {
+  try {
+    const allReferrals = await db
+      .select({
+        referrerId: referralsTable.referrerId,
+        username: usersTable.username,
+        tier: referralsTable.tier,
+        referredUserPlan: referralsTable.referredUserPlan,
+      })
+      .from(referralsTable)
+      .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
+      .where(
+        sql`${referralsTable.tier} IN ('yearly', 'lifetime') OR ${referralsTable.referredUserPlan} IN ('active', 'lifetime')`
+      );
+
+    // Build per-user stats
+    const userMap = new Map<number, { username: string; yearly: number; lifetime: number }>();
+    for (const r of allReferrals) {
+      const u = userMap.get(r.referrerId) || { username: r.username, yearly: 0, lifetime: 0 };
+      if (r.tier === "yearly" || (r.tier === null && r.referredUserPlan === "active")) u.yearly++;
+      if (r.tier === "lifetime" || r.referredUserPlan === "lifetime") u.lifetime++;
+      userMap.set(r.referrerId, u);
+    }
+
+    const users = Array.from(userMap.entries()).map(([id, data]) => ({ id, ...data }));
+
+    // Yearly challenge
+    const yearlySorted = users
+      .map(u => ({ username: u.username, count: u.yearly }))
+      .sort((a, b) => b.count - a.count)
+      .map((u, i) => ({
+        rank: i + 1,
+        username: u.username,
+        count: u.count,
+        qualifies: u.count >= YEARLY_CHALLENGE.minQualify,
+      }));
+
+    const yearlyQualified = yearlySorted.filter(u => u.qualifies);
+    const yearlyUnlock = yearlyQualified.length >= YEARLY_CHALLENGE.milestone2.qualified
+      ? 100
+      : yearlyQualified.length >= YEARLY_CHALLENGE.milestone1.qualified
+      ? 50
+      : 0;
+
+    // Lifetime challenge
+    const lifetimeSorted = users
+      .map(u => ({ username: u.username, count: u.lifetime }))
+      .sort((a, b) => b.count - a.count)
+      .map((u, i) => ({
+        rank: i + 1,
+        username: u.username,
+        count: u.count,
+        qualifies: u.count >= LIFETIME_CHALLENGE.minQualify,
+      }));
+
+    const lifetimeQualified = lifetimeSorted.filter(u => u.qualifies);
+    const lifetimeUnlock = lifetimeQualified.length >= LIFETIME_CHALLENGE.milestone2.qualified
+      ? 100
+      : lifetimeQualified.length >= LIFETIME_CHALLENGE.milestone1.qualified
+      ? 50
+      : 0;
+
+    res.json({
+      yearly: {
+        config: YEARLY_CHALLENGE,
+        leaderboard: yearlySorted.slice(0, 10),
+        qualifiedCount: yearlyQualified.length,
+        unlockedPercent: yearlyUnlock,
+        unlockedAmount: yearlyUnlock === 100 ? YEARLY_CHALLENGE.milestone2.unlockAmount : yearlyUnlock === 50 ? YEARLY_CHALLENGE.milestone1.unlockAmount : 0,
+      },
+      lifetime: {
+        config: LIFETIME_CHALLENGE,
+        leaderboard: lifetimeSorted.slice(0, 10),
+        qualifiedCount: lifetimeQualified.length,
+        unlockedPercent: lifetimeUnlock,
+        unlockedAmount: lifetimeUnlock === 100 ? LIFETIME_CHALLENGE.milestone2.unlockAmount : lifetimeUnlock === 50 ? LIFETIME_CHALLENGE.milestone1.unlockAmount : 0,
+      },
+    });
+  } catch (err) {
+    logger.error(err, "Challenge leaderboard error");
+    res.status(500).json({ error: "Failed to get challenges" });
   }
 });

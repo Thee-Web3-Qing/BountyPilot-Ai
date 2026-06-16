@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
-import { usersTable } from "@workspace/db";
+import { usersTable, referralsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import {
@@ -126,6 +126,15 @@ router.post("/webhook", async (req, res) => {
         .update(usersTable)
         .set({ plan: newPlan, subscriptionEndsAt, updatedAt: new Date() })
         .where(eq(usersTable.id, deposit.userId));
+
+      // Track tier on the referral record for challenge campaigns
+      if (deposit.tier === "yearly" || deposit.tier === "lifetime") {
+        await db
+          .update(referralsTable)
+          .set({ tier: deposit.tier, referredUserPlan: newPlan, qualifies: true })
+          .where(eq(referralsTable.referredUserId, deposit.userId));
+      }
+
       logger.info(
         { userId: deposit.userId, depositId, tier: deposit.tier, plan: newPlan, subscriptionEndsAt },
         "User subscription activated after deposit"

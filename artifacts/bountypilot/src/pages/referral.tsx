@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Gift, Trophy, Users, Star, Zap, Crown, Lock } from "lucide-react";
+import { Copy, Check, Gift, Trophy, Users, Star, Zap, Crown, Lock, Gem, Award, Target } from "lucide-react";
 
 interface ReferredUser {
   id: number;
@@ -46,13 +46,44 @@ interface LeaderboardData {
   cryptoPrizeTop: number;
 }
 
+interface ChallengeLeaderboardEntry {
+  rank: number;
+  username: string;
+  count: number;
+  qualifies: boolean;
+}
+
+interface ChallengeConfig {
+  prizePool: number;
+  minQualify: number;
+  milestone1: { qualified: number; unlockPercent: number; unlockAmount: number };
+  milestone2: { qualified: number; unlockPercent: number; unlockAmount: number };
+  rewards50: { first: number; second: number; restShare: number };
+  rewards100: { first: number; second: number; thirdToTenth: number };
+}
+
+interface ChallengeData {
+  config: ChallengeConfig;
+  leaderboard: ChallengeLeaderboardEntry[];
+  qualifiedCount: number;
+  unlockedPercent: number;
+  unlockedAmount: number;
+}
+
+interface ChallengesData {
+  yearly: ChallengeData;
+  lifetime: ChallengeData;
+}
+
 export function Referral() {
   const { user, token } = useAuth();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [lb, setLb] = useState<LeaderboardData | null>(null);
+  const [challenges, setChallenges] = useState<ChallengesData | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"crypto" | "access">("crypto");
+  const [challengeTab, setChallengeTab] = useState<"yearly" | "lifetime">("yearly");
 
   // Build referral link/code directly from auth context — always correct for the
   // logged-in user even before the API responds.
@@ -66,9 +97,11 @@ export function Referral() {
     Promise.all([
       fetch("/api/referrals/my", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch("/api/referrals/leaderboard").then(r => r.json()),
-    ]).then(([myStats, lbData]) => {
+      fetch("/api/referrals/challenges").then(r => r.json()),
+    ]).then(([myStats, lbData, chData]) => {
       if (myStats && !myStats.error) setStats(myStats);
       setLb(lbData);
+      if (chData && !chData.error) setChallenges(chData);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [token]);
 
@@ -142,6 +175,73 @@ export function Referral() {
           {stats?.qualifiesAccess && (
             <Badge className="bg-foreground text-background font-mono text-[10px]">✓ On leaderboard</Badge>
           )}
+        </div>
+      </div>
+
+      {/* ─── Challenge Campaigns ─── */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Award className="w-4 h-4 text-amber-400" />
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Subscriber Challenges</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Yearly Challenge */}
+          <div className="bg-amber-500/5 border border-amber-500/20 rounded-sm p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-amber-500/20 rounded-sm flex items-center justify-center shrink-0">
+                <Gem className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <p className="font-bold font-mono text-xs uppercase tracking-wider text-amber-400">Yearly Challenge</p>
+                <p className="font-mono text-[10px] text-muted-foreground">$200 prize pool</p>
+              </div>
+            </div>
+            <p className="font-mono text-xs text-muted-foreground">
+              Refer <strong className="text-foreground">3+ yearly subscribers</strong> to qualify. Unlock prize pool at 5 and 10 qualified referrers.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between font-mono text-[10px]">
+                <span className="text-muted-foreground">Pool unlocked</span>
+                <span className="text-amber-400 font-bold">{challenges?.yearly?.unlockedPercent ?? 0}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-background border border-border rounded-full overflow-hidden">
+                <div className="h-full bg-amber-400 transition-all duration-500" style={{ width: `${challenges?.yearly?.unlockedPercent ?? 0}%` }} />
+              </div>
+              <div className="flex items-center justify-between font-mono text-[10px]">
+                <span className="text-muted-foreground">Qualified: {challenges?.yearly?.qualifiedCount ?? 0} / {challenges?.yearly?.config?.milestone2?.qualified ?? 10}</span>
+                <span className="text-amber-400 font-bold">${challenges?.yearly?.unlockedAmount ?? 0} unlocked</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Lifetime Challenge */}
+          <div className="bg-purple-500/5 border border-purple-500/20 rounded-sm p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-purple-500/20 rounded-sm flex items-center justify-center shrink-0">
+                <Crown className="w-4 h-4 text-purple-400" />
+              </div>
+              <div>
+                <p className="font-bold font-mono text-xs uppercase tracking-wider text-purple-400">Lifetime Challenge</p>
+                <p className="font-mono text-[10px] text-muted-foreground">$500 prize pool</p>
+              </div>
+            </div>
+            <p className="font-mono text-xs text-muted-foreground">
+              Refer <strong className="text-foreground">3+ lifetime subscribers</strong> to qualify. Unlock prize pool at 5 and 10 qualified referrers.
+            </p>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between font-mono text-[10px]">
+                <span className="text-muted-foreground">Pool unlocked</span>
+                <span className="text-purple-400 font-bold">{challenges?.lifetime?.unlockedPercent ?? 0}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-background border border-border rounded-full overflow-hidden">
+                <div className="h-full bg-purple-400 transition-all duration-500" style={{ width: `${challenges?.lifetime?.unlockedPercent ?? 0}%` }} />
+              </div>
+              <div className="flex items-center justify-between font-mono text-[10px]">
+                <span className="text-muted-foreground">Qualified: {challenges?.lifetime?.qualifiedCount ?? 0} / {challenges?.lifetime?.config?.milestone2?.qualified ?? 10}</span>
+                <span className="text-purple-400 font-bold">${challenges?.lifetime?.unlockedAmount ?? 0} unlocked</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -396,6 +496,122 @@ export function Referral() {
         </CardContent>
       </Card>
 
+      {/* Challenge Leaderboard */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Target className="w-4 h-4" /> Challenge Leaderboards
+            </p>
+            <span className="font-mono text-[10px] text-muted-foreground">Qualified referrers only</span>
+          </div>
+
+          {/* Tab switcher */}
+          <div className="flex gap-1 border-b border-border pb-1">
+            <button
+              onClick={() => setChallengeTab("yearly")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${
+                challengeTab === "yearly"
+                  ? "text-amber-400 border-b-2 border-amber-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Gem className="w-3.5 h-3.5" /> Yearly ($200)
+            </button>
+            <button
+              onClick={() => setChallengeTab("lifetime")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono uppercase tracking-wider transition-colors ${
+                challengeTab === "lifetime"
+                  ? "text-purple-400 border-b-2 border-purple-400"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Crown className="w-3.5 h-3.5" /> Lifetime ($500)
+            </button>
+          </div>
+
+          {challengeTab === "yearly" && (
+            <div className="space-y-3">
+              <p className="font-mono text-[10px] text-muted-foreground">
+                Ranked by <strong className="text-foreground">yearly subscriber referrals</strong>. Minimum {challenges?.yearly?.config?.minQualify ?? 3} to qualify. Top 3 split the unlocked pool.
+              </p>
+              {(challenges?.yearly?.leaderboard?.length ?? 0) === 0 ? (
+                <p className="font-mono text-sm text-muted-foreground py-4 text-center">No yearly referrals yet — be the first!</p>
+              ) : (
+                <div className="space-y-2">
+                  {challenges!.yearly.leaderboard.map(entry => (
+                    <div
+                      key={entry.rank}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-sm border ${
+                        entry.username === user?.username
+                          ? "border-amber-400/40 bg-amber-400/5"
+                          : entry.qualifies
+                          ? "border-amber-400/20 bg-amber-400/5"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      <span className={`font-mono text-sm font-bold w-6 ${entry.rank <= 3 ? "text-amber-400" : "text-muted-foreground"}`}>
+                        #{entry.rank}
+                      </span>
+                      <span className="font-mono text-sm flex-1 truncate">
+                        {entry.username}
+                        {entry.username === user?.username && <span className="text-amber-400 ml-2 text-xs">(you)</span>}
+                      </span>
+                      <span className="font-mono text-xs text-amber-400 font-semibold">{entry.count} yearly</span>
+                      {entry.qualifies ? (
+                        <Badge className="bg-amber-400/20 text-amber-400 border-amber-400/30 font-mono text-[10px] px-1.5">✓ Qualifies</Badge>
+                      ) : (
+                        <span className="font-mono text-[10px] text-muted-foreground">{challenges?.yearly?.config?.minQualify ?? 3 - entry.count} more</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {challengeTab === "lifetime" && (
+            <div className="space-y-3">
+              <p className="font-mono text-[10px] text-muted-foreground">
+                Ranked by <strong className="text-foreground">lifetime subscriber referrals</strong>. Minimum {challenges?.lifetime?.config?.minQualify ?? 3} to qualify. Top 3 split the unlocked pool.
+              </p>
+              {(challenges?.lifetime?.leaderboard?.length ?? 0) === 0 ? (
+                <p className="font-mono text-sm text-muted-foreground py-4 text-center">No lifetime referrals yet — be the first!</p>
+              ) : (
+                <div className="space-y-2">
+                  {challenges!.lifetime.leaderboard.map(entry => (
+                    <div
+                      key={entry.rank}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-sm border ${
+                        entry.username === user?.username
+                          ? "border-purple-400/40 bg-purple-400/5"
+                          : entry.qualifies
+                          ? "border-purple-400/20 bg-purple-400/5"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      <span className={`font-mono text-sm font-bold w-6 ${entry.rank <= 3 ? "text-purple-400" : "text-muted-foreground"}`}>
+                        #{entry.rank}
+                      </span>
+                      <span className="font-mono text-sm flex-1 truncate">
+                        {entry.username}
+                        {entry.username === user?.username && <span className="text-purple-400 ml-2 text-xs">(you)</span>}
+                      </span>
+                      <span className="font-mono text-xs text-purple-400 font-semibold">{entry.count} lifetime</span>
+                      {entry.qualifies ? (
+                        <Badge className="bg-purple-400/20 text-purple-400 border-purple-400/30 font-mono text-[10px] px-1.5">✓ Qualifies</Badge>
+                      ) : (
+                        <span className="font-mono text-[10px] text-muted-foreground">{challenges?.lifetime?.config?.minQualify ?? 3 - entry.count} more</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* How it works */}
       <Card className="bg-card border-border">
         <CardContent className="p-5 space-y-4">
@@ -421,6 +637,30 @@ export function Referral() {
                 <p><span className="text-foreground">02</span> — Hit {lb?.freeLeaderboardMin ?? 10}+ total referrals to appear on the leaderboard</p>
                 <p><span className="text-foreground">03</span> — Stay in the top 10 — rankings shift in real time</p>
                 <p><span className="text-foreground">04</span> — Top 10 at campaign end get 2 months free access</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-mono text-xs text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Gem className="w-3.5 h-3.5" /> Yearly Challenge ($200)
+              </p>
+              <div className="space-y-1 font-mono text-xs text-muted-foreground ml-5">
+                <p><span className="text-amber-400">01</span> — Refer creators who subscribe yearly</p>
+                <p><span className="text-amber-400">02</span> — Get 3+ yearly referrals to qualify</p>
+                <p><span className="text-amber-400">03</span> — At 5 qualified, 50% pool unlocks ($100)</p>
+                <p><span className="text-amber-400">04</span> — At 10 qualified, 100% pool unlocks ($200)</p>
+                <p><span className="text-amber-400">05</span> — Top 3 split the unlocked amount at campaign end</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-mono text-xs text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5" /> Lifetime Challenge ($500)
+              </p>
+              <div className="space-y-1 font-mono text-xs text-muted-foreground ml-5">
+                <p><span className="text-purple-400">01</span> — Refer creators who subscribe lifetime</p>
+                <p><span className="text-purple-400">02</span> — Get 3+ lifetime referrals to qualify</p>
+                <p><span className="text-purple-400">03</span> — At 5 qualified, 50% pool unlocks ($250)</p>
+                <p><span className="text-purple-400">04</span> — At 10 qualified, 100% pool unlocks ($500)</p>
+                <p><span className="text-purple-400">05</span> — Top 3 split the unlocked amount at campaign end</p>
               </div>
             </div>
           </div>
