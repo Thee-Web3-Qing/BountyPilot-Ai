@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
   User, Settings2, LogOut, Globe, Menu, X, ShieldCheck,
-  Rocket, Gift, Crown, Sparkles,
+  Rocket, Gift, Crown, Sparkles, Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth";
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/earnings", label: "Earnings", icon: Coins },
   { href: "/referral", label: "Refer & Earn", icon: Gift },
   { href: "/stars", label: "Stars", icon: Sparkles },
+  { href: "/agent", label: "Autopilot", icon: Bot },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

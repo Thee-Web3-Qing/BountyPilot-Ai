@@ -18,6 +18,7 @@ import { customBountiesRouter } from "./custom-bounties";
 import { gamificationRouter } from "./gamification";
 import { checkinRouter } from "./checkin";
 import { notificationsRouter } from "./notifications";
+import { agentRouter } from "./agent";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use("/custom-bounties", customBountiesRouter);
 router.use("/gamification", gamificationRouter);
 router.use("/checkin", checkinRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/agent", agentRouter);
 
 export default router;

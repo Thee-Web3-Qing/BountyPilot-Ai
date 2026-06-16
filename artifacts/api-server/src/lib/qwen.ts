@@ -519,3 +519,93 @@ export async function generateProductionPlan(scraped: ScrapedBounty): Promise<Pr
 
   return templateProductionPlan(scraped);
 }
+
+// ── Application Drafter ────────────────────────────────────────
+
+export interface ApplicationDraft {
+  opening: string;
+  creatorFit: string;
+  approach: string;
+  closing: string;
+  fullDraft: string;
+}
+
+function templateApplicationDraft(
+  bounty: { title: string | null; platform: string | null; contentFormat: string | null },
+  profile?: UserProfile & { creatorName?: string | null; fullName?: string | null }
+): ApplicationDraft {
+  const name = profile?.creatorName || profile?.fullName || "I";
+  const niche = profile?.niche ? ` in the ${profile.niche} space` : "";
+  const format = bounty.contentFormat || "content";
+  const project = bounty.title || "this project";
+
+  const opening = `Hi! I'm ${name}, a Web3 content creator${niche} excited about the ${project} bounty.`;
+  const creatorFit = `My experience creating ${format} content makes me a strong fit for this opportunity. I specialize in communicating complex Web3 concepts clearly to engaged audiences.`;
+  const approach = `For this bounty I would create high-quality ${format} covering the core value proposition of the project, hitting every required deliverable, and submitting well ahead of the deadline.`;
+  const closing = `I'm ready to deliver great work here — please reach out if you have any questions!`;
+  const fullDraft = `${opening}\n\n${creatorFit}\n\n${approach}\n\n${closing}`;
+  return { opening, creatorFit, approach, closing, fullDraft };
+}
+
+export async function generateApplicationDraft(
+  bounty: {
+    title: string | null;
+    platform: string | null;
+    projectName: string | null;
+    rewardAmount: string | null;
+    rewardCurrency: string | null;
+    contentFormat: string | null;
+    submissionRequirements: string | null;
+    deliverables: string | null;
+    description: string | null;
+  },
+  profile?: UserProfile & { creatorName?: string | null; fullName?: string | null; portfolioLinks?: string | null }
+): Promise<ApplicationDraft> {
+  if (!hasKey()) return templateApplicationDraft(bounty, profile);
+
+  const profileContext = profile
+    ? `\nCreator applying:\n- Name: ${profile.creatorName || profile.fullName || "not provided"}\n- Niche: ${profile.niche || "Web3 creator"}\n- Platforms: ${profile.mainPlatforms || "not specified"}\n- Content formats: ${profile.contentFormats || "not specified"}\n- Skill level: ${profile.skillLevel || "intermediate"}\n- Strengths: ${profile.creatorStrengths || "not specified"}\n- Portfolio: ${profile.portfolioLinks || "not specified"}`
+    : "";
+
+  const draftTool: QwenTool = {
+    type: "function",
+    function: {
+      name: "submit_application_draft",
+      description: "Submit a structured bounty application draft personalized to this creator",
+      parameters: {
+        type: "object",
+        properties: {
+          opening: { type: "string", description: "1-2 sentence opening: who you are and why you're interested in this specific bounty" },
+          creatorFit: { type: "string", description: "2-3 sentences: why this creator is a strong fit — niche, format experience, relevant strengths" },
+          approach: { type: "string", description: "2-3 sentences: specific approach to the deliverables — research plan, unique angle, timeline" },
+          closing: { type: "string", description: "1-2 sentence confident closing with a CTA" },
+          fullDraft: { type: "string", description: "Complete application text in natural flowing prose, ready to submit" },
+        },
+        required: ["opening", "creatorFit", "approach", "closing", "fullDraft"],
+      },
+    },
+  };
+
+  try {
+    const result = await callQwenWithTool<ApplicationDraft>(
+      [
+        {
+          role: "system",
+          content:
+            "You are BountyPilot, drafting tailored Web3 bounty applications for content creators. Write in first person, professionally but conversationally. Be specific to this bounty and this creator's profile. No filler. Call submit_application_draft.",
+        },
+        {
+          role: "user",
+          content: `Draft an application for this bounty:\n- Title: ${bounty.title}\n- Platform: ${bounty.platform}\n- Project: ${bounty.projectName}\n- Reward: ${bounty.rewardAmount || "listed"} ${bounty.rewardCurrency || ""}\n- Format: ${bounty.contentFormat}\n- Requirements: ${bounty.submissionRequirements?.slice(0, 400) || "see listing"}\n- Description: ${bounty.description?.slice(0, 300) || ""}${profileContext}`,
+        },
+      ],
+      draftTool,
+      { maxTokens: 700 }
+    );
+    if (result) return result;
+  } catch {
+    // Fall through to template
+  }
+
+  return templateApplicationDraft(bounty, profile);
+}

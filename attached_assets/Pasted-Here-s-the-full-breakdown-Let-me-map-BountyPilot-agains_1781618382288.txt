@@ -1,0 +1,38 @@
+Here's the full breakdown. Let me map BountyPilot against every judging criterion:
+
+Track 4: Autopilot Agent — How BountyPilot fits
+The pitch: BountyPilot is an Autopilot Agent for Web3 creators — it autonomously discovers bounties from across the internet, scores them against your profile using Qwen AI, and surfaces the right opportunities at the right time. Human-in-the-loop: the creator reviews AI-scored opportunities and decides what to pursue.
+
+Judging gaps to close (by weight)
+🔴 Technical Depth & Engineering — 30%
+"Sophisticated use of QwenCloud APIs, custom skills, MCP integrations, algorithmic innovation"
+
+You currently have: Qwen API key wired in, falls back to rule-based mock.
+Gap — this is the biggest one. Judges need to see Qwen doing actual work, not just a fallback. Specifically:
+
+What to build	Why it scores
+AI Opportunity Scorer — Qwen reads each crawled bounty + the user's profile and returns a fit score + reason	Core autopilot logic, non-trivial, uses Qwen for structured output
+AI Application Drafter — one-tap "draft my application" that sends bounty details + user profile to Qwen and returns a tailored submission	Demonstrates tool invocation + real user value
+Human-in-the-loop checkpoint — before the agent "commits" (marks a bounty as pursued), it shows the AI reasoning and asks the user to confirm	Directly matches the track requirement
+🟡 Innovation & AI Creativity — 30%
+"Architecture quality, modularity, scalability, non-trivial logic"
+
+You have: working SaaS with DB, auth, crawler, gamification.
+Gap: The AI layer needs to be architecturally visible — a clear agent loop (observe → reason → act → checkpoint). Right now it reads like a tracker, not an agent.
+
+Fix: Create an explicit "Agent Pipeline" in the code: crawl → score with Qwen → rank → notify user → await approval → log action. This becomes the architecture diagram.
+
+🟢 Problem Value & Impact — 25%
+Strong. Web3 bounties are a real $500M+ market. BountyPilot already has real users, a live deployment, referral system, payments. This is clearly not a toy demo.
+
+🟢 Presentation & Documentation — 15%
+Needs work. You'll need:
+
+Architecture diagram (agent loop visual)
+3-min demo video showing the AI in action
+README with Qwen API integration explained
+The 3 things I'd build right now
+Qwen Opportunity Scorer — when the crawler runs, each bounty gets AI-scored (1-10) against the logged-in user's profile. Displayed as a score badge on the bounty card.
+AI Application Drafter — button on each bounty: "Draft Application" → Qwen generates a tailored pitch using the user's profile + bounty requirements.
+Agent Activity Feed — a visible log of what the autopilot did: "Crawled 12 new bounties → Scored 5 as High Match → 2 new notifications sent"
+These three directly hit the track description's keywords: handles ambiguous inputs (bounties), invokes external tools (crawler + Qwen), human-in-the-loop (user reviews scores before acting).

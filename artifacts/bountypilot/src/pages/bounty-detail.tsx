@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe, Bot, FileText, Copy, Check } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
 
 // ── Team helpers ─────────────────────────────────────────────
@@ -230,7 +230,17 @@ export function BountyDetail() {
   const [reporting, setReporting] = useState(false);
   const [reportSent, setReportSent] = useState(false);
 
-  const handleStatusChange = (status: string) => {
+  // AI Application Drafter state
+  const [draftingApp, setDraftingApp] = useState(false);
+  const [appDraft, setAppDraft] = useState<{ opening: string; creatorFit: string; approach: string; closing: string; fullDraft: string } | null>(null);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [copiedDraft, setCopiedDraft] = useState(false);
+
+  // Human-in-the-loop checkpoint state
+  const [showHitL, setShowHitL] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+
+  const commitStatusChange = (status: string) => {
     updateMutation.mutate(
       { id: bountyId, data: { status } },
       {
@@ -241,6 +251,15 @@ export function BountyDetail() {
         },
       }
     );
+  };
+
+  const handleStatusChange = (status: string) => {
+    if (bounty?.status === "discovered" && bounty?.opportunityScore != null) {
+      setPendingStatus(status);
+      setShowHitL(true);
+      return;
+    }
+    commitStatusChange(status);
   };
 
   const handleMarkSubmitted = (e: React.FormEvent) => {
@@ -317,6 +336,31 @@ export function BountyDetail() {
     } finally {
       setRescraping(false);
     }
+  };
+
+  const handleDraftApplication = async () => {
+    if (!token || draftingApp) return;
+    setDraftingApp(true);
+    try {
+      const resp = await fetch(`/api/bounties/${bountyId}/draft-application`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setAppDraft(data);
+        setShowDraftModal(true);
+      }
+    } finally {
+      setDraftingApp(false);
+    }
+  };
+
+  const handleCopyDraft = async () => {
+    if (!appDraft) return;
+    await navigator.clipboard.writeText(appDraft.fullDraft);
+    setCopiedDraft(true);
+    setTimeout(() => setCopiedDraft(false), 2000);
   };
 
   const handleReport = async () => {
@@ -441,9 +485,22 @@ export function BountyDetail() {
         {bounty.opportunityScore != null && bounty.scoreExplanation && (
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
-                <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Score Explanation</p>
+                  <span className="inline-block px-1.5 py-0 bg-primary/10 rounded text-[9px] text-primary/70 font-mono">AI-Generated</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDraftApplication}
+                  disabled={draftingApp}
+                  className="font-mono text-xs uppercase tracking-wider border-primary/30 text-primary hover:bg-primary/10 h-7 px-2 flex-shrink-0"
+                >
+                  {draftingApp
+                    ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Drafting…</>
+                    : <><Bot className="w-3 h-3 mr-1.5" />Draft Application</>}
+                </Button>
               </div>
               <p className="text-sm">{bounty.scoreExplanation}</p>
 
@@ -760,6 +817,159 @@ export function BountyDetail() {
         sending={reporting}
         sent={reportSent}
       />
+
+      {/* ── AI Application Drafter Modal ─────────────────────── */}
+      {showDraftModal && appDraft && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowDraftModal(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full bg-card border-t border-border rounded-t-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-mono font-bold text-base flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-primary" /> AI Application Draft
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Generated by Qwen AI · personalised to your profile and this bounty
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyDraft}
+                  className="font-mono text-xs h-7 px-2 border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  {copiedDraft
+                    ? <><Check className="w-3 h-3 mr-1" />Copied</>
+                    : <><Copy className="w-3 h-3 mr-1" />Copy</>}
+                </Button>
+                <button onClick={() => setShowDraftModal(false)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { label: "Opening", value: appDraft.opening },
+                { label: "Why I'm a Good Fit", value: appDraft.creatorFit },
+                { label: "My Approach", value: appDraft.approach },
+                { label: "Closing", value: appDraft.closing },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+                  <p className="text-sm bg-muted/30 rounded-sm p-3 leading-relaxed">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-1">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Full Draft (ready to submit)</p>
+              <pre className="text-sm bg-muted/30 rounded-sm p-3 whitespace-pre-wrap leading-relaxed font-sans border border-border">
+                {appDraft.fullDraft}
+              </pre>
+            </div>
+
+            <Button
+              className="w-full font-mono uppercase text-xs tracking-wider"
+              onClick={handleCopyDraft}
+            >
+              {copiedDraft ? <><Check className="w-3 h-3 mr-1.5" />Copied to clipboard</> : <><Copy className="w-3 h-3 mr-1.5" />Copy full draft</>}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Human-in-the-Loop Checkpoint Modal ───────────────── */}
+      {showHitL && bounty && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowHitL(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full bg-card border-t border-border rounded-t-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-mono font-bold text-base flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-primary" /> Agent Checkpoint
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Review the AI reasoning before committing to this opportunity
+                </p>
+              </div>
+              <button onClick={() => setShowHitL(false)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {bounty.opportunityScore != null && (
+              <div className="flex items-center gap-4 p-3 rounded-sm border border-primary/30 bg-primary/5">
+                <div className="text-center">
+                  <p className={`text-4xl font-bold font-mono ${bounty.opportunityScore >= 7 ? "text-green-400" : bounty.opportunityScore >= 5 ? "text-yellow-400" : "text-red-400"}`}>
+                    {bounty.opportunityScore}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-mono">/10</p>
+                </div>
+                <div className="flex-1">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Qwen AI Score</p>
+                  <p className="text-sm leading-relaxed">{bounty.scoreExplanation}</p>
+                </div>
+              </div>
+            )}
+
+            {bounty.scoreBreakdown && (() => {
+              try {
+                const bd = JSON.parse(bounty.scoreBreakdown) as Array<{ label: string; score: number; note: string }>;
+                if (!Array.isArray(bd) || bd.length === 0) return null;
+                return (
+                  <div className="space-y-2">
+                    <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Score Breakdown</p>
+                    {bd.map((c, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="w-20 font-mono text-[10px] text-muted-foreground uppercase flex-shrink-0">{c.label}</span>
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${(c.score / 10) * 100}%` }} />
+                        </div>
+                        <span className="w-5 font-mono text-xs font-bold text-right flex-shrink-0">{c.score}</span>
+                        <span className="flex-1 text-xs text-muted-foreground min-w-0 truncate">{c.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            <p className="text-sm text-muted-foreground">
+              The autopilot has evaluated this opportunity. You're about to move it to <span className="font-mono text-foreground">{pendingStatus?.replace(/_/g, " ").toUpperCase()}</span>. Confirm to proceed.
+            </p>
+
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 font-mono uppercase text-xs tracking-wider"
+                onClick={() => {
+                  setShowHitL(false);
+                  if (pendingStatus) commitStatusChange(pendingStatus);
+                  setPendingStatus(null);
+                }}
+                disabled={updateMutation.isPending}
+              >
+                {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                Confirm &amp; Pursue
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 font-mono uppercase text-xs tracking-wider"
+                onClick={() => { setShowHitL(false); setPendingStatus(null); }}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

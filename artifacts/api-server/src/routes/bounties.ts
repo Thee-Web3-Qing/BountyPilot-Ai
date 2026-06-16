@@ -11,7 +11,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { CreateBountyBody, UpdateBountyBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger.js";
 import { scrapeBounty } from "../lib/scraper.js";
-import { analyzeBounty, generateResearchBrief, generateProductionPlan } from "../lib/qwen.js";
+import { analyzeBounty, generateResearchBrief, generateProductionPlan, generateApplicationDraft } from "../lib/qwen.js";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { getUserPlanStatus, countUserBounties } from "../lib/access.js";
 
@@ -367,5 +367,88 @@ bountiesRouter.post("/:id/save-later", async (req: AuthRequest, res) => {
   } catch (err) {
     logger.error(err, "Error saving bounty for later");
     res.status(500).json({ error: "Failed to save bounty" });
+  }
+});
+
+// POST /bounties/:id/rescore — re-score with user's current profile using Qwen AI
+bountiesRouter.post("/:id/rescore", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const id = parseInt(req.params.id as string);
+    const [bounty] = await db
+      .select()
+      .from(bountiesTable)
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
+    if (!bounty) { res.status(404).json({ error: "Not found" }); return; }
+
+    const [userProfile] = await db.select().from(userProfilesTable).where(eq(userProfilesTable.userId, userId));
+
+    const scraped = {
+      title: bounty.title ?? "",
+      platform: bounty.platform ?? "",
+      projectName: bounty.projectName ?? "",
+      rewardAmount: bounty.rewardAmount ?? null,
+      rewardCurrency: bounty.rewardCurrency ?? null,
+      deadline: bounty.deadline ?? null,
+      contentFormat: bounty.contentFormat ?? "",
+      submissionRequirements: bounty.submissionRequirements ?? "",
+      deliverables: bounty.deliverables ?? "",
+      description: bounty.submissionRequirements ?? "",
+      submissionLink: bounty.submissionLink ?? "",
+      eligibilityRules: bounty.eligibilityRules ?? "",
+      importantNotes: bounty.importantNotes ?? "",
+      confidenceScore: bounty.confidenceScore ?? 70,
+      prizeBreakdown: null,
+      prizeRank: null,
+    };
+
+    const analysis = await analyzeBounty(scraped, userProfile ?? undefined);
+    const [updated] = await db
+      .update(bountiesTable)
+      .set({
+        opportunityScore: analysis.opportunityScore,
+        scoreExplanation: analysis.scoreExplanation,
+        scoreBreakdown: analysis.scoreBreakdown ? JSON.stringify(analysis.scoreBreakdown) : null,
+      })
+      .where(eq(bountiesTable.id, id))
+      .returning();
+
+    res.json({ ...updated, personalized: !!userProfile });
+  } catch (err) {
+    logger.error(err, "Error rescoring bounty");
+    res.status(500).json({ error: "Failed to rescore bounty" });
+  }
+});
+
+// POST /bounties/:id/draft-application — generate AI application draft using Qwen
+bountiesRouter.post("/:id/draft-application", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const id = parseInt(req.params.id as string);
+    const [bounty] = await db
+      .select()
+      .from(bountiesTable)
+      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
+    if (!bounty) { res.status(404).json({ error: "Not found" }); return; }
+
+    const [userProfile] = await db.select().from(userProfilesTable).where(eq(userProfilesTable.userId, userId));
+    const draft = await generateApplicationDraft(
+      {
+        title: bounty.title,
+        platform: bounty.platform,
+        projectName: bounty.projectName,
+        rewardAmount: bounty.rewardAmount,
+        rewardCurrency: bounty.rewardCurrency,
+        contentFormat: bounty.contentFormat,
+        submissionRequirements: bounty.submissionRequirements,
+        deliverables: bounty.deliverables,
+        description: null,
+      },
+      userProfile ?? undefined
+    );
+    res.json(draft);
+  } catch (err) {
+    logger.error(err, "Error drafting application");
+    res.status(500).json({ error: "Failed to draft application" });
   }
 });
