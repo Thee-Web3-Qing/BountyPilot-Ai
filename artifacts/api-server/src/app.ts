@@ -40,11 +40,14 @@ app.use(express.urlencoded({ extended: true }));
 // API routes first
 app.use("/api", router);
 
-// Serve bountypilot static assets (JS, CSS, images, etc.)
-app.use(express.static(frontendDist));
+// Serve bountypilot static assets (JS, CSS, images — hashed filenames, long cache)
+app.use(express.static(frontendDist, { maxAge: "1y", index: false }));
 
-// SPA catch-all: any non-API path gets index.html so React/Wouter handles routing
+// SPA catch-all: serve index.html with no-cache so users always get the latest build
 app.get("/{*any}", (_req, res) => {
+  res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
   res.sendFile(resolve(frontendDist, "index.html"));
 });
 
