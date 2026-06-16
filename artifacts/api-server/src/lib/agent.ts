@@ -2,17 +2,39 @@
  * BountyPilot Agentic Pipeline
  *
  * Multi-step Qwen tool-calling loop that orchestrates the full creator
- * intelligence workflow: score → decide → research brief → production plan.
+ * intelligence workflow: score → decide → research brief → production plan → application draft.
  *
  * Qwen acts as the orchestrator — it decides whether a bounty is worth
  * a full research brief based on its own score evaluation, then generates
  * all downstream assets. The decision logic is Qwen's, not hardcoded.
  */
 
-import { runQwenAgentLoop, analyzeBounty, generateResearchBrief, generateProductionPlan, hasKey } from "./qwen.js";
+import { runQwenAgentLoop, analyzeBounty, generateResearchBrief, generateProductionPlan, generateApplicationDraft, hasKey } from "./qwen.js";
 import { scrapeBounty, type ScrapedBounty } from "./scraper.js";
 import { logger } from "./logger.js";
 import type { QwenMessage } from "./qwen.js";
+
+// ── URL validation ─────────────────────────────────────────────
+
+function validateBountyUrl(raw: string): { ok: true; url: string } | { ok: false; reason: string } {
+  let u: URL;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    return { ok: false, reason: `"${raw.slice(0, 60)}" is not a valid URL. Paste a full bounty listing link (https://…).` };
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") {
+    return { ok: false, reason: "URL must start with https://. Paste the full bounty listing link." };
+  }
+  if (!u.hostname.includes(".")) {
+    return { ok: false, reason: "URL hostname looks invalid. Paste the full bounty listing link." };
+  }
+  const blocklist = ["twitter.com", "x.com", "instagram.com", "facebook.com", "tiktok.com", "youtube.com"];
+  if (blocklist.some((b) => u.hostname.includes(b))) {
+    return { ok: false, reason: `${u.hostname} is a social platform, not a bounty board. Paste the listing URL directly (e.g. from Superteam Earn, Devpost, or Dework).` };
+  }
+  return { ok: true, url: u.href };
+}
 
 // ── Stream event types ────────────────────────────────────────
 
@@ -22,7 +44,8 @@ export type AgentStreamEvent =
   | { type: "no_key" }
   | { type: "tool_call"; step: number; tool: string; label: string }
   | { type: "tool_result"; step: number; tool: string; durationMs: number; preview: string; score?: number }
-  | { type: "done"; opportunityScore: number; scoreExplanation: string; briefGenerated: boolean; planGenerated: boolean; agentDecision: string; durationMs: number; title: string; platform: string }
+  | { type: "confirm"; score: number; message: string }
+  | { type: "done"; opportunityScore: number; scoreExplanation: string; briefGenerated: boolean; planGenerated: boolean; draftGenerated: boolean; applicationDraft?: string; agentDecision: string; durationMs: number; title: string; platform: string }
   | { type: "error"; message: string }
 
 // ── Result types ──────────────────────────────────────────────
@@ -33,6 +56,7 @@ export interface AgentPipelineResult {
   scoreExplanation: string;
   briefGenerated: boolean;
   planGenerated: boolean;
+  draftGenerated: boolean;
   researchBrief?: {
     summary: string;
     contentAngles: string;
@@ -48,6 +72,7 @@ export interface AgentPipelineResult {
     submissionChecklist: string;
     estimatedHours: number;
   };
+  applicationDraft?: string;
   agentDecision: string;
   toolCallLog: Array<{ tool: string; args: unknown; result: unknown }>;
   durationMs: number;
@@ -110,6 +135,23 @@ const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "draft_application",
+      description: "Write a ready-to-submit application cover letter personalised to the creator's profile. Call this after the production plan.",
+      parameters: {
+        type: "object",
+        properties: {
+          tone_notes: {
+            type: "string",
+            description: "Any specific tone or angle notes for the application",
+          },
+        },
+        required: ["tone_notes"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "finalize_pipeline",
       description: "Mark the pipeline as complete and provide a final creator recommendation.",
       parameters: {
@@ -135,6 +177,16 @@ export async function runBountyAgentPipeline(
 ): Promise<AgentPipelineResult> {
   const start = Date.now();
 
+  // 0. Validate URL if a string was provided
+  if (typeof urlOrScraped === "string") {
+    const validation = validateBountyUrl(urlOrScraped);
+    if (!validation.ok) {
+      emit?.({ type: "error", message: validation.reason });
+      throw new Error(validation.reason);
+    }
+    urlOrScraped = validation.url;
+  }
+
   // 1. Scrape bounty if URL provided
   let scraped: ScrapedBounty;
   if (typeof urlOrScraped === "string") {
@@ -150,8 +202,10 @@ export async function runBountyAgentPipeline(
   let scoreExplanation = "";
   let briefGenerated = false;
   let planGenerated = false;
+  let draftGenerated = false;
   let researchBrief: AgentPipelineResult["researchBrief"];
   let productionPlan: AgentPipelineResult["productionPlan"];
+  let applicationDraft: string | undefined;
   let agentDecision = "";
   let stepCount = 0;
 
@@ -180,15 +234,22 @@ export async function runBountyAgentPipeline(
       productionPlan = plan;
       planGenerated = true;
       emit?.({ type: "tool_result", step: stepCount, tool: "generate_production_plan", durationMs: Date.now() - t3, preview: `~${plan.estimatedHours}h estimated · ${scraped.contentFormat} format` });
+
+      emit?.({ type: "tool_call", step: ++stepCount, tool: "draft_application", label: "Drafting Application" });
+      const t4 = Date.now();
+      const draft = await generateApplicationDraft(scraped, profile as Parameters<typeof generateApplicationDraft>[1]);
+      applicationDraft = draft.fullDraft;
+      draftGenerated = true;
+      emit?.({ type: "tool_result", step: stepCount, tool: "draft_application", durationMs: Date.now() - t4, preview: draft.opening?.slice(0, 120) ?? "Application draft ready" });
     }
 
     const result: AgentPipelineResult = {
-      scraped, opportunityScore, scoreExplanation, briefGenerated, planGenerated,
-      researchBrief, productionPlan,
+      scraped, opportunityScore, scoreExplanation, briefGenerated, planGenerated, draftGenerated,
+      researchBrief, productionPlan, applicationDraft,
       agentDecision: opportunityScore >= 5 ? "Pursued — score meets threshold" : "Skipped brief — low score",
       toolCallLog: [], durationMs: Date.now() - start,
     };
-    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, agentDecision: result.agentDecision, durationMs: result.durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
+    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, draftGenerated, applicationDraft, agentDecision: result.agentDecision, durationMs: result.durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
     return result;
   }
 
@@ -200,8 +261,9 @@ export async function runBountyAgentPipeline(
 Follow this sequence using the available tools:
 1. Call score_bounty to evaluate the opportunity
 2. If the bounty looks worthwhile (score 5+), call generate_research_brief
-3. After the research brief, call generate_production_plan  
-4. Always finish by calling finalize_pipeline with your recommendation
+3. After the research brief, call generate_production_plan
+4. After the production plan, call draft_application to write a ready-to-submit cover letter
+5. Always finish by calling finalize_pipeline with your recommendation
 
 Make each tool call decision based on the bounty data. You are the orchestrator — use your judgment.`,
   };
@@ -224,15 +286,14 @@ ${profile ? `\nCreator profile:\n${JSON.stringify(profile, null, 2)}` : ""}
 Work through the pipeline step by step using the available tools.`,
   };
 
-  // Tool labels for stream events
   const TOOL_LABELS: Record<string, string> = {
     score_bounty: "Scoring Opportunity",
     generate_research_brief: "Generating Research Brief",
     generate_production_plan: "Building Production Plan",
+    draft_application: "Drafting Application",
     finalize_pipeline: "Finalizing Recommendation",
   };
 
-  // Tool executor: maps agent tool calls to real functions
   const toolExecutor = async (name: string, args: unknown): Promise<unknown> => {
     logger.info({ tool: name, args }, "Agent executing tool");
     const t = Date.now();
@@ -263,10 +324,18 @@ Work through the pipeline step by step using the available tools.`,
         return { generated: true, estimatedHours: plan.estimatedHours, format: scraped.contentFormat };
       }
 
+      case "draft_application": {
+        const draft = await generateApplicationDraft(scraped, profile as Parameters<typeof generateApplicationDraft>[1]);
+        applicationDraft = draft.fullDraft;
+        draftGenerated = true;
+        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: draft.opening?.slice(0, 120) ?? "Application draft ready" });
+        return { generated: true, opening: draft.opening };
+      }
+
       case "finalize_pipeline": {
         agentDecision = (args as { recommendation: string }).recommendation || "Pipeline complete";
         emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: agentDecision.slice(0, 120) });
-        return { status: "complete", briefGenerated, planGenerated };
+        return { status: "complete", briefGenerated, planGenerated, draftGenerated };
       }
 
       default:
@@ -279,7 +348,7 @@ Work through the pipeline step by step using the available tools.`,
       [systemPrompt, userPrompt],
       AGENT_TOOLS,
       toolExecutor,
-      { maxTokens: 500, timeout: 60000, maxIterations: 8 }
+      { maxTokens: 500, timeout: 90000, maxIterations: 10 }
     );
 
     if (!agentDecision && loopResult.finalContent) {
@@ -287,29 +356,22 @@ Work through the pipeline step by step using the available tools.`,
     }
 
     logger.info(
-      { score: opportunityScore, briefGenerated, planGenerated, tools: loopResult.toolCallLog.length },
+      { score: opportunityScore, briefGenerated, planGenerated, draftGenerated, tools: loopResult.toolCallLog.length },
       "BountyPilot agent pipeline complete"
     );
 
     const durationMs = Date.now() - start;
-    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, agentDecision, durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
+    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, draftGenerated, applicationDraft, agentDecision, durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
 
     return {
-      scraped,
-      opportunityScore,
-      scoreExplanation,
-      briefGenerated,
-      planGenerated,
-      researchBrief,
-      productionPlan,
-      agentDecision,
+      scraped, opportunityScore, scoreExplanation, briefGenerated, planGenerated, draftGenerated,
+      researchBrief, productionPlan, applicationDraft, agentDecision,
       toolCallLog: loopResult.toolCallLog,
       durationMs,
     };
   } catch (err) {
     logger.error({ err }, "Agent pipeline error — falling back to direct calls");
 
-    // Hard fallback if the agent loop fails
     const analysis = await analyzeBounty(scraped);
     return {
       scraped,
@@ -317,6 +379,7 @@ Work through the pipeline step by step using the available tools.`,
       scoreExplanation: analysis.scoreExplanation,
       briefGenerated: false,
       planGenerated: false,
+      draftGenerated: false,
       agentDecision: "Fallback mode — agent loop encountered an error",
       toolCallLog: [],
       durationMs: Date.now() - start,

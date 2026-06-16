@@ -8,12 +8,13 @@ import {
   Bot, Cpu, Zap, ShieldCheck, ChevronRight, CheckCircle2, Circle,
   Loader2, RefreshCw, Brain, Crosshair, BookOpen, FileText,
   Link2, AlertTriangle, ChevronDown, ChevronUp, Plus, Check,
+  PenLine, X as XIcon,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { usePageMeta } from "@/lib/use-page-meta";
 import { cn } from "@/lib/utils";
 
-// ── Stream event types (mirror server) ───────────────────────────────────────
+// ── Stream event types ────────────────────────────────────────────────────────
 
 type StreamEvent =
   | { type: "scraping"; url: string }
@@ -21,7 +22,8 @@ type StreamEvent =
   | { type: "no_key" }
   | { type: "tool_call"; step: number; tool: string; label: string }
   | { type: "tool_result"; step: number; tool: string; durationMs: number; preview: string; score?: number }
-  | { type: "done"; opportunityScore: number; scoreExplanation: string; briefGenerated: boolean; planGenerated: boolean; agentDecision: string; durationMs: number; title: string; platform: string }
+  | { type: "confirm"; score: number; message: string }
+  | { type: "done"; opportunityScore: number; scoreExplanation: string; briefGenerated: boolean; planGenerated: boolean; draftGenerated: boolean; applicationDraft?: string; agentDecision: string; durationMs: number; title: string; platform: string }
   | { type: "error"; message: string }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -45,6 +47,7 @@ const TOOL_META: Record<string, { icon: React.ElementType; color: string; bg: st
   score_bounty:            { icon: Crosshair,    color: "text-primary",    bg: "bg-primary/10 border-primary/30",       label: "Score Bounty" },
   generate_research_brief: { icon: BookOpen,     color: "text-blue-400",   bg: "bg-blue-500/10 border-blue-500/30",     label: "Research Brief" },
   generate_production_plan:{ icon: FileText,     color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/30", label: "Production Plan" },
+  draft_application:       { icon: PenLine,      color: "text-amber-400",  bg: "bg-amber-500/10 border-amber-500/30",   label: "Application Draft" },
   finalize_pipeline:       { icon: CheckCircle2, color: "text-green-400",  bg: "bg-green-500/10 border-green-500/30",   label: "Finalize" },
 };
 
@@ -60,7 +63,7 @@ function IconPill({
   );
 }
 
-// ── Thinking action strip ─────────────────────────────────────────────────────
+// ── Action strip ──────────────────────────────────────────────────────────────
 
 function ActionStrip({ events, running }: { events: StreamEvent[]; running: boolean }) {
   const toolCalls = events.filter((e): e is Extract<StreamEvent, { type: "tool_call" }> => e.type === "tool_call");
@@ -96,7 +99,64 @@ function ActionStrip({ events, running }: { events: StreamEvent[]; running: bool
   );
 }
 
-// ── Save-to-bounties button (inside done card) ────────────────────────────────
+// ── HITL Confirm card ─────────────────────────────────────────────────────────
+
+function ConfirmCard({
+  score,
+  onContinue,
+  onStop,
+}: {
+  score: number;
+  onContinue: () => void;
+  onStop: () => void;
+}) {
+  const isHigh   = score >= 8;
+  const isMedium = score >= 5 && score < 8;
+  const isLow    = score < 5;
+
+  const accent = isHigh ? "border-green-500/50 bg-green-500/5"
+    : isMedium ? "border-yellow-500/50 bg-yellow-500/5"
+    : "border-red-500/40 bg-red-500/5";
+
+  const scoreColor = isHigh ? "text-green-400" : isMedium ? "text-yellow-400" : "text-red-400";
+
+  const message = isHigh
+    ? "Strong opportunity. Run full analysis?"
+    : isMedium
+    ? "Medium opportunity. Run full analysis? (~45–90s)"
+    : "Low score. Still run full analysis?";
+
+  return (
+    <div className={cn("rounded-sm border p-3 flex flex-col gap-2.5 my-1", accent)}>
+      <div className="flex items-center gap-2">
+        <Brain className="w-4 h-4 text-primary flex-shrink-0" />
+        <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+          Human Checkpoint
+        </span>
+      </div>
+      <div className="flex items-center gap-3 pl-6">
+        <span className={cn("font-bold text-2xl font-mono", scoreColor)}>{score}/10</span>
+        <p className="font-mono text-xs text-foreground leading-snug">{message}</p>
+      </div>
+      <div className="flex items-center gap-2 pl-6">
+        <button
+          onClick={onContinue}
+          className="flex items-center gap-1.5 font-mono text-xs px-3 py-1.5 rounded-sm border border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+        >
+          <Brain className="w-3 h-3" /> Continue Full Analysis
+        </button>
+        <button
+          onClick={onStop}
+          className="flex items-center gap-1.5 font-mono text-xs px-3 py-1.5 rounded-sm border border-border text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors"
+        >
+          <XIcon className="w-3 h-3" /> Score Only
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Save-to-bounties button ───────────────────────────────────────────────────
 
 function SaveButton({ url, token }: { url: string; token: string | null }) {
   const [state, setState] = useState<"idle" | "loading" | "saved" | "error">("idle");
@@ -156,6 +216,29 @@ function SaveButton({ url, token }: { url: string; token: string | null }) {
   );
 }
 
+// ── Expandable text ───────────────────────────────────────────────────────────
+
+function ExpandableText({ text, maxLen = 180, className }: { text: string; maxLen?: number; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > maxLen;
+  return (
+    <div className={className}>
+      <p className={cn("font-mono text-xs text-muted-foreground leading-relaxed", !expanded && isLong && "line-clamp-3")}>
+        {text}
+      </p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="font-mono text-[10px] text-primary/70 hover:text-primary transition-colors mt-0.5"
+        >
+          {expanded ? "Show less ↑" : "Show more ↓"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Individual event row ──────────────────────────────────────────────────────
 
 function EventRow({ event, token, bountyUrl }: {
@@ -211,7 +294,6 @@ function EventRow({ event, token, bountyUrl }: {
 
       return (
         <div className="flex flex-col gap-0">
-          {/* Clickable header row */}
           <button
             type="button"
             onClick={() => isLong && setExpanded((v) => !v)}
@@ -237,40 +319,27 @@ function EventRow({ event, token, bountyUrl }: {
             )}
             {isLong && (
               <span className="ml-auto text-muted-foreground/60 flex-shrink-0">
-                {expanded
-                  ? <ChevronUp className="w-3 h-3" />
-                  : <ChevronDown className="w-3 h-3" />
-                }
+                {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </span>
             )}
           </button>
-
-          {/* Preview content */}
           {cleanPreview && (
             <p className={cn(
-              "font-mono text-xs text-muted-foreground pl-5 leading-relaxed transition-all",
+              "font-mono text-xs text-muted-foreground pl-5 leading-relaxed",
               !expanded && "line-clamp-2"
             )}>
               {cleanPreview}
             </p>
           )}
-
-          {/* Expand hint */}
           {isLong && !expanded && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="pl-5 mt-0.5 font-mono text-[10px] text-primary/70 hover:text-primary transition-colors text-left"
-            >
+            <button type="button" onClick={() => setExpanded(true)}
+              className="pl-5 mt-0.5 font-mono text-[10px] text-primary/70 hover:text-primary transition-colors text-left">
               Show more ↓
             </button>
           )}
           {isLong && expanded && (
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="pl-5 mt-0.5 font-mono text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors text-left"
-            >
+            <button type="button" onClick={() => setExpanded(false)}
+              className="pl-5 mt-0.5 font-mono text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors text-left">
               Show less ↑
             </button>
           )}
@@ -283,10 +352,8 @@ function EventRow({ event, token, bountyUrl }: {
       return (
         <div className={cn(
           "rounded-sm border p-3 flex flex-col gap-2 mt-1",
-          event.opportunityScore >= 7
-            ? "border-green-500/40 bg-green-500/5"
-            : event.opportunityScore >= 5
-            ? "border-yellow-500/40 bg-yellow-500/5"
+          event.opportunityScore >= 7 ? "border-green-500/40 bg-green-500/5"
+            : event.opportunityScore >= 5 ? "border-yellow-500/40 bg-yellow-500/5"
             : "border-red-500/40 bg-red-500/5"
         )}>
           <div className="flex items-center justify-between gap-2">
@@ -307,7 +374,8 @@ function EventRow({ event, token, bountyUrl }: {
               <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Opportunity Score</span>
               <span className="font-mono text-xs text-muted-foreground">
                 {event.briefGenerated ? "✓ Research brief" : "✗ No brief"}{" · "}
-                {event.planGenerated ? "✓ Production plan" : "✗ No plan"}
+                {event.planGenerated ? "✓ Production plan" : "✗ No plan"}{" · "}
+                {event.draftGenerated ? "✓ Application draft" : "✗ No draft"}
               </span>
             </div>
           </div>
@@ -316,6 +384,10 @@ function EventRow({ event, token, bountyUrl }: {
           )}
           {event.agentDecision && (
             <ExpandableText text={stripHtml(event.agentDecision)} maxLen={160} className="pl-6" />
+          )}
+          {/* Application draft inline */}
+          {event.applicationDraft && (
+            <ApplicationDraftCard draft={event.applicationDraft} />
           )}
           {/* Save to bounties */}
           {bountyUrl && token && (
@@ -340,24 +412,45 @@ function EventRow({ event, token, bountyUrl }: {
   }
 }
 
-// ── Expandable text helper ────────────────────────────────────────────────────
+// ── Application draft card (inside done) ─────────────────────────────────────
 
-function ExpandableText({ text, maxLen, className }: { text: string; maxLen: number; className?: string }) {
+function ApplicationDraftCard({ draft }: { draft: string }) {
   const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > maxLen;
+  const [copied, setCopied] = useState(false);
+  const clean = stripHtml(draft);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(clean);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className={className}>
-      <p className={cn("font-mono text-xs text-muted-foreground leading-relaxed", !expanded && isLong && "line-clamp-3")}>
-        {text}
-      </p>
-      {isLong && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="font-mono text-[10px] text-primary/70 hover:text-primary transition-colors mt-0.5"
-        >
-          {expanded ? "Show less ↑" : "Show more ↓"}
-        </button>
+    <div className="mt-1 border border-amber-500/30 rounded-sm bg-amber-500/5 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 hover:bg-amber-500/5 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <PenLine className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span className="font-mono text-xs font-bold text-amber-400 uppercase tracking-wider">Application Draft</span>
+          <span className="font-mono text-[10px] text-muted-foreground">· Ready to submit</span>
+        </div>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 flex flex-col gap-2">
+          <pre className="font-mono text-xs text-foreground leading-relaxed whitespace-pre-wrap bg-background/60 rounded-sm p-3 border border-border">
+            {clean}
+          </pre>
+          <button
+            onClick={copy}
+            className="self-start flex items-center gap-1.5 font-mono text-[10px] px-2.5 py-1.5 rounded-sm border border-amber-500/40 text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 transition-colors"
+          >
+            {copied ? <><Check className="w-3 h-3" /> Copied!</> : "Copy to clipboard"}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -369,20 +462,60 @@ function LiveAgentPanel({ token }: { token: string | null }) {
   const [url, setUrl] = useState("");
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<StreamEvent[]>([]);
+
+  // HITL: buffer events that arrive after scoring while we wait for user decision
+  const waitingForConfirmRef = useRef(false);
+  const pendingBufferRef = useRef<StreamEvent[]>([]);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const [confirmScore, setConfirmScore] = useState<number | null>(null);
+
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [events]);
+  }, [events, confirmScore]);
 
   const isDone = events.some((e) => e.type === "done" || e.type === "error");
+
+  const pushEvent = (ev: StreamEvent) => {
+    if (waitingForConfirmRef.current) {
+      pendingBufferRef.current.push(ev);
+    } else {
+      setEvents((prev) => [...prev, ev]);
+      // After scoring, pause if score < 8 for HITL
+      if (ev.type === "tool_result" && ev.tool === "score_bounty" && ev.score != null && ev.score < 8) {
+        waitingForConfirmRef.current = true;
+        setConfirmScore(ev.score);
+      }
+    }
+  };
+
+  const handleConfirmContinue = () => {
+    waitingForConfirmRef.current = false;
+    setConfirmScore(null);
+    const pending = pendingBufferRef.current.slice();
+    pendingBufferRef.current = [];
+    setEvents((prev) => [...prev, ...pending]);
+  };
+
+  const handleConfirmStop = () => {
+    waitingForConfirmRef.current = false;
+    pendingBufferRef.current = [];
+    setConfirmScore(null);
+    readerRef.current?.cancel().catch(() => {});
+    readerRef.current = null;
+    setRunning(false);
+  };
 
   const runAgent = async () => {
     if (!url.trim() || running || !token) return;
     setRunning(true);
     setEvents([]);
+    setConfirmScore(null);
+    waitingForConfirmRef.current = false;
+    pendingBufferRef.current = [];
 
     try {
       const resp = await fetch("/api/agent/run", {
@@ -398,6 +531,7 @@ function LiveAgentPanel({ token }: { token: string | null }) {
       }
 
       const reader = resp.body.getReader();
+      readerRef.current = reader;
       const decoder = new TextDecoder();
       let buffer = "";
 
@@ -411,14 +545,26 @@ function LiveAgentPanel({ token }: { token: string | null }) {
           if (line.startsWith("data: ")) {
             try {
               const ev = JSON.parse(line.slice(6)) as StreamEvent;
-              setEvents((prev) => [...prev, ev]);
+              pushEvent(ev);
             } catch {}
           }
         }
       }
-    } catch (err) {
-      setEvents((prev) => [...prev, { type: "error", message: (err as Error).message }]);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Stream error";
+      if (!msg.includes("cancel")) {
+        setEvents((prev) => [...prev, { type: "error", message: msg }]);
+      }
     } finally {
+      readerRef.current = null;
+      // Flush any remaining buffer if we finished while waiting
+      if (pendingBufferRef.current.length > 0) {
+        const pending = pendingBufferRef.current.slice();
+        pendingBufferRef.current = [];
+        setEvents((prev) => [...prev, ...pending]);
+      }
+      waitingForConfirmRef.current = false;
+      setConfirmScore(null);
       setRunning(false);
     }
   };
@@ -457,9 +603,8 @@ function LiveAgentPanel({ token }: { token: string | null }) {
           </Button>
           {isDone && !running && (
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setEvents([]); setUrl(""); }}
+              variant="outline" size="sm"
+              onClick={() => { setEvents([]); setUrl(""); setConfirmScore(null); }}
               className="font-mono text-xs uppercase tracking-wider flex-shrink-0"
             >
               Reset
@@ -468,21 +613,28 @@ function LiveAgentPanel({ token }: { token: string | null }) {
         </div>
 
         {/* Live log */}
-        {(events.length > 0 || running) && (
+        {(events.length > 0 || running || confirmScore !== null) && (
           <div className="border border-border rounded-sm bg-background/60 overflow-hidden">
-            {/* Icon action strip header */}
             <div className="px-4 pt-3 pb-2 border-b border-border">
-              <ActionStrip events={events} running={running} />
+              <ActionStrip events={events} running={running && confirmScore === null} />
             </div>
-
-            {/* Event log */}
             <div
               ref={logRef}
-              className="px-4 py-3 flex flex-col gap-2.5 max-h-[26rem] overflow-y-auto"
+              className="px-4 py-3 flex flex-col gap-2.5 max-h-[30rem] overflow-y-auto"
             >
               {events.map((ev, i) => (
                 <EventRow key={i} event={ev} token={token} bountyUrl={url.trim()} />
               ))}
+
+              {/* HITL checkpoint */}
+              {confirmScore !== null && (
+                <ConfirmCard
+                  score={confirmScore}
+                  onContinue={handleConfirmContinue}
+                  onStop={handleConfirmStop}
+                />
+              )}
+
               {running && events.length === 0 && (
                 <div className="flex items-center gap-2 text-muted-foreground font-mono text-xs">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -494,10 +646,10 @@ function LiveAgentPanel({ token }: { token: string | null }) {
         )}
 
         {/* Hint when empty */}
-        {events.length === 0 && !running && (
+        {events.length === 0 && !running && confirmScore === null && (
           <p className="font-mono text-[11px] text-muted-foreground leading-relaxed">
             Paste any bounty URL — Superteam Earn, Devpost, Dework — and watch the Qwen agent score it,
-            generate a research brief, and build a production plan in real time.
+            generate a research brief, build a production plan, and draft a ready-to-submit application in real time.
           </p>
         )}
       </CardContent>
@@ -505,7 +657,7 @@ function LiveAgentPanel({ token }: { token: string | null }) {
   );
 }
 
-// ── Existing page helpers ─────────────────────────────────────────────────────
+// ── Page helpers ──────────────────────────────────────────────────────────────
 
 interface PipelineStep {
   step: string;
@@ -568,7 +720,6 @@ export function Agent() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold font-sans uppercase tracking-tight flex items-center gap-2">
@@ -592,7 +743,6 @@ export function Agent() {
         </Button>
       </div>
 
-      {/* ── LIVE AGENT PANEL ── */}
       <LiveAgentPanel token={token} />
 
       {/* Pipeline steps */}
@@ -652,7 +802,7 @@ export function Agent() {
         </div>
       )}
 
-      {/* Recent Activity Feed */}
+      {/* Recent Activity */}
       <div>
         <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">Recent Activity Feed</p>
         {isLoading ? (
