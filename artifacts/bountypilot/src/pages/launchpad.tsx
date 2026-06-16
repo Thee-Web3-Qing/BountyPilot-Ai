@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Rocket, Trophy, Gift, Calendar, Star, ArrowRight, Users, Loader2,
+  Rocket, Trophy, Gift, Calendar, Star, ArrowRight, Users, Loader2, Clock,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,9 +175,9 @@ export function Launchpad() {
 
                   {/* Footer */}
                   <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                      <Users className="w-3 h-3" />
-                      <span>{info?.enrolledCount ?? 0} joined</span>
+                    <div className="flex items-center gap-2.5 font-mono text-[10px] text-muted-foreground">
+                      <span className="flex items-center gap-1"><Users className="w-3 h-3" />{info?.enrolledCount ?? 0} joined</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Ends Aug 7</span>
                     </div>
                     <Button
                       size="sm"

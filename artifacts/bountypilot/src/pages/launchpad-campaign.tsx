@@ -339,6 +339,9 @@ export function LaunchpadCampaign() {
                 <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 font-mono text-[10px] uppercase tracking-wider">
                   Active
                 </Badge>
+                <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground gap-1 flex items-center">
+                  <Clock className="w-2.5 h-2.5" /> Ends Aug 7
+                </Badge>
                 {isEnrolled && (
                   <Badge variant="outline" className={`${config.accentClass} border-current/30 font-mono text-[10px] uppercase tracking-wider`}>
                     <CheckCircle2 className="w-3 h-3 mr-1" /> Joined
