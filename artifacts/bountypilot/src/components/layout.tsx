@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  Crosshair, LayoutDashboard, ListTodo, Plus, Award, Coins,
+  Crosshair, LayoutDashboard, ListTodo, Award, Coins,
   User, Settings2, LogOut, Globe, Menu, X, ShieldCheck,
   Rocket, Gift, Crown, Sparkles, Bot,
 } from "lucide-react";
@@ -14,7 +14,6 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/discover", label: "Discover", icon: Globe },
   { href: "/bounties", label: "My Bounties", icon: ListTodo },
-  { href: "/bounties/add", label: "Hunt Bounty", icon: Plus },
   { href: "/launchpad", label: "Launchpad", icon: Rocket },
   { href: "/submissions", label: "Submissions", icon: Award },
   { href: "/earnings", label: "Earnings", icon: Coins },
