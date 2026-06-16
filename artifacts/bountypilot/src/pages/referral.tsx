@@ -125,7 +125,7 @@ export function Referral() {
   const accessProgress = Math.min(100, ((stats?.totalReferrals ?? 0) / (lb?.freeLeaderboardMin ?? 10)) * 100);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div className="w-full flex flex-col gap-6">
       {/* Header */}
       <div>
         <h1 className="font-bold font-sans text-2xl uppercase tracking-tighter flex items-center gap-2">

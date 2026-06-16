@@ -107,7 +107,7 @@ export function Profile() {
   const bountyTypes = chipList(profile.preferredBountyTypes);
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-6 w-full">
       {/* Profile Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

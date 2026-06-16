@@ -572,7 +572,7 @@ export function Launchpad() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+    <div className="w-full flex flex-col gap-4">
       {/* Header */}
       <div className="mb-2">
         <h1 className="font-bold font-sans text-2xl uppercase tracking-tighter flex items-center gap-2">

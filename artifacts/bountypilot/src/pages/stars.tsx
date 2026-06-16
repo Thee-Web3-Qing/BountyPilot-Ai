@@ -19,7 +19,7 @@ export function Stars() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-6 w-full">
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">

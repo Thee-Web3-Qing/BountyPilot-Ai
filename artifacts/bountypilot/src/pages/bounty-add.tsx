@@ -165,7 +165,7 @@ export function BountyAdd() {
   // Free/expired users see an upgrade wall instead of the hunt form
   if (!canAccessAI) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="w-full flex flex-col gap-4">
         <div className="mb-4">
           <h1 className="font-bold font-sans text-2xl uppercase tracking-tighter">Hunt Bounty</h1>
           <p className="font-mono text-sm text-muted-foreground mt-1">AI-powered bounty analysis — paid feature</p>
@@ -282,7 +282,7 @@ export function BountyAdd() {
   const missing = editFields ? countMissing(editFields) : 0;
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl mx-auto">
+    <div className="flex flex-col gap-8 w-full">
       <div>
         <h1 className="text-3xl font-bold font-sans uppercase tracking-tight">Hunt Bounty</h1>
         <p className="text-muted-foreground font-mono mt-2 text-sm">

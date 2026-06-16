@@ -51,7 +51,7 @@ export function Settings() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-8 max-w-2xl">
+    <div className="flex flex-col gap-8 w-full">
       <div className="flex items-center gap-3">
         <Settings2 className="w-7 h-7 text-primary" />
         <div>
