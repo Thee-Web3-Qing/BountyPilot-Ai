@@ -157,7 +157,7 @@ referralsRouter.get("/campaigns", async (req: AuthRequest, res) => {
 referralsRouter.post("/campaigns/:slug/join", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const { slug } = req.params;
+    const slug = req.params.slug as string;
 
     if (!CAMPAIGN_SLUGS.includes(slug)) {
       res.status(400).json({ error: "Invalid campaign slug" });
@@ -179,7 +179,7 @@ referralsRouter.post("/campaigns/:slug/join", requireAuth, async (req: AuthReque
 // ── GET /referrals/campaigns/:slug/leaderboard ───────────────
 referralsRouter.get("/campaigns/:slug/leaderboard", async (req: AuthRequest, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug as string;
     const userId = tryGetUserId(req);
 
     if (!CAMPAIGN_SLUGS.includes(slug)) {

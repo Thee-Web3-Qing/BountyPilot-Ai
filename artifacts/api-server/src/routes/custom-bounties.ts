@@ -68,7 +68,7 @@ customBountiesRouter.post("/", requireAuth, async (req: AuthRequest, res) => {
 customBountiesRouter.put("/:id", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user!.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id as string);
     const { title, description, requirements, reward, rewardToken, rewardType, category, maxParticipants, deadline, status, featured } = req.body;
     const [updated] = await db.update(customBountiesTable)
       .set({
@@ -98,7 +98,7 @@ customBountiesRouter.put("/:id", requireAuth, async (req: AuthRequest, res) => {
 customBountiesRouter.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user!.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
   try {
-    await db.delete(customBountiesTable).where(eq(customBountiesTable.id, parseInt(req.params.id)));
+    await db.delete(customBountiesTable).where(eq(customBountiesTable.id, parseInt(req.params.id as string)));
     res.json({ deleted: true });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete bounty" });
@@ -108,7 +108,7 @@ customBountiesRouter.delete("/:id", requireAuth, async (req: AuthRequest, res) =
 // GET /custom-bounties/:id — single bounty
 customBountiesRouter.get("/:id", async (req, res) => {
   try {
-    const [bounty] = await db.select().from(customBountiesTable).where(eq(customBountiesTable.id, parseInt(req.params.id)));
+    const [bounty] = await db.select().from(customBountiesTable).where(eq(customBountiesTable.id, parseInt(req.params.id as string)));
     if (!bounty) { res.status(404).json({ error: "Not found" }); return; }
     res.json(bounty);
   } catch (err) {
@@ -119,7 +119,7 @@ customBountiesRouter.get("/:id", async (req, res) => {
 // POST /custom-bounties/:id/apply — user applies
 customBountiesRouter.post("/:id/apply", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const bountyId = parseInt(req.params.id);
+    const bountyId = parseInt(req.params.id as string);
     const userId = req.user!.userId;
     const { submissionNote, submissionUrl } = req.body;
 
@@ -150,7 +150,7 @@ customBountiesRouter.post("/:id/apply", requireAuth, async (req: AuthRequest, re
 customBountiesRouter.get("/:id/applications", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user!.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
   try {
-    const bountyId = parseInt(req.params.id);
+    const bountyId = parseInt(req.params.id as string);
     const apps = await db
       .select({
         id: customBountyApplicationsTable.id,
@@ -177,8 +177,8 @@ customBountiesRouter.get("/:id/applications", requireAuth, async (req: AuthReque
 customBountiesRouter.patch("/:id/applications/:appId", requireAuth, async (req: AuthRequest, res) => {
   if (!req.user!.isAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
   try {
-    const bountyId = parseInt(req.params.id);
-    const appId = parseInt(req.params.appId);
+    const bountyId = parseInt(req.params.id as string);
+    const appId = parseInt(req.params.appId as string);
     const { status, adminNote } = req.body;
 
     const [updated] = await db.update(customBountyApplicationsTable)

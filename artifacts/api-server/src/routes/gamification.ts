@@ -24,11 +24,16 @@ gamificationRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
       .where(eq(userBadgesTable.userId, userId))
       .orderBy(desc(userBadgesTable.earnedAt));
 
-    const badges = badgeRows.map((r) => ({
-      key: r.badge,
-      earnedAt: r.earnedAt,
-      ...(BADGE_MAP[r.badge] ?? { label: r.badge, description: "", emoji: "🎖️" }),
-    }));
+    const badges = badgeRows.map((r) => {
+      const def = BADGE_MAP[r.badge];
+      return {
+        key: r.badge,
+        earnedAt: r.earnedAt,
+        label: def?.label ?? r.badge,
+        description: def?.description ?? "",
+        emoji: def?.emoji ?? "🎖️",
+      };
+    });
 
     res.json({ points: userRow?.points ?? 0, badges });
   } catch (err) {

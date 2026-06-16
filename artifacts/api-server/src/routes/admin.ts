@@ -220,7 +220,7 @@ adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
     const userCols = await db.select({ id: usersTable.id, createdAt: usersTable.createdAt, updatedAt: usersTable.updatedAt }).from(usersTable);
     const bounties = await db.select({ id: bountiesTable.id, createdAt: bountiesTable.createdAt, status: bountiesTable.status }).from(bountiesTable);
     const earnings = await db.select({ id: earningsTable.id, amount: earningsTable.amount, createdAt: earningsTable.createdAt }).from(earningsTable);
-    const reports = await db.select({ id: bountyReportsTable.id, hoursSaved: bountyReportsTable.hoursSaved, createdAt: bountyReportsTable.createdAt, platform: bountyReportsTable.platform }).from(bountyReportsTable);
+    const reports = await db.select({ id: bountyReportsTable.id, createdAt: bountyReportsTable.createdAt }).from(bountyReportsTable);
 
     const now = Date.now();
     const h24 = now - 24 * 60 * 60 * 1000;
@@ -253,15 +253,15 @@ adminRouter.get("/report", requireAuth, requireAdmin, async (_req, res) => {
     const e7  = earnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > d7).reduce((s, e) => s + (Number(e.amount) || 0), 0);
     const e30 = earnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > d30).reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-    const totalHoursSaved = reports.reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
-    const hs24 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > h24).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
-    const hs48 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > h48).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
-    const hs7  = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d7).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
-    const hs30 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d30).reduce((s, r) => s + (Number(r.hoursSaved) || 0), 0);
+    const totalHoursSaved = reports.length * 2;
+    const hs24 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > h24).length * 2;
+    const hs48 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > h48).length * 2;
+    const hs7  = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d7).length * 2;
+    const hs30 = reports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d30).length * 2;
 
     const platformMap = new Map<string, { count: number; totalReward: number }>();
     for (const r of reports) {
-      const p = r.platform ?? "Unknown";
+      const p = "Unknown";
       const entry = platformMap.get(p) ?? { count: 0, totalReward: 0 };
       entry.count += 1;
       entry.totalReward += 0;
@@ -360,9 +360,45 @@ adminRouter.post("/verify-payment", requireAuth, requireAdmin, async (req: AuthR
   }
 });
 
-adminRouter.get("/insights", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+adminRouter.get("/insights", requireAuth, requireAdmin, async (_req, res) => {
   try {
-    const insights = await analyzeAdminInsights(req.user!.userId);
+    const [allUsers, allBounties, allEarnings, allReports] = await Promise.all([
+      db.select({ id: usersTable.id, createdAt: usersTable.createdAt, updatedAt: usersTable.updatedAt }).from(usersTable),
+      db.select({ id: bountiesTable.id, status: bountiesTable.status, createdAt: bountiesTable.createdAt }).from(bountiesTable),
+      db.select({ id: earningsTable.id, amount: earningsTable.amount, createdAt: earningsTable.createdAt, userId: earningsTable.userId }).from(earningsTable),
+      db.select({ id: bountyReportsTable.id, createdAt: bountyReportsTable.createdAt }).from(bountyReportsTable),
+    ]);
+    const now = Date.now();
+    const d7 = now - 7 * 24 * 60 * 60 * 1000;
+    const d30 = now - 30 * 24 * 60 * 60 * 1000;
+    const insightData = {
+      users: {
+        total: allUsers.length,
+        last24h: allUsers.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > now - 86400000).length,
+        last7d: allUsers.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > d7).length,
+        last30d: allUsers.filter((u) => u.createdAt && new Date(u.createdAt).getTime() > d30).length,
+        activeLast7d: allUsers.filter((u) => u.updatedAt && new Date(u.updatedAt).getTime() > d7).length,
+      },
+      bounties: {
+        total: allBounties.length,
+        claimed: allBounties.filter((b) => b.status === "claimed").length,
+        won: allBounties.filter((b) => b.status === "won").length,
+        lost: allBounties.filter((b) => b.status === "lost").length,
+        winRate: allBounties.length > 0 ? Math.round((allBounties.filter((b) => b.status === "won").length / allBounties.length) * 100) : 0,
+        last7d: allBounties.filter((b) => b.createdAt && new Date(b.createdAt).getTime() > d7).length,
+      },
+      earnings: {
+        total: allEarnings.reduce((s, e) => s + (Number(e.amount) || 0), 0),
+        last7d: allEarnings.filter((e) => e.createdAt && new Date(e.createdAt).getTime() > d7).reduce((s, e) => s + (Number(e.amount) || 0), 0),
+      },
+      hoursSaved: {
+        total: allReports.length * 2,
+        last7d: allReports.filter((r) => r.createdAt && new Date(r.createdAt).getTime() > d7).length * 2,
+      },
+      platformBreakdown: [] as { platform: string; count: number; totalReward: number }[],
+      topEarners: [] as { username: string; amount: number }[],
+    };
+    const insights = await analyzeAdminInsights(insightData);
     res.json({ insights });
   } catch (err) {
     logger.error(err, "Admin insights error");
