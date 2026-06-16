@@ -224,46 +224,48 @@ ${profile ? `\nCreator profile:\n${JSON.stringify(profile, null, 2)}` : ""}
 Work through the pipeline step by step using the available tools.`,
   };
 
+  // Tool labels for stream events
+  const TOOL_LABELS: Record<string, string> = {
+    score_bounty: "Scoring Opportunity",
+    generate_research_brief: "Generating Research Brief",
+    generate_production_plan: "Building Production Plan",
+    finalize_pipeline: "Finalizing Recommendation",
+  };
+
   // Tool executor: maps agent tool calls to real functions
   const toolExecutor = async (name: string, args: unknown): Promise<unknown> => {
     logger.info({ tool: name, args }, "Agent executing tool");
+    const t = Date.now();
+    emit?.({ type: "tool_call", step: ++stepCount, tool: name, label: TOOL_LABELS[name] ?? name });
 
     switch (name) {
       case "score_bounty": {
         const analysis = await analyzeBounty(scraped);
         opportunityScore = analysis.opportunityScore;
         scoreExplanation = analysis.scoreExplanation;
-        return {
-          opportunityScore,
-          scoreExplanation,
-          decision: opportunityScore >= 5 ? "proceed_to_brief" : "skip_brief",
-        };
+        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: `Score: ${opportunityScore}/10 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
+        return { opportunityScore, scoreExplanation, decision: opportunityScore >= 5 ? "proceed_to_brief" : "skip_brief" };
       }
 
       case "generate_research_brief": {
         const brief = await generateResearchBrief(scraped);
         researchBrief = brief;
         briefGenerated = true;
-        return {
-          generated: true,
-          summary: brief.summary?.slice(0, 200),
-          sectionsCompleted: 14,
-        };
+        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: brief.summary?.slice(0, 120) ?? "Research brief generated" });
+        return { generated: true, summary: brief.summary?.slice(0, 200), sectionsCompleted: 14 };
       }
 
       case "generate_production_plan": {
         const plan = await generateProductionPlan(scraped);
         productionPlan = plan;
         planGenerated = true;
-        return {
-          generated: true,
-          estimatedHours: plan.estimatedHours,
-          format: scraped.contentFormat,
-        };
+        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: `~${plan.estimatedHours}h estimated · ${scraped.contentFormat ?? "content"} format` });
+        return { generated: true, estimatedHours: plan.estimatedHours, format: scraped.contentFormat };
       }
 
       case "finalize_pipeline": {
         agentDecision = (args as { recommendation: string }).recommendation || "Pipeline complete";
+        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: agentDecision.slice(0, 120) });
         return { status: "complete", briefGenerated, planGenerated };
       }
 
@@ -289,6 +291,9 @@ Work through the pipeline step by step using the available tools.`,
       "BountyPilot agent pipeline complete"
     );
 
+    const durationMs = Date.now() - start;
+    emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, agentDecision, durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
+
     return {
       scraped,
       opportunityScore,
@@ -299,7 +304,7 @@ Work through the pipeline step by step using the available tools.`,
       productionPlan,
       agentDecision,
       toolCallLog: loopResult.toolCallLog,
-      durationMs: Date.now() - start,
+      durationMs,
     };
   } catch (err) {
     logger.error({ err }, "Agent pipeline error — falling back to direct calls");

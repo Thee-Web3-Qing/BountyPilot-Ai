@@ -5,6 +5,7 @@ import { eq, gte, desc, sql } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { hasKey } from "../lib/qwen.js";
+import { runBountyAgentPipeline, type AgentStreamEvent } from "../lib/agent.js";
 
 export const agentRouter = Router();
 
@@ -98,4 +99,35 @@ agentRouter.get("/status", async (req: AuthRequest, res) => {
     logger.error(err, "Error fetching agent status");
     res.status(500).json({ error: "Failed to fetch agent status" });
   }
+});
+
+// POST /agent/run — SSE stream of every tool-call as it fires
+agentRouter.post("/run", async (req: AuthRequest, res) => {
+  const { url } = req.body as { url?: string };
+  if (!url || typeof url !== "string" || !url.startsWith("http")) {
+    res.status(400).json({ error: "A valid bounty URL is required" });
+    return;
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const send = (event: AgentStreamEvent) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+    if (typeof (res as unknown as { flush?: () => void }).flush === "function") {
+      (res as unknown as { flush: () => void }).flush();
+    }
+  };
+
+  try {
+    await runBountyAgentPipeline(url, undefined, send);
+  } catch (err) {
+    logger.error({ err }, "SSE agent pipeline error");
+    send({ type: "error", message: (err as Error).message ?? "Pipeline failed" });
+  }
+
+  res.end();
 });

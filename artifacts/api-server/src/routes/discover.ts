@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { bountiesTable } from "@workspace/db";
+import { bountiesTable, userProfilesTable } from "@workspace/db";
 import { isNull, eq, and, desc, or, gte } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { getUserPlanStatus, countUserBounties } from "../lib/access.js";
@@ -32,6 +32,60 @@ discoverRouter.get("/", async (_req: AuthRequest, res) => {
   } catch (err) {
     logger.error(err, "Error listing discover bounties");
     res.status(500).json({ error: "Failed to list bounties" });
+  }
+});
+
+// GET /discover/for-me — profile-aware personalized bounty feed
+discoverRouter.get("/for-me", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const nowDate = new Date().toISOString().slice(0, 10);
+
+    const [profile] = await db
+      .select()
+      .from(userProfilesTable)
+      .where(eq(userProfilesTable.userId, userId))
+      .limit(1);
+
+    const bounties = await db
+      .select()
+      .from(bountiesTable)
+      .where(
+        and(
+          isNull(bountiesTable.userId),
+          or(isNull(bountiesTable.deadline), gte(bountiesTable.deadline, nowDate))
+        )
+      );
+
+    const chipList = (v?: string | null) =>
+      v ? v.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+    const userPlatforms = chipList(profile?.mainPlatforms);
+    const userNiches = chipList(profile?.niche);
+    const userFormats = chipList(profile?.contentFormats);
+    const userBountyTypes = chipList(profile?.preferredBountyTypes);
+    const minReward = profile?.minimumReward ?? 0;
+
+    const scored = bounties.map((b) => {
+      let matchBonus = 0;
+      if (profile) {
+        const haystack = `${b.title ?? ""} ${b.scoreExplanation ?? ""} ${b.deliverables ?? ""}`.toLowerCase();
+        if (b.platform && userPlatforms.some((p) => b.platform!.toLowerCase().includes(p.toLowerCase()))) matchBonus += 20;
+        if (b.contentFormat && userFormats.some((f) => b.contentFormat!.toLowerCase().includes(f.toLowerCase()))) matchBonus += 20;
+        if (userNiches.some((n) => haystack.includes(n.toLowerCase()))) matchBonus += 15;
+        if (b.contentFormat && userBountyTypes.some((bt) => b.contentFormat!.toLowerCase().includes(bt.toLowerCase()))) matchBonus += 15;
+        if (minReward > 0 && b.rewardAmount && parseFloat(b.rewardAmount) >= minReward) matchBonus += 10;
+      }
+      const profileMatchScore = (b.opportunityScore ?? 5) * 6 + matchBonus;
+      return { ...b, profileMatchScore };
+    });
+
+    scored.sort((a, b) => b.profileMatchScore - a.profileMatchScore);
+
+    res.json(scored.slice(0, 30));
+  } catch (err) {
+    logger.error(err, "Error fetching for-me bounties");
+    res.status(500).json({ error: "Failed to fetch personalised bounties" });
   }
 });
 
