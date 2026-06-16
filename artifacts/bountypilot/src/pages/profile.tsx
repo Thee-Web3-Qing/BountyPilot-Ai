@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Loader2, User, Pencil, Globe, Award, Coins, Gift, Zap, Target,
-  ArrowLeft, CheckCircle, X, Plus,
+  ArrowLeft, CheckCircle, X, Plus, Link2, Copy, Check,
 } from "lucide-react";
 import { usePageMeta } from "@/lib/use-page-meta";
 
@@ -193,6 +193,9 @@ export function Profile() {
           <StatCard icon={Coins} label="Earnings" value={`$${earningsTotal}`} color="text-green-400" />
         </div>
 
+        {/* Referral Link */}
+        {user?.username && <ReferralCard username={user.username} />}
+
         {/* About */}
         <Card className="bg-card border-border">
           <CardContent className="p-5 flex flex-col gap-4">
@@ -369,6 +372,38 @@ export function Profile() {
 }
 
 // ─── View helpers ──────────────────────────────────────────────────────────
+
+function ReferralCard({ username }: { username: string }) {
+  const link = `${window.location.origin}/signup?ref=${encodeURIComponent(username)}`;
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <Card className="bg-card border-border border-primary/20">
+      <CardContent className="p-5 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Link2 className="w-3.5 h-3.5 text-primary" />
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Your Referral Link</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-background border border-border rounded-sm px-3 py-2 font-mono text-xs text-muted-foreground truncate">
+            {link}
+          </div>
+          <Button size="sm" variant="outline" onClick={copy} className="shrink-0 gap-1.5 font-mono text-xs uppercase tracking-wider h-9">
+            {copied ? <><Check className="w-3.5 h-3.5 text-green-400" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+          </Button>
+        </div>
+        <p className="font-mono text-[10px] text-muted-foreground">
+          Share this link to earn rewards — every referral counts toward the Launchpad campaigns.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string | number; color: string }) {
   return (

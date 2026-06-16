@@ -11,21 +11,23 @@ import {
   TrendingUp,
   ArrowRight,
   Zap,
-  Target,
   DollarSign,
   Check,
-  X,
   Crown,
-  Lock,
+  Code2,
+  Palette,
+  Users,
+  GraduationCap,
+  Megaphone,
 } from "lucide-react";
 
 export function Landing() {
   const [, navigate] = useLocation();
 
   usePageMeta({
-    title: "BountyPilot AI — AI-Powered Bug Bounty & Security Research Platform",
+    title: "BountyPilot AI — Find Paid Opportunities Online",
     description:
-      "BountyPilot AI helps security researchers discover programs, triage scope, and draft vulnerability reports faster with AI-powered assistance. Start hunting smarter today.",
+      "BountyPilot AI helps creators, developers, designers, marketers, and students discover paid bounties and opportunities across Web3 platforms. AI-powered scoring, research briefs, and production plans — all in one place.",
     canonical: "https://bountypilot.xyz/",
     ogUrl: "https://bountypilot.xyz/",
   });
@@ -73,14 +75,29 @@ export function Landing() {
         </div>
 
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold font-sans uppercase tracking-tighter leading-none mb-6">
-          Turn Crypto<br />
-          <span className="text-primary">Bounties</span> Into<br />
-          Creator Income
+          Get Paid For<br />
+          What You're<br />
+          <span className="text-primary">Already Good At</span>
         </h1>
 
-        <p className="text-muted-foreground font-mono text-base sm:text-lg max-w-xl mx-auto leading-relaxed mb-10">
-          BountyPilot finds paid content opportunities across Web3 platforms, scores them with AI, then builds your research brief and production plan — so you just show up and create.
+        <p className="text-muted-foreground font-mono text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-4">
+          Whether you're a creator, developer, designer, marketer, student, or just someone looking for more opportunities online — BountyPilot finds paid bounties that match your skills, scores them with AI, and builds your action plan so you can go straight to earning.
         </p>
+
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+          {[
+            { icon: <Sparkles className="w-3 h-3" />, label: "Creators" },
+            { icon: <Code2 className="w-3 h-3" />, label: "Developers" },
+            { icon: <Palette className="w-3 h-3" />, label: "Designers" },
+            { icon: <Megaphone className="w-3 h-3" />, label: "Marketers" },
+            { icon: <Users className="w-3 h-3" />, label: "Community Builders" },
+            { icon: <GraduationCap className="w-3 h-3" />, label: "Students" },
+          ].map(({ icon, label }) => (
+            <span key={label} className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground border border-border px-2.5 py-1 rounded-full">
+              {icon} {label}
+            </span>
+          ))}
+        </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <Button
@@ -110,13 +127,62 @@ export function Landing() {
               <p className="font-mono text-sm text-muted-foreground">Unlimited</p>
             </div>
             <div className="flex-1">
-              <p className="font-sans font-bold text-lg">Production Plans</p>
+              <p className="font-sans font-bold text-lg">Action Plans</p>
               <p className="font-mono text-sm text-muted-foreground">Unlimited</p>
             </div>
           </div>
           <p className="font-mono text-[10px] text-muted-foreground mt-3 text-center">
             After Aug 7, free plan gets 3 bounties + 50 browse limit. Upgrade to unlock everything.
           </p>
+        </div>
+      </section>
+
+      {/* Who it's for */}
+      <section className="border-t border-border px-6 py-16 bg-card">
+        <div className="max-w-4xl mx-auto">
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground text-center mb-10">
+            Built for everyone with something to offer
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
+            {[
+              {
+                icon: <Sparkles className="w-5 h-5 text-primary" />,
+                title: "Creators",
+                desc: "Writers, video makers, podcasters, thread writers — find content bounties across Web3 platforms.",
+              },
+              {
+                icon: <Code2 className="w-5 h-5 text-primary" />,
+                title: "Developers",
+                desc: "Coders and builders — discover hackathons, technical bounties, and open-source grants.",
+              },
+              {
+                icon: <Palette className="w-5 h-5 text-primary" />,
+                title: "Designers",
+                desc: "UI/UX, graphic, and motion designers — land paid design bounties from Web3 projects.",
+              },
+              {
+                icon: <Megaphone className="w-5 h-5 text-primary" />,
+                title: "Marketers",
+                desc: "Growth, SEO, and social experts — projects need you to help them grow their communities.",
+              },
+              {
+                icon: <Users className="w-5 h-5 text-primary" />,
+                title: "Community Builders",
+                desc: "Discord mods, ambassadors, advocates — earn for building and managing online communities.",
+              },
+              {
+                icon: <GraduationCap className="w-5 h-5 text-primary" />,
+                title: "Students",
+                desc: "Learn by doing and earn at the same time — bounties are a great way to build your portfolio.",
+              },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="flex flex-col gap-2 p-4 border border-border rounded-lg bg-background">
+                <div className="mb-1">{icon}</div>
+                <p className="font-sans font-bold uppercase tracking-tight text-sm">{title}</p>
+                <p className="font-mono text-xs text-muted-foreground leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -132,25 +198,25 @@ export function Landing() {
                 icon: <Search className="w-5 h-5" />,
                 step: "01",
                 title: "Discover",
-                desc: "Auto-crawls Superteam, Zealy, Galxe, and 15+ platforms for live paid bounties.",
+                desc: "Auto-crawls Superteam, Zealy, Galxe, Devpost, and 15+ platforms for live paid opportunities.",
               },
               {
-                icon: <Target className="w-5 h-5" />,
+                icon: <Sparkles className="w-5 h-5" />,
                 step: "02",
-                title: "AI Score",
-                desc: "Each bounty gets a personalised 1–10 score based on your niche, formats, and skill level.",
+                title: "AI Match",
+                desc: "Each opportunity gets a personalised 1–10 match score based on your skills, niche, and goals.",
               },
               {
                 icon: <FileText className="w-5 h-5" />,
                 step: "03",
                 title: "Research Brief",
-                desc: "One click generates a full brief: content angles, key points, audience, and competitor analysis.",
+                desc: "One click generates a full brief: key angles, talking points, audience context, and analysis.",
               },
               {
                 icon: <ClipboardList className="w-5 h-5" />,
                 step: "04",
-                title: "Production Plan",
-                desc: "AI writes your script outline, shot list, caption draft, and submission checklist.",
+                title: "Action Plan",
+                desc: "AI builds your step-by-step execution plan — whatever your medium, you know exactly what to do.",
               },
             ].map(({ icon, step, title, desc }) => (
               <div key={step} className="flex flex-col gap-3">
@@ -177,8 +243,8 @@ export function Landing() {
             {[
               {
                 icon: <Zap className="w-5 h-5 text-primary" />,
-                title: "Built for Creators",
-                desc: "Set your platforms, content formats, and niche once — every score and brief is personalised to you.",
+                title: "Matched to You",
+                desc: "Tell us your skills, platforms, and goals once — every score and brief is personalised to your profile.",
               },
               {
                 icon: <DollarSign className="w-5 h-5 text-primary" />,
@@ -188,7 +254,7 @@ export function Landing() {
               {
                 icon: <TrendingUp className="w-5 h-5 text-primary" />,
                 title: "Stay Organised",
-                desc: "Move bounties through your workflow — Discovered → Approved → Scripting → Submitted — all in one place.",
+                desc: "Move opportunities through your pipeline — Discovered → Approved → In Progress → Submitted.",
               },
             ].map(({ icon, title, desc }) => (
               <div key={title} className="flex flex-col gap-2">
@@ -209,14 +275,14 @@ export function Landing() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { feature: "Browse Bounties", desc: "Unlimited across all platforms" },
-              { feature: "Pipeline Bounties", desc: "Track unlimited opportunities" },
-              { feature: "AI Opportunity Score", desc: "Full 1-10 score with breakdown" },
-              { feature: "For You Matching", desc: "Profile-based smart filter" },
-              { feature: "Research Brief", desc: "AI-generated content angles" },
-              { feature: "Production Plan", desc: "AI-generated script outlines" },
-              { feature: "Dashboard Analytics", desc: "Full platform breakdown" },
-              { feature: "Devpost Crawler", desc: "Auto-discovers open hackathons" },
+              { feature: "Browse Opportunities", desc: "Unlimited across all platforms" },
+              { feature: "Pipeline Tracker", desc: "Manage unlimited opportunities" },
+              { feature: "AI Match Score", desc: "Personalised 1-10 score with full breakdown" },
+              { feature: "For You Matching", desc: "Skill-based smart filter" },
+              { feature: "Research Brief", desc: "AI-generated angles and talking points" },
+              { feature: "Action Plan", desc: "AI-generated step-by-step execution plan" },
+              { feature: "Dashboard Analytics", desc: "Full earnings and platform breakdown" },
+              { feature: "Hackathon Crawler", desc: "Auto-discovers open hackathons and grants" },
             ].map((row, i) => (
               <div key={i} className="flex items-center gap-3 p-4 border border-border rounded-lg">
                 <Check className="w-4 h-4 text-green-400 shrink-0" />
@@ -239,7 +305,7 @@ export function Landing() {
       <section className="border-t border-border px-6 py-16 text-center">
         <div className="max-w-lg mx-auto flex flex-col items-center gap-6">
           <h2 className="font-bold font-sans text-3xl uppercase tracking-tighter">
-            Ready to start<br />earning from bounties?
+            Whatever you do online,<br />there's a bounty for it.
           </h2>
           <p className="font-mono text-sm text-muted-foreground">
             Free during beta. No credit card required. Upgrade anytime for unlimited access.
@@ -256,7 +322,7 @@ export function Landing() {
 
       <footer className="border-t border-border px-6 py-5 text-center">
         <p className="font-mono text-xs text-muted-foreground">
-          © 2025 BountyPilot AI — Your creator revenue autopilot
+          © 2025 BountyPilot AI — Paid opportunities for everyone online
         </p>
       </footer>
     </div>
