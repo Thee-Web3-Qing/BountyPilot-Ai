@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { usePageMeta } from "@/lib/use-page-meta";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   Crosshair,
   Sparkles,
@@ -47,6 +48,7 @@ export function Landing() {
           <span className="font-bold font-sans text-lg uppercase tracking-tighter">BountyPilot AI</span>
         </div>
         <div className="flex items-center gap-3">
+          <NotificationBell />
           <button
             onClick={() => navigate("/login")}
             className="font-mono text-sm text-muted-foreground hover:text-foreground transition-colors"

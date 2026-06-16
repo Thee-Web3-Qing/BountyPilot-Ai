@@ -7,6 +7,20 @@ import { logger } from "../lib/logger.js";
 
 export const notificationsRouter = Router();
 
+// GET /public/updates — list all updates for anyone (no auth required)
+notificationsRouter.get("/public/updates", async (_req, res) => {
+  try {
+    const updates = await db
+      .select()
+      .from(siteUpdatesTable)
+      .orderBy(desc(siteUpdatesTable.createdAt));
+    res.json({ updates });
+  } catch (err) {
+    logger.error(err, "Error fetching public updates");
+    res.status(500).json({ error: "Failed to fetch updates" });
+  }
+});
+
 // GET /notifications — list all updates for the user with read status
 notificationsRouter.get("/", requireAuth, async (req: AuthRequest, res) => {
   try {

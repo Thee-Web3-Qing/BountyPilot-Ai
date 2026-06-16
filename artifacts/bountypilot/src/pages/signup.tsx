@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Crosshair, Loader2, AlertCircle, Gift } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { GoogleLogin } from "@react-oauth/google";
 import { useGoogleAuth } from "@/contexts/google-auth";
 
@@ -45,7 +46,10 @@ export function Signup() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md flex flex-col gap-8">
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 relative">
+          <div className="absolute top-0 right-0">
+            <NotificationBell />
+          </div>
           <div className="w-12 h-12 bg-primary text-primary-foreground flex items-center justify-center rounded-sm">
             <Crosshair className="w-7 h-7" />
           </div>

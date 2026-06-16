@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/auth";
-import { Bell, BellDot, CheckCircle, X, Pin, Trash2, Loader2 } from "lucide-react";
+import { Bell, BellDot, CheckCircle, Pin, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Update {
@@ -10,8 +10,7 @@ interface Update {
   category: string;
   pinned: boolean;
   createdAt: string;
-  read: boolean | null;
-  readAt: string | null;
+  read?: boolean | null;
 }
 
 export function NotificationBell() {
@@ -20,10 +19,12 @@ export function NotificationBell() {
   const [updates, setUpdates] = useState<Update[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [hasNew, setHasNew] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  const isLoggedIn = !!user && !!token;
+
   useEffect(() => {
-    if (!token || !user) return;
     loadNotifications();
   }, [token, user]);
 
@@ -36,17 +37,33 @@ export function NotificationBell() {
   }, []);
 
   async function loadNotifications() {
+    setLoading(true);
     try {
-      const res = await fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (data.updates) {
-        setUpdates(data.updates);
-        setUnread(data.unread ?? 0);
+      if (isLoggedIn) {
+        const res = await fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (data.updates) {
+          setUpdates(data.updates);
+          setUnread(data.unread ?? 0);
+          setHasNew(data.unread > 0);
+        }
+      } else {
+        const res = await fetch("/api/notifications/public/updates");
+        const data = await res.json();
+        if (data.updates) {
+          setUpdates(data.updates);
+          // Anonymous: show new badge if updates exist from last 7 days
+          const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const recent = data.updates.filter((u: Update) => new Date(u.createdAt).getTime() > weekAgo);
+          setHasNew(recent.length > 0);
+        }
       }
     } catch {}
+    setLoading(false);
   }
 
   async function markRead(id: number) {
+    if (!isLoggedIn) return;
     try {
       await fetch(`/api/notifications/${id}/read`, {
         method: "POST",
@@ -58,6 +75,7 @@ export function NotificationBell() {
   }
 
   async function markAllRead() {
+    if (!isLoggedIn) return;
     try {
       await fetch("/api/notifications/read-all", {
         method: "POST",
@@ -65,10 +83,9 @@ export function NotificationBell() {
       });
       setUpdates((prev) => prev.map((u) => ({ ...u, read: true })));
       setUnread(0);
+      setHasNew(false);
     } catch {}
   }
-
-  if (!user) return null;
 
   return (
     <div ref={ref} className="relative">
@@ -77,7 +94,7 @@ export function NotificationBell() {
         className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Notifications"
       >
-        {unread > 0 ? (
+        {hasNew || unread > 0 ? (
           <BellDot className="w-5 h-5" />
         ) : (
           <Bell className="w-5 h-5" />
@@ -87,13 +104,18 @@ export function NotificationBell() {
             {unread > 9 ? "9+" : unread}
           </span>
         )}
+        {hasNew && !isLoggedIn && (
+          <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-card" />
+        )}
       </button>
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 max-w-[90vw] bg-[#0d0d0d] border border-border rounded-sm shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider">Founder Updates</h3>
-            {unread > 0 && (
+            <h3 className="font-mono text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+              <Megaphone className="w-3.5 h-3.5" /> What's New
+            </h3>
+            {isLoggedIn && unread > 0 && (
               <button
                 onClick={markAllRead}
                 className="font-mono text-[10px] text-primary hover:text-primary/80 transition-colors"
@@ -115,7 +137,7 @@ export function NotificationBell() {
                 key={u.id}
                 className={cn(
                   "px-4 py-3 border-b border-border/50 cursor-pointer hover:bg-white/5 transition-colors",
-                  !u.read && "bg-primary/5"
+                  isLoggedIn && u.read === false && "bg-primary/5"
                 )}
                 onClick={() => markRead(u.id)}
               >
@@ -125,7 +147,7 @@ export function NotificationBell() {
                       {u.pinned && <Pin className="w-3 h-3 text-primary shrink-0" />}
                       <span className={cn(
                         "font-mono text-xs font-semibold truncate",
-                        !u.read ? "text-foreground" : "text-muted-foreground"
+                        isLoggedIn && u.read === false ? "text-foreground" : "text-muted-foreground"
                       )}>
                         {u.title}
                       </span>
@@ -146,7 +168,7 @@ export function NotificationBell() {
                       <span className="font-mono text-[9px] text-muted-foreground">
                         {new Date(u.createdAt).toLocaleDateString()}
                       </span>
-                      {u.read && (
+                      {isLoggedIn && u.read === true && (
                         <span className="flex items-center gap-1 font-mono text-[9px] text-green-400">
                           <CheckCircle className="w-3 h-3" /> read
                         </span>
