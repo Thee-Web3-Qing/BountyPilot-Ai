@@ -2,47 +2,26 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CheckCircle, User, X, Plus, Calendar, Sparkles, Pencil, Star, Award, Trophy } from "lucide-react";
+import { Loader2, User, Calendar, Pencil, Star, Crown, Sparkles, Globe, Award, Coins, Gift, Zap, Target } from "lucide-react";
 import { Link } from "wouter";
-import { GamificationPanel } from "@/components/GamificationPanel";
-import { DailyCheckIn } from "@/components/DailyCheckIn";
-import { StarsDisplay } from "@/components/StarsDisplay";
-import { cn } from "@/lib/utils";
+import { usePageMeta } from "@/lib/use-page-meta";
 
-interface Profile {
-  fullName?: string; creatorName?: string; mainPlatforms?: string;
-  contentFormats?: string; niche?: string; skillLevel?: string;
-  preferredBountyTypes?: string; minimumReward?: number;
-  weeklyContentCapacity?: number; targetMonthlyEarnings?: number;
-  creatorStrengths?: string; creatorWeaknesses?: string;
-  portfolioLinks?: string; notes?: string;
+interface ProfileData {
+  fullName?: string;
+  creatorName?: string;
+  mainPlatforms?: string;
+  contentFormats?: string;
+  niche?: string;
+  skillLevel?: string;
+  preferredBountyTypes?: string;
+  minimumReward?: number;
+  weeklyContentCapacity?: number;
+  targetMonthlyEarnings?: number;
+  creatorStrengths?: string;
+  creatorWeaknesses?: string;
+  portfolioLinks?: string;
+  notes?: string;
 }
-
-type TabKey = "overview" | "edit" | "achievements" | "stars";
-
-const PLATFORMS = [
-  "YouTube", "Twitter / X", "LinkedIn", "Instagram", "TikTok",
-  "Mirror", "Substack", "Farcaster", "Lens", "Discord", "Telegram", "Medium",
-];
-
-const CONTENT_FORMATS = [
-  "Article / Thread", "Long-form Video", "Short-form Video", "Podcast",
-  "Newsletter", "Tutorial", "Design", "Infographic", "Comic Strip", "Meme",
-];
-
-const NICHES = [
-  "DeFi", "NFTs", "Layer 2", "Gaming", "DePIN", "DAOs",
-  "Infrastructure", "Trading", "Education", "Web3 General",
-];
-
-const SKILL_LEVELS = ["Beginner", "Intermediate", "Expert"];
-
-const BOUNTY_TYPES = [
-  "Articles", "Videos", "Threads", "Tutorials",
-  "Technical Writing", "Design", "Memes", "Podcasts",
-];
 
 function formatDate(date: string | null): string {
   if (!date) return "N/A";
@@ -80,401 +59,215 @@ function computeSubscriptionStatus(user: any) {
   return { plan: user.plan, label: "", color: "text-muted-foreground" };
 }
 
+function chipList(value?: string): string[] {
+  if (!value) return [];
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
 export function Profile() {
+  usePageMeta({ title: "Profile", description: "Your BountyPilot profile", canonical: "/profile" });
   const { user, token } = useAuth();
-  const [profile, setProfile] = useState<Profile>({});
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [profile, setProfile] = useState<ProfileData>({});
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [starCount, setStarCount] = useState(0);
+  const [bountyCount, setBountyCount] = useState(0);
+  const [submissionCount, setSubmissionCount] = useState(0);
+  const [earningsTotal, setEarningsTotal] = useState(0);
 
   const subStatus = computeSubscriptionStatus(user);
 
   useEffect(() => {
     if (!token) return;
-    fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((d) => { if (d.profile) setProfile(d.profile); })
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
+      fetch("/api/checkin/status", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => ({ totalStars: 0 })),
+      fetch("/api/bounties", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => ({ bounties: [] })),
+      fetch("/api/submissions", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => ({ submissions: [] })),
+      fetch("/api/earnings", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => ({ totalEarned: 0 })),
+    ]).then(([me, checkin, bounties, submissions, earnings]) => {
+      if (me.profile) setProfile(me.profile);
+      setStarCount(checkin.totalStars || 0);
+      setBountyCount(bounties.bounties?.length || 0);
+      setSubmissionCount(submissions.submissions?.length || 0);
+      setEarningsTotal(earnings.totalEarned || 0);
+    }).finally(() => setLoading(false));
   }, [token]);
 
-  const set = (k: keyof Profile, v: string | number) =>
-    setProfile((p) => ({ ...p, [k]: v }));
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-muted-foreground font-mono">
+        <Loader2 className="w-6 h-6 animate-spin mr-3" /> Loading profile...
+      </div>
+    );
+  }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await fetch("/api/auth/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(profile),
-      });
-      setSaved(true);
-      setActiveTab("overview");
-      setTimeout(() => setSaved(false), 3000);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) return (
-    <div className="flex items-center justify-center py-20 text-muted-foreground font-mono">
-      <Loader2 className="w-6 h-6 animate-spin mr-3" /> Loading profile...
-    </div>
-  );
-
-  const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-    { key: "overview", label: "Overview", icon: User },
-    { key: "stars", label: "Stars", icon: Star },
-    { key: "achievements", label: "Achievements", icon: Trophy },
-    { key: "edit", label: "Edit", icon: Pencil },
-  ];
+  const platforms = chipList(profile.mainPlatforms);
+  const niches = chipList(profile.niche);
+  const formats = chipList(profile.contentFormats);
+  const bountyTypes = chipList(profile.preferredBountyTypes);
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       {/* Profile Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center">
-            <User className="w-7 h-7 text-primary" />
+          <div className="w-16 h-16 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center">
+            <User className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold font-sans uppercase tracking-tight">@{user?.username}</h1>
+            <h1 className="text-2xl font-bold font-sans uppercase tracking-tight">
+              {profile.fullName || profile.creatorName || `@${user?.username}`}
+            </h1>
             <p className="text-muted-foreground font-mono text-sm">{user?.email}</p>
-          </div>
-        </div>
-        {subStatus && (
-          <div className="text-right">
-            <div className="flex items-center gap-2 justify-end">
-              <span className={`font-mono text-sm font-semibold ${subStatus.color}`}>{subStatus.plan}</span>
-              <span className="text-muted-foreground font-mono text-xs">{subStatus.label}</span>
-            </div>
-            {subStatus.endsAt && (
-              <p className="font-mono text-xs text-muted-foreground mt-0.5">
-                <Calendar className="w-3 h-3 inline mr-1" />ends {subStatus.endsAt}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Tab Bar */}
-      <div className="flex items-center gap-1 border-b border-border pb-0 overflow-x-auto">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2.5 font-mono text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap",
-                activeTab === t.key
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+            <div className="flex items-center gap-2 mt-1">
+              {subStatus && (
+                <span className={`font-mono text-[10px] uppercase tracking-wider border px-2 py-0.5 rounded-sm ${subStatus.color} border-current/30`}>
+                  {subStatus.plan}
+                </span>
               )}
-            >
-              <Icon className="w-4 h-4" />
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "overview" && (
-        <div className="flex flex-col gap-6">
-          <DailyCheckIn />
-          <div className="flex flex-col gap-4">
-            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Profile Summary</p>
-            <Card className="bg-card border-border">
-              <CardContent className="p-5 flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Full Name</p>
-                    <p className="font-mono text-sm font-semibold text-foreground">{profile.fullName || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Creator Name</p>
-                    <p className="font-mono text-sm font-semibold text-foreground">{profile.creatorName || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Platforms</p>
-                    <p className="font-mono text-sm text-foreground">{profile.mainPlatforms || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Niche</p>
-                    <p className="font-mono text-sm text-foreground">{profile.niche || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Skill Level</p>
-                    <p className="font-mono text-sm text-foreground">{profile.skillLevel || "Not set"}</p>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Target Earnings</p>
-                    <p className="font-mono text-sm text-foreground">{profile.targetMonthlyEarnings ? `$${profile.targetMonthlyEarnings}` : "Not set"}</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setActiveTab("edit")}
-                  className="w-full font-mono text-xs font-bold uppercase tracking-wider h-10"
-                  variant="outline"
-                >
-                  <Pencil className="w-4 h-4 mr-2" /> Edit Profile
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "stars" && (
-        <StarsDisplay />
-      )}
-
-      {activeTab === "achievements" && (
-        <GamificationPanel />
-      )}
-
-      {activeTab === "edit" && (
-        <div className="flex flex-col gap-6">
-          <p className="text-muted-foreground font-mono text-xs border-l-2 border-primary/50 pl-3">
-            Your profile personalises opportunity scoring — the more you fill in, the better the AI understands your strengths and goals.
-          </p>
-
-          <form onSubmit={handleSave} className="flex flex-col gap-6">
-            <Section title="Identity">
-              <Row2>
-                <Field label="Full Name" value={profile.fullName} onChange={(v) => set("fullName", v)} placeholder="Your real name" />
-                <Field label="Creator Name / Handle" value={profile.creatorName} onChange={(v) => set("creatorName", v)} placeholder="@yourhandle" />
-              </Row2>
-            </Section>
-
-            <Section title="Creator Focus">
-              <MultiChipSelect
-                label="Main Platforms"
-                options={PLATFORMS}
-                value={profile.mainPlatforms || ""}
-                onChange={(v) => set("mainPlatforms", v)}
-              />
-              <MultiChipSelect
-                label="Content Formats"
-                options={CONTENT_FORMATS}
-                value={profile.contentFormats || ""}
-                onChange={(v) => set("contentFormats", v)}
-              />
-              <MultiChipSelect
-                label="Niche"
-                options={NICHES}
-                value={profile.niche || ""}
-                onChange={(v) => set("niche", v)}
-              />
-              <Row2>
-                <SingleChipSelect
-                  label="Skill Level"
-                  options={SKILL_LEVELS}
-                  value={profile.skillLevel || ""}
-                  onChange={(v) => set("skillLevel", v)}
-                />
-                <MultiChipSelect
-                  label="Preferred Bounty Types"
-                  options={BOUNTY_TYPES}
-                  value={profile.preferredBountyTypes || ""}
-                  onChange={(v) => set("preferredBountyTypes", v)}
-                />
-              </Row2>
-            </Section>
-
-            <Section title="Goals & Capacity">
-              <Row2>
-                <Field label="Minimum Reward ($)" value={profile.minimumReward?.toString()} onChange={(v) => set("minimumReward", parseFloat(v) || 0)} placeholder="e.g. 200" type="number" />
-                <Field label="Weekly Content Capacity (hrs)" value={profile.weeklyContentCapacity?.toString()} onChange={(v) => set("weeklyContentCapacity", parseInt(v) || 0)} placeholder="e.g. 10" type="number" />
-              </Row2>
-              <Field label="Target Monthly Earnings ($)" value={profile.targetMonthlyEarnings?.toString()} onChange={(v) => set("targetMonthlyEarnings", parseFloat(v) || 0)} placeholder="e.g. 2000" type="number" />
-            </Section>
-
-            <Section title="Self Assessment">
-              <TextareaField label="Creator Strengths" value={profile.creatorStrengths} onChange={(v) => set("creatorStrengths", v)} placeholder="e.g. Strong research skills, can produce videos quickly, existing audience in DeFi..." />
-              <TextareaField label="Creator Weaknesses" value={profile.creatorWeaknesses} onChange={(v) => set("creatorWeaknesses", v)} placeholder="e.g. Limited technical knowledge, no podcast setup..." />
-            </Section>
-
-            <Section title="Portfolio & Notes">
-              <TextareaField label="Portfolio Links" value={profile.portfolioLinks} onChange={(v) => set("portfolioLinks", v)} placeholder="YouTube channel, Mirror, Twitter, personal site..." />
-              <TextareaField label="Additional Notes" value={profile.notes} onChange={(v) => set("notes", v)} placeholder="Anything else about your creator setup..." />
-            </Section>
-
-            <div className="flex items-center gap-4">
-              <Button type="submit" disabled={saving} className="font-mono uppercase tracking-wider">
-                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save Profile
-              </Button>
-              {saved && (
-                <span className="flex items-center gap-2 text-green-400 font-mono text-sm">
-                  <CheckCircle className="w-4 h-4" /> Saved
+              {profile.skillLevel && (
+                <span className="font-mono text-[10px] text-primary uppercase tracking-wider border border-primary/30 px-2 py-0.5 rounded-sm">
+                  {profile.skillLevel}
                 </span>
               )}
             </div>
-          </form>
+          </div>
         </div>
+        <Link href="/profile/edit">
+          <Button size="sm" variant="outline" className="font-mono text-xs uppercase tracking-wider gap-2">
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </Button>
+        </Link>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard icon={Star} label="Stars" value={starCount} color="text-amber-400" />
+        <StatCard icon={Target} label="Bounties" value={bountyCount} color="text-primary" />
+        <StatCard icon={Award} label="Submissions" value={submissionCount} color="text-blue-400" />
+        <StatCard icon={Coins} label="Earnings" value={`$${earningsTotal}`} color="text-green-400" />
+      </div>
+
+      {/* About */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-5 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">About</p>
+            <Link href="/stars">
+              <Button size="sm" variant="ghost" className="font-mono text-xs uppercase tracking-wider gap-1.5 h-7 text-primary hover:text-primary">
+                <Sparkles className="w-3.5 h-3.5" /> Stars
+              </Button>
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InfoRow label="Creator Name" value={profile.creatorName} />
+            <InfoRow label="Full Name" value={profile.fullName} />
+            <InfoRow label="Target Earnings" value={profile.targetMonthlyEarnings ? `$${profile.targetMonthlyEarnings}/mo` : undefined} />
+            <InfoRow label="Min. Reward" value={profile.minimumReward ? `$${profile.minimumReward}` : undefined} />
+            <InfoRow label="Weekly Capacity" value={profile.weeklyContentCapacity ? `${profile.weeklyContentCapacity} hrs` : undefined} />
+            <InfoRow label="Member Since" value={user?.id ? "Joined" : undefined} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Creator Focus */}
+      <Card className="bg-card border-border">
+        <CardContent className="p-5 flex flex-col gap-4">
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Creator Focus</p>
+          <div className="flex flex-col gap-3">
+            <ChipGroup label="Platforms" chips={platforms} icon={Globe} />
+            <ChipGroup label="Niches" chips={niches} icon={Zap} />
+            <ChipGroup label="Content Formats" chips={formats} icon={Gift} />
+            <ChipGroup label="Bounty Types" chips={bountyTypes} icon={Target} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Self Assessment */}
+      {(profile.creatorStrengths || profile.creatorWeaknesses) && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-5 flex flex-col gap-4">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Self Assessment</p>
+            <div className="flex flex-col gap-3">
+              {profile.creatorStrengths && (
+                <div>
+                  <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Strengths</p>
+                  <p className="font-mono text-sm text-foreground">{profile.creatorStrengths}</p>
+                </div>
+              )}
+              {profile.creatorWeaknesses && (
+                <div>
+                  <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Weaknesses</p>
+                  <p className="font-mono text-sm text-foreground">{profile.creatorWeaknesses}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Portfolio & Notes */}
+      {(profile.portfolioLinks || profile.notes) && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-5 flex flex-col gap-4">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Portfolio & Notes</p>
+            <div className="flex flex-col gap-3">
+              {profile.portfolioLinks && (
+                <div>
+                  <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Portfolio</p>
+                  <p className="font-mono text-sm text-foreground whitespace-pre-wrap">{profile.portfolioLinks}</p>
+                </div>
+              )}
+              {profile.notes && (
+                <div>
+                  <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Notes</p>
+                  <p className="font-mono text-sm text-foreground whitespace-pre-wrap">{profile.notes}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
-// ─── Multi-chip selector (comma-separated storage) ─────────────────────────
-function MultiChipSelect({
-  label, options, value, onChange,
-}: {
-  label: string; options: string[]; value: string; onChange: (v: string) => void;
-}) {
-  const selected = value
-    ? value.split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
-
-  const toggle = (opt: string) => {
-    const next = selected.includes(opt)
-      ? selected.filter((s) => s !== opt)
-      : [...selected, opt];
-    onChange(next.join(", "));
-  };
-
-  const removeCustom = (opt: string) => {
-    const next = selected.filter((s) => s !== opt);
-    onChange(next.join(", "));
-  };
-
-  const customItems = selected.filter((s) => !options.includes(s));
-  const [customInput, setCustomInput] = useState("");
-
-  const addCustom = () => {
-    const val = customInput.trim();
-    if (!val || selected.includes(val)) { setCustomInput(""); return; }
-    onChange([...selected, val].join(", "));
-    setCustomInput("");
-  };
-
-  return (
-    <div>
-      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-2">{label}</label>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => {
-          const active = selected.includes(opt);
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => toggle(opt)}
-              className={`font-mono text-xs px-2.5 py-1 rounded-sm border transition-colors ${
-                active
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
-            >
-              {opt}
-            </button>
-          );
-        })}
-        {customItems.map((opt) => (
-          <span
-            key={opt}
-            className="font-mono text-xs px-2.5 py-1 rounded-sm border border-primary bg-primary/15 text-primary flex items-center gap-1"
-          >
-            {opt}
-            <button type="button" onClick={() => removeCustom(opt)} className="hover:text-red-400 ml-0.5">
-              <X className="w-2.5 h-2.5" />
-            </button>
-          </span>
-        ))}
-        <div className="flex items-center gap-1">
-          <input
-            type="text"
-            value={customInput}
-            onChange={(e) => setCustomInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
-            placeholder="Custom…"
-            className="font-mono text-xs px-2 py-1 rounded-sm border border-dashed border-border bg-transparent text-muted-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60 w-20"
-          />
-          {customInput.trim() && (
-            <button
-              type="button"
-              onClick={addCustom}
-              className="text-primary hover:text-primary/70"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Single-chip selector (radio style) ───────────────────────────────────
-function SingleChipSelect({
-  label, options, value, onChange,
-}: {
-  label: string; options: string[]; value: string; onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-2">{label}</label>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => {
-          const active = value === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(active ? "" : opt)}
-              className={`font-mono text-xs px-2.5 py-1 rounded-sm border transition-colors ${
-                active
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              }`}
-            >
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Supporting components ─────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string | number; color: string }) {
   return (
     <Card className="bg-card border-border">
-      <CardContent className="p-6 flex flex-col gap-5">
-        <p className="font-mono text-xs uppercase tracking-wider text-primary border-b border-border pb-2">{title}</p>
-        {children}
+      <CardContent className="p-4 flex flex-col items-center gap-1.5">
+        <Icon className={`w-5 h-5 ${color}`} />
+        <p className="font-mono text-lg font-bold text-foreground">{value}</p>
+        <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
       </CardContent>
     </Card>
   );
 }
 
-function Row2({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 md:grid-cols-2 gap-5">{children}</div>;
-}
-
-function Field({ label, value, onChange, placeholder, type = "text" }: {
-  label: string; value?: string; onChange: (v: string) => void; placeholder: string; type?: string;
-}) {
+function InfoRow({ label, value }: { label: string; value?: string }) {
   return (
     <div>
-      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">{label}</label>
-      <Input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="font-mono text-sm bg-background" />
+      <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+      <p className="font-mono text-sm font-semibold text-foreground">{value || "Not set"}</p>
     </div>
   );
 }
 
-function TextareaField({ label, value, onChange, placeholder }: {
-  label: string; value?: string; onChange: (v: string) => void; placeholder: string;
-}) {
+function ChipGroup({ label, chips, icon: Icon }: { label: string; chips: string[]; icon: React.ElementType }) {
+  if (chips.length === 0) return null;
   return (
     <div>
-      <label className="font-mono text-xs uppercase tracking-wider text-muted-foreground block mb-1.5">{label}</label>
-      <Textarea value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="font-mono text-sm bg-background min-h-[80px] resize-y" />
+      <div className="flex items-center gap-1.5 mb-2">
+        <Icon className="w-3 h-3 text-muted-foreground" />
+        <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {chips.map((chip) => (
+          <span key={chip} className="font-mono text-xs px-2 py-1 rounded-sm border border-primary/30 bg-primary/10 text-primary">
+            {chip}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

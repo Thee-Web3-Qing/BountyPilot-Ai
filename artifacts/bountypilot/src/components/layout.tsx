@@ -46,23 +46,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* ── Top bar ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 flex items-center justify-between px-5 h-14 border-b border-border bg-card/95 backdrop-blur">
-        <Link href="/" onClick={close}>
-          <div className="flex items-center gap-2.5 cursor-pointer">
-            <div className="w-7 h-7 bg-primary text-primary-foreground flex items-center justify-center rounded-sm shrink-0">
-              <Crosshair className="w-4 h-4" />
+        <div className="flex items-center gap-2">
+          {open ? (
+            <button
+              onClick={close}
+              className="flex items-center gap-1.5 p-2 text-foreground hover:text-primary transition-colors"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+              <span className="font-mono text-xs uppercase tracking-wider font-bold">Close</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setOpen(true)}
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+          <Link href="/" onClick={close}>
+            <div className="flex items-center gap-2.5 cursor-pointer">
+              <div className="w-7 h-7 bg-primary text-primary-foreground flex items-center justify-center rounded-sm shrink-0">
+                <Crosshair className="w-4 h-4" />
+              </div>
+              <span className="font-bold font-sans text-base uppercase tracking-tighter">BountyPilot</span>
             </div>
-            <span className="font-bold font-sans text-base uppercase tracking-tighter">BountyPilot</span>
-          </div>
-        </Link>
+          </Link>
+        </div>
         <div className="flex items-center gap-1">
           <NotificationBell />
-          <button
-            onClick={() => setOpen(true)}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <Link href="/profile" onClick={close}>
+            <div className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" aria-label="Profile">
+              <User className="w-5 h-5" />
+            </div>
+          </Link>
         </div>
       </header>
 
@@ -141,12 +159,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 ) : null}
               </div>
 
-              {/* Profile — expands to show Settings + Sign Out */}
+              {/* Profile — expands to show Profile + Stars + Settings + Sign Out */}
               <button
                 onClick={() => setProfileExpanded((v) => !v)}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors",
-                  location === "/profile"
+                  location === "/profile" || location === "/profile/edit" || location === "/stars"
                     ? "bg-primary text-primary-foreground font-bold"
                     : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                 )}
@@ -158,18 +176,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
 
-              {/* Expanded: Settings + Sign Out */}
+              {/* Expanded: Profile + Stars + Settings + Sign Out */}
               {profileExpanded && (
                 <div className="mt-0.5 pl-4 flex flex-col gap-0.5">
                   <Link href="/profile" onClick={close}>
                     <div className={cn(
                       "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
-                      location === "/profile"
+                      location === "/profile" && !location.includes("/edit")
                         ? "text-primary font-bold"
                         : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                     )}>
                       <User className="w-3.5 h-3.5 shrink-0" />
-                      Edit Profile
+                      View Profile
+                    </div>
+                  </Link>
+                  <Link href="/stars" onClick={close}>
+                    <div className={cn(
+                      "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
+                      location === "/stars"
+                        ? "text-primary font-bold"
+                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                    )}>
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      Stars
                     </div>
                   </Link>
                   <Link href="/settings" onClick={close}>
