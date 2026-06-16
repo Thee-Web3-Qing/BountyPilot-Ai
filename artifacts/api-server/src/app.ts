@@ -44,7 +44,7 @@ app.use("/api", router);
 app.use(express.static(frontendDist));
 
 // SPA catch-all: any non-API path gets index.html so React/Wouter handles routing
-app.get("*", (_req, res) => {
+app.get(/(.*)/, (_req, res) => {
   res.sendFile(resolve(frontendDist, "index.html"));
 });
 
