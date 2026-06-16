@@ -5,5 +5,5 @@
 - [Email Authentication](email-auth.md) — Resend SDK (EMAIL_PROVIDER=resend, FROM_EMAIL=noreply@bountypilot.xyz). OTP login + forgot-password both use sendOTPEmail(). login_code/login_code_expires columns on users.
 - [Google Auth](google-auth.md) — google-auth-library backend + @react-oauth/google frontend. GoogleAuthProvider fetches clientId from /api/auth/google-client-id at runtime. Conditionally renders GoogleLogin only when ready=true to avoid crash outside provider.
 - [Referral System](referral-system.md) — referral_code auto-generated on signup (4-char prefix + 6 hex). referrals table. Qualifies at 5+ referrals OR 1 active/lifetime. ?ref= param on signup/google flows. /referral page + leaderboard.
-- [Launchpad](launchpad.md) — Admin-only custom bounty posting. custom_bounties + custom_bounty_applications tables. /launchpad page for users to browse + apply. Admin CRUD at /api/custom-bounties.
+- [Launchpad](launchpad.md) — Campaign hub with 4 isolated campaigns (crypto-50, free-access, yearly-challenge, lifetime-challenge). campaign_enrollments table. /launchpad/campaign/:slug detail pages.
 - **No Stripe** — payments are crypto-only via Dextopus.

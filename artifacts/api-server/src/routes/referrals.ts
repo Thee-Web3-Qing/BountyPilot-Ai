@@ -1,19 +1,21 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, referralsTable } from "@workspace/db";
-import { eq, desc, count, sql, gte } from "drizzle-orm";
+import { usersTable, referralsTable, campaignEnrollmentsTable } from "@workspace/db";
+import { eq, desc, count, sql, and, or, isNull } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 
 export const referralsRouter = Router();
 
-// Thresholds
-const MIN_PAID_REFERRALS = 3;          // qualify for $50 crypto prize track (paid refs)
-const FREE_LEADERBOARD_MIN = 10;       // minimum total referrals to appear on access track
-const FREE_LEADERBOARD_TOP = 10;       // top N get 2 months free
-const CRYPTO_PRIZE_TOP = 2;            // top N split the $50 pool
+// ── Campaign config ───────────────────────────────────────────
+const CAMPAIGN_SLUGS = ["crypto-50", "free-access", "yearly-challenge", "lifetime-challenge"];
 
-// Challenge campaigns
+// Thresholds
+const MIN_PAID_REFERRALS = 3;
+const FREE_LEADERBOARD_MIN = 10;
+const FREE_LEADERBOARD_TOP = 10;
+const CRYPTO_PRIZE_TOP = 2;
+
 const YEARLY_CHALLENGE = {
   prizePool: 200,
   minQualify: 3,
@@ -32,11 +34,16 @@ const LIFETIME_CHALLENGE = {
   rewards100: { first: 250, second: 150, thirdToTenth: 50 },
 };
 
-function qualifiesForCryptoPrize(paidReferrals: number) {
-  return paidReferrals >= MIN_PAID_REFERRALS;
+// ── Optional auth helper ──────────────────────────────────────
+function tryGetUserId(req: AuthRequest): number | null {
+  try {
+    return req.user?.userId ?? null;
+  } catch {
+    return null;
+  }
 }
 
-// GET /referrals/my — user's referral stats + referred user details
+// ── GET /referrals/my — user's referral stats ─────────────────
 referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
@@ -45,12 +52,12 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
       .from(usersTable)
       .where(eq(usersTable.id, userId));
 
-    // Join with users table to get referred user's username
     const referralRows = await db
       .select({
         id: referralsTable.id,
         referredUserId: referralsTable.referredUserId,
         referredUserPlan: referralsTable.referredUserPlan,
+        tier: referralsTable.tier,
         qualifies: referralsTable.qualifies,
         rewardGranted: referralsTable.rewardGranted,
         createdAt: referralsTable.createdAt,
@@ -62,10 +69,19 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
       .orderBy(desc(referralsTable.createdAt));
 
     const total = referralRows.length;
-    const paidReferrals = referralRows.filter(r =>
-      r.referredUserPlan === "active" || r.referredUserPlan === "lifetime"
+
+    // Per-campaign counts (isolated)
+    const cryptoRefs = referralRows.filter(r =>
+      r.referredUserPlan === "active" &&
+      (r.tier === "monthly" || r.tier === null)
     ).length;
-    const hasPremiumReferral = paidReferrals > 0;
+    const yearlyRefs = referralRows.filter(r => r.tier === "yearly").length;
+    const lifetimeRefs = referralRows.filter(r =>
+      r.tier === "lifetime" || r.referredUserPlan === "lifetime"
+    ).length;
+    const freeRefs = referralRows.filter(r =>
+      r.referredUserPlan !== "active" && r.referredUserPlan !== "lifetime"
+    ).length;
 
     const baseUrl = process.env.APP_URL || "https://bountypilot.xyz";
     const referralLink = `${baseUrl}/signup?ref=${encodeURIComponent(user.username)}`;
@@ -74,17 +90,21 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
       referralCode: user.username,
       referralLink,
       totalReferrals: total,
-      paidReferrals,
-      qualifiesCrypto: qualifiesForCryptoPrize(paidReferrals),
-      qualifiesAccess: total >= FREE_LEADERBOARD_MIN,
+      paidReferrals: cryptoRefs,
+      yearlyReferrals: yearlyRefs,
+      lifetimeReferrals: lifetimeRefs,
+      freeReferrals: freeRefs,
+      qualifiesCrypto: cryptoRefs >= MIN_PAID_REFERRALS,
+      qualifiesAccess: freeRefs >= FREE_LEADERBOARD_MIN,
       minRequired: MIN_PAID_REFERRALS,
       freeLeaderboardMin: FREE_LEADERBOARD_MIN,
-      hasPremiumReferral,
+      hasPremiumReferral: cryptoRefs > 0 || yearlyRefs > 0 || lifetimeRefs > 0,
       referrals: referralRows.map(r => ({
         id: r.id,
         referredUserId: r.referredUserId,
         referredUsername: r.referredUsername,
         referredUserPlan: r.referredUserPlan,
+        tier: r.tier,
         isPaid: r.referredUserPlan === "active" || r.referredUserPlan === "lifetime",
         createdAt: r.createdAt,
       })),
@@ -95,7 +115,248 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-// GET /referrals/leaderboard — two separate leaderboards
+// ── GET /referrals/campaigns — list campaigns with enrollment ─
+referralsRouter.get("/campaigns", async (req: AuthRequest, res) => {
+  try {
+    const userId = tryGetUserId(req);
+
+    let enrollments: string[] = [];
+    if (userId) {
+      const enrolled = await db
+        .select({ campaignSlug: campaignEnrollmentsTable.campaignSlug })
+        .from(campaignEnrollmentsTable)
+        .where(eq(campaignEnrollmentsTable.userId, userId));
+      enrollments = enrolled.map(e => e.campaignSlug);
+    }
+
+    const enrolledCounts = await db
+      .select({
+        campaignSlug: campaignEnrollmentsTable.campaignSlug,
+        cnt: count(campaignEnrollmentsTable.id),
+      })
+      .from(campaignEnrollmentsTable)
+      .groupBy(campaignEnrollmentsTable.campaignSlug);
+
+    const countMap: Record<string, number> = {};
+    for (const e of enrolledCounts) countMap[e.campaignSlug] = Number(e.cnt);
+
+    res.json({
+      campaigns: CAMPAIGN_SLUGS.map(slug => ({
+        slug,
+        enrolledCount: countMap[slug] ?? 0,
+        isEnrolled: enrollments.includes(slug),
+      })),
+    });
+  } catch (err) {
+    logger.error(err, "Get campaigns error");
+    res.status(500).json({ error: "Failed to get campaigns" });
+  }
+});
+
+// ── POST /referrals/campaigns/:slug/join ─────────────────────
+referralsRouter.post("/campaigns/:slug/join", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { slug } = req.params;
+
+    if (!CAMPAIGN_SLUGS.includes(slug)) {
+      res.status(400).json({ error: "Invalid campaign slug" });
+      return;
+    }
+
+    await db.insert(campaignEnrollmentsTable)
+      .values({ userId, campaignSlug: slug })
+      .onConflictDoNothing();
+
+    logger.info({ userId, slug }, "User joined campaign");
+    res.json({ joined: true, campaignSlug: slug });
+  } catch (err) {
+    logger.error(err, "Join campaign error");
+    res.status(500).json({ error: "Failed to join campaign" });
+  }
+});
+
+// ── GET /referrals/campaigns/:slug/leaderboard ───────────────
+referralsRouter.get("/campaigns/:slug/leaderboard", async (req: AuthRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const userId = tryGetUserId(req);
+
+    if (!CAMPAIGN_SLUGS.includes(slug)) {
+      res.status(400).json({ error: "Invalid campaign slug" });
+      return;
+    }
+
+    // Build isolated leaderboard per campaign
+    if (slug === "crypto-50") {
+      // Monthly paid referrals: active plan + tier is null or "monthly"
+      const rows = await db
+        .select({
+          referrerId: referralsTable.referrerId,
+          username: usersTable.username,
+          cnt: count(referralsTable.id),
+        })
+        .from(referralsTable)
+        .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
+        .where(and(
+          eq(referralsTable.referredUserPlan, "active"),
+          or(isNull(referralsTable.tier), eq(referralsTable.tier, "monthly"))
+        ))
+        .groupBy(referralsTable.referrerId, usersTable.username)
+        .orderBy(desc(count(referralsTable.id)))
+        .limit(50);
+
+      const leaderboard = rows.map((r, i) => ({
+        rank: i + 1,
+        username: r.username,
+        count: Number(r.cnt),
+        isYou: r.referrerId === userId,
+        isWinner: i < CRYPTO_PRIZE_TOP,
+        qualifies: Number(r.cnt) >= MIN_PAID_REFERRALS,
+      }));
+
+      res.json({
+        slug,
+        leaderboard,
+        config: {
+          prizePool: 50,
+          topWinners: CRYPTO_PRIZE_TOP,
+          prizePerWinner: 25,
+          minQualify: MIN_PAID_REFERRALS,
+          label: "monthly referrals",
+        },
+      });
+
+    } else if (slug === "free-access") {
+      // Free signups: not active or lifetime
+      const rows = await db
+        .select({
+          referrerId: referralsTable.referrerId,
+          username: usersTable.username,
+          cnt: count(referralsTable.id),
+        })
+        .from(referralsTable)
+        .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
+        .where(sql`${referralsTable.referredUserPlan} NOT IN ('active', 'lifetime')`)
+        .groupBy(referralsTable.referrerId, usersTable.username)
+        .orderBy(desc(count(referralsTable.id)))
+        .limit(100);
+
+      const qualified = rows.filter(r => Number(r.cnt) >= FREE_LEADERBOARD_MIN);
+      const leaderboard = qualified
+        .slice(0, FREE_LEADERBOARD_TOP)
+        .map((r, i) => ({
+          rank: i + 1,
+          username: r.username,
+          count: Number(r.cnt),
+          isYou: r.referrerId === userId,
+          isWinner: true,
+          qualifies: true,
+        }));
+
+      // Also include current user if not in top 10
+      const myRow = rows.find(r => r.referrerId === userId);
+      const myRank = myRow ? rows.indexOf(myRow) + 1 : null;
+
+      res.json({
+        slug,
+        leaderboard,
+        myRank,
+        myCount: myRow ? Number(myRow.cnt) : 0,
+        config: {
+          minQualify: FREE_LEADERBOARD_MIN,
+          topWinners: FREE_LEADERBOARD_TOP,
+          prize: "2 months free access",
+          label: "free referrals",
+        },
+      });
+
+    } else if (slug === "yearly-challenge") {
+      const rows = await db
+        .select({
+          referrerId: referralsTable.referrerId,
+          username: usersTable.username,
+          cnt: count(referralsTable.id),
+        })
+        .from(referralsTable)
+        .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
+        .where(eq(referralsTable.tier, "yearly"))
+        .groupBy(referralsTable.referrerId, usersTable.username)
+        .orderBy(desc(count(referralsTable.id)))
+        .limit(50);
+
+      const leaderboard = rows.map((r, i) => ({
+        rank: i + 1,
+        username: r.username,
+        count: Number(r.cnt),
+        isYou: r.referrerId === userId,
+        qualifies: Number(r.cnt) >= YEARLY_CHALLENGE.minQualify,
+        isWinner: i < 10,
+      }));
+
+      const qualified = leaderboard.filter(e => e.qualifies);
+      const unlockPercent = qualified.length >= YEARLY_CHALLENGE.milestone2.qualified ? 100
+        : qualified.length >= YEARLY_CHALLENGE.milestone1.qualified ? 50 : 0;
+      const unlockedAmount = unlockPercent === 100 ? YEARLY_CHALLENGE.milestone2.unlockAmount
+        : unlockPercent === 50 ? YEARLY_CHALLENGE.milestone1.unlockAmount : 0;
+
+      res.json({
+        slug,
+        leaderboard: leaderboard.slice(0, 10),
+        qualifiedCount: qualified.length,
+        unlockPercent,
+        unlockedAmount,
+        config: YEARLY_CHALLENGE,
+      });
+
+    } else if (slug === "lifetime-challenge") {
+      const rows = await db
+        .select({
+          referrerId: referralsTable.referrerId,
+          username: usersTable.username,
+          cnt: count(referralsTable.id),
+        })
+        .from(referralsTable)
+        .innerJoin(usersTable, eq(usersTable.id, referralsTable.referrerId))
+        .where(or(
+          eq(referralsTable.tier, "lifetime"),
+          eq(referralsTable.referredUserPlan, "lifetime")
+        ))
+        .groupBy(referralsTable.referrerId, usersTable.username)
+        .orderBy(desc(count(referralsTable.id)))
+        .limit(50);
+
+      const leaderboard = rows.map((r, i) => ({
+        rank: i + 1,
+        username: r.username,
+        count: Number(r.cnt),
+        isYou: r.referrerId === userId,
+        qualifies: Number(r.cnt) >= LIFETIME_CHALLENGE.minQualify,
+        isWinner: i < 10,
+      }));
+
+      const qualified = leaderboard.filter(e => e.qualifies);
+      const unlockPercent = qualified.length >= LIFETIME_CHALLENGE.milestone2.qualified ? 100
+        : qualified.length >= LIFETIME_CHALLENGE.milestone1.qualified ? 50 : 0;
+      const unlockedAmount = unlockPercent === 100 ? LIFETIME_CHALLENGE.milestone2.unlockAmount
+        : unlockPercent === 50 ? LIFETIME_CHALLENGE.milestone1.unlockAmount : 0;
+
+      res.json({
+        slug,
+        leaderboard: leaderboard.slice(0, 10),
+        qualifiedCount: qualified.length,
+        unlockPercent,
+        unlockedAmount,
+        config: LIFETIME_CHALLENGE,
+      });
+    }
+  } catch (err) {
+    logger.error(err, "Campaign leaderboard error");
+    res.status(500).json({ error: "Failed to get campaign leaderboard" });
+  }
+});
+
+// ── GET /referrals/leaderboard — legacy two-track leaderboard ─
 referralsRouter.get("/leaderboard", async (_req, res) => {
   try {
     const rows = await db
@@ -112,7 +373,6 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
       .orderBy(desc(count(referralsTable.id)))
       .limit(100);
 
-    // Crypto / paid track — rank by paid referrals, all shown (top 2 win)
     const paidSorted = [...rows]
       .map(r => ({
         username: r.username,
@@ -128,7 +388,6 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
         qualifies: r.paidReferrals >= MIN_PAID_REFERRALS,
       }));
 
-    // Access track — rank by total referrals, only those with >= FREE_LEADERBOARD_MIN, top FREE_LEADERBOARD_TOP
     const freeSorted = [...rows]
       .filter(r => Number(r.total) >= FREE_LEADERBOARD_MIN)
       .map(r => ({
@@ -142,7 +401,7 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
       .map((r, i) => ({
         rank: i + 1,
         ...r,
-        isWinner: true, // all top 10 who hit threshold win
+        isWinner: true,
         qualifies: true,
       }));
 
@@ -160,7 +419,7 @@ referralsRouter.get("/leaderboard", async (_req, res) => {
   }
 });
 
-// POST /referrals/record — called after signup/google auth with a ref code
+// ── POST /referrals/record ────────────────────────────────────
 referralsRouter.post("/record", async (req, res) => {
   try {
     const { referralCode, newUserId } = req.body;
@@ -205,14 +464,18 @@ referralsRouter.post("/record", async (req, res) => {
   }
 });
 
-// PATCH /referrals/:referredUserId/plan — update plan on referred user
+// ── PATCH /referrals/:referredUserId/plan ─────────────────────
 referralsRouter.patch("/:referredUserId/plan", async (req, res) => {
   try {
-    const { plan } = req.body;
+    const { plan, tier } = req.body;
     const referredUserId = parseInt(req.params.referredUserId);
 
     await db.update(referralsTable)
-      .set({ referredUserPlan: plan, qualifies: plan === "active" || plan === "lifetime" })
+      .set({
+        referredUserPlan: plan,
+        tier: tier ?? undefined,
+        qualifies: plan === "active" || plan === "lifetime",
+      })
       .where(eq(referralsTable.referredUserId, referredUserId));
 
     res.json({ updated: true });
@@ -222,7 +485,7 @@ referralsRouter.patch("/:referredUserId/plan", async (req, res) => {
   }
 });
 
-// GET /referrals/challenges — yearly + lifetime challenge leaderboards
+// ── GET /referrals/challenges — legacy yearly + lifetime data ─
 referralsRouter.get("/challenges", async (_req, res) => {
   try {
     const allReferrals = await db
@@ -238,18 +501,16 @@ referralsRouter.get("/challenges", async (_req, res) => {
         sql`${referralsTable.tier} IN ('yearly', 'lifetime') OR ${referralsTable.referredUserPlan} IN ('active', 'lifetime')`
       );
 
-    // Build per-user stats
     const userMap = new Map<number, { username: string; yearly: number; lifetime: number }>();
     for (const r of allReferrals) {
       const u = userMap.get(r.referrerId) || { username: r.username, yearly: 0, lifetime: 0 };
-      if (r.tier === "yearly" || (r.tier === null && r.referredUserPlan === "active")) u.yearly++;
+      if (r.tier === "yearly") u.yearly++;
       if (r.tier === "lifetime" || r.referredUserPlan === "lifetime") u.lifetime++;
       userMap.set(r.referrerId, u);
     }
 
     const users = Array.from(userMap.entries()).map(([id, data]) => ({ id, ...data }));
 
-    // Yearly challenge
     const yearlySorted = users
       .map(u => ({ username: u.username, count: u.yearly }))
       .sort((a, b) => b.count - a.count)
@@ -261,13 +522,9 @@ referralsRouter.get("/challenges", async (_req, res) => {
       }));
 
     const yearlyQualified = yearlySorted.filter(u => u.qualifies);
-    const yearlyUnlock = yearlyQualified.length >= YEARLY_CHALLENGE.milestone2.qualified
-      ? 100
-      : yearlyQualified.length >= YEARLY_CHALLENGE.milestone1.qualified
-      ? 50
-      : 0;
+    const yearlyUnlock = yearlyQualified.length >= YEARLY_CHALLENGE.milestone2.qualified ? 100
+      : yearlyQualified.length >= YEARLY_CHALLENGE.milestone1.qualified ? 50 : 0;
 
-    // Lifetime challenge
     const lifetimeSorted = users
       .map(u => ({ username: u.username, count: u.lifetime }))
       .sort((a, b) => b.count - a.count)
@@ -279,11 +536,8 @@ referralsRouter.get("/challenges", async (_req, res) => {
       }));
 
     const lifetimeQualified = lifetimeSorted.filter(u => u.qualifies);
-    const lifetimeUnlock = lifetimeQualified.length >= LIFETIME_CHALLENGE.milestone2.qualified
-      ? 100
-      : lifetimeQualified.length >= LIFETIME_CHALLENGE.milestone1.qualified
-      ? 50
-      : 0;
+    const lifetimeUnlock = lifetimeQualified.length >= LIFETIME_CHALLENGE.milestone2.qualified ? 100
+      : lifetimeQualified.length >= LIFETIME_CHALLENGE.milestone1.qualified ? 50 : 0;
 
     res.json({
       yearly: {
@@ -291,14 +545,16 @@ referralsRouter.get("/challenges", async (_req, res) => {
         leaderboard: yearlySorted.slice(0, 10),
         qualifiedCount: yearlyQualified.length,
         unlockedPercent: yearlyUnlock,
-        unlockedAmount: yearlyUnlock === 100 ? YEARLY_CHALLENGE.milestone2.unlockAmount : yearlyUnlock === 50 ? YEARLY_CHALLENGE.milestone1.unlockAmount : 0,
+        unlockedAmount: yearlyUnlock === 100 ? YEARLY_CHALLENGE.milestone2.unlockAmount
+          : yearlyUnlock === 50 ? YEARLY_CHALLENGE.milestone1.unlockAmount : 0,
       },
       lifetime: {
         config: LIFETIME_CHALLENGE,
         leaderboard: lifetimeSorted.slice(0, 10),
         qualifiedCount: lifetimeQualified.length,
         unlockedPercent: lifetimeUnlock,
-        unlockedAmount: lifetimeUnlock === 100 ? LIFETIME_CHALLENGE.milestone2.unlockAmount : lifetimeUnlock === 50 ? LIFETIME_CHALLENGE.milestone1.unlockAmount : 0,
+        unlockedAmount: lifetimeUnlock === 100 ? LIFETIME_CHALLENGE.milestone2.unlockAmount
+          : lifetimeUnlock === 50 ? LIFETIME_CHALLENGE.milestone1.unlockAmount : 0,
       },
     });
   } catch (err) {

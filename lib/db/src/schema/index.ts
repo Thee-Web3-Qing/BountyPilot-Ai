@@ -14,3 +14,4 @@ export * from "./site_updates";
 export * from "./user_notifications";
 export * from "./user_checkins";
 export * from "./user_star_transactions";
+export * from "./campaign_enrollments";

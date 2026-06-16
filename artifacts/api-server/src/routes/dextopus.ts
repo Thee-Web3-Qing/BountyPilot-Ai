@@ -127,13 +127,11 @@ router.post("/webhook", async (req, res) => {
         .set({ plan: newPlan, subscriptionEndsAt, updatedAt: new Date() })
         .where(eq(usersTable.id, deposit.userId));
 
-      // Track tier on the referral record for challenge campaigns
-      if (deposit.tier === "yearly" || deposit.tier === "lifetime") {
-        await db
-          .update(referralsTable)
-          .set({ tier: deposit.tier, referredUserPlan: newPlan, qualifies: true })
-          .where(eq(referralsTable.referredUserId, deposit.userId));
-      }
+      // Track tier on the referral record for campaign leaderboard isolation
+      await db
+        .update(referralsTable)
+        .set({ tier: deposit.tier, referredUserPlan: newPlan, qualifies: true })
+        .where(eq(referralsTable.referredUserId, deposit.userId));
 
       logger.info(
         { userId: deposit.userId, depositId, tier: deposit.tier, plan: newPlan, subscriptionEndsAt },
