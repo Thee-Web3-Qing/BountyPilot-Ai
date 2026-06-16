@@ -85,8 +85,8 @@ function Router() {
                 <Route path="/stars" component={Stars} />
                 <Route path="/settings" component={Settings} />
                 <Route path="/referral" component={Referral} />
-                <Route path="/launchpad" component={Launchpad} />
                 <Route path="/launchpad/campaign/:slug" component={LaunchpadCampaign} />
+                <Route path="/launchpad" component={Launchpad} />
                 <Route path="/admin" component={Admin} />
                 <Route component={NotFound} />
               </Switch>
