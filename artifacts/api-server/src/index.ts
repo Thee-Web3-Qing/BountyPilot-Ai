@@ -51,6 +51,12 @@ const SEED_NOTIFICATIONS = [
     category: "update",
     pinned: false,
   },
+  {
+    title: "Profile Update: Languages & AI Tools",
+    body: "Your profile just got smarter!\n\n👨‍💻 Developer? You can now select your Languages & Frameworks (Solidity, Rust, TypeScript, Go, Cairo, Move, and more) directly on your profile.\n\n🤖 VibeCoder? Pick the AI Tools you use — Cursor, Windsurf, Bolt.new, Lovable, v0, Replit, Claude, ChatGPT, and more.\n\nHead to your Profile, tap Edit, and fill in your stack so the AI can match you to the right bounties.",
+    category: "feature",
+    pinned: true,
+  },
 ];
 
 async function seedNotifications() {
