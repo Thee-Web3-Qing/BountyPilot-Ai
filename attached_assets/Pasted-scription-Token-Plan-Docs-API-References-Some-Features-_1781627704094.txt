@@ -1,0 +1,90 @@
+scription
+Token Plan
+Docs
+API References
+Some Features Restricted
+
+Singapore
+Default Workspace
+
+Overview
+My Subscriptions
+Token Plan Overview
+Product Introduction
+Token Plan Team Edition is an AI model subscription service for enterprises and developers. It supports flexible multi-model access, is compatible with mainstream coding and agent tools, and provides enterprise-grade seat management and data security to help teams deploy AI productivity efficiently.
+You have not subscribed to Token Plan Team Edition
+Flexible Multi-Model Switching
+Multi-modal, multi-model flexibility with unified Credits deduction
+Compatible with Coding and Agent Tools
+Compatible with mainstream coding tools and popular agent tools
+Multiple Seat Options
+Standard, Advanced, and Premium seat tiers to match different usage levels, with flexible combinations
+Budget Control
+Monthly subscription with predictable budgets. Flexible with Shared Quota Packs and pay-as-you-go overage
+Data Security
+Your data is never used for model training or service optimization, meeting enterprise-grade data privacy requirements
+Enterprise Management Features
+Seat management, permission settings, cost control, and usage analytics for effortless management at scale
+Token Plan Available Models
+Brand
+Model
+Model Capabilities
+Qwen
+qwen3.7-plus
+Text Generation,Reasoning Model,Visual Understanding
+qwen3.7-max
+Text Generation,Reasoning Model
+qwen3.6-plus
+Text Generation,Reasoning Model,Visual Understanding
+qwen3.6-flash
+Text Generation,Reasoning Model,Visual Understanding
+qwen-image-2.0
+Image Generation
+qwen-image-2.0-pro
+Image Generation
+Wan
+wan2.7-image
+Image Generation
+wan2.7-image-pro
+Image Generation
+DeepSeek
+deepseek-v4-pro
+Text Generation,Reasoning Model
+deepseek-v4-flash
+Text Generation,Reasoning Model
+deepseek-v3.2
+Text Generation,Reasoning Model
+Zhipu AI
+glm-5.1
+Text Generation
+glm-5
+Text Generation
+MiniMax
+MiniMax-M2.5
+Text Generation,Reasoning Model
+Moonshot AI
+kimi-k2.6
+Text Generation,Reasoning Model,Visual Understanding
+kimi-k2.5
+Text Generation,Reasoning Model,Visual Understanding
+Getting Started
+1
+Subscribe to Plan
+Select a Token Plan that fits your needs and subscribe
+2
+Get Your API Key
+Get your dedicated API Key and Base URL from My Subscriptions
+3
+Connect AI Tools
+Download and install your preferred coding or agent tools, and configure them as described in the documentation
+4
+Start Coding
+Start calling models and unlock AI productivity
+FAQ
+PurchaseBilling and QuotasAccess and ConfigurationProduct Features
+Q: Can I purchase multiple plans at the same time?
+A: Each Alibaba Cloud account is limited to one Token Plan Team Edition subscription.
+Q: What tiers does Token Plan offer?
+A: Token Plan Team Edition offers Standard, Advanced, and Premium seat tiers, each with different Credits allocations. Choose the tier that best fits your team size and usage intensity.
+Q: Can I cancel my subscription?
+A: Token Plan Team Edition does not support refunds.
