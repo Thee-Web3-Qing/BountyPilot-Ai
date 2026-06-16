@@ -294,6 +294,9 @@ export function LaunchpadCampaign() {
   const isEnrolled = thisCampaign?.isEnrolled ?? false;
   const enrolledCount = thisCampaign?.enrolledCount ?? 0;
 
+  const [hasJoined, setHasJoined] = useState(false);
+  const joined = isEnrolled || hasJoined;
+
   // Join campaign mutation
   const joinMutation = useMutation({
     mutationFn: async () => {
@@ -305,6 +308,7 @@ export function LaunchpadCampaign() {
       return r.json();
     },
     onSuccess: () => {
+      setHasJoined(true);
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     },
   });
@@ -342,7 +346,7 @@ export function LaunchpadCampaign() {
                 <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground gap-1 flex items-center">
                   <Clock className="w-2.5 h-2.5" /> Ends Aug 7
                 </Badge>
-                {isEnrolled && (
+                {joined && (
                   <Badge variant="outline" className={`${config.accentClass} border-current/30 font-mono text-[10px] uppercase tracking-wider`}>
                     <CheckCircle2 className="w-3 h-3 mr-1" /> Joined
                   </Badge>
@@ -380,9 +384,9 @@ export function LaunchpadCampaign() {
               >
                 Sign in to join
               </Button>
-            ) : isEnrolled ? (
+            ) : joined ? (
               <div className={`flex items-center gap-1.5 font-mono text-xs font-bold ${config.accentClass}`}>
-                <CheckCircle2 className="w-4 h-4" /> You're in!
+                <CheckCircle2 className="w-4 h-4" /> Joined
               </div>
             ) : (
               <Button

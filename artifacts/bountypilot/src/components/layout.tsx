@@ -153,6 +153,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 ) : null}
               </div>
 
+              {user?.isAdmin && (
               <Link href="/settings" onClick={close}>
                 <div className={cn(
                   "flex items-center gap-3 px-4 py-2.5 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors cursor-pointer",
@@ -164,6 +165,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   Settings
                 </div>
               </Link>
+              )}
               {user?.isAdmin && (
                 <Link href="/admin" onClick={close}>
                   <div className={cn(
