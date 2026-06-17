@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send, Coins } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -135,10 +135,24 @@ interface BountyApplication {
   adminNote: string | null; createdAt: string; userId: number; username: string; email: string;
 }
 
+interface AdminCommission {
+  id: number;
+  referrerId: number;
+  referredUserId: number;
+  plan: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+  referrerUsername: string;
+  referrerEmail: string;
+  referredUsername: string;
+  referredEmail: string;
+}
+
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -178,6 +192,12 @@ export function Admin() {
   const [updateForm, setUpdateForm] = useState({ title: "", body: "", category: "update", pinned: false });
   const [postingUpdate, setPostingUpdate] = useState(false);
 
+  // Commissions state
+  const [commissions, setCommissions] = useState<AdminCommission[]>([]);
+  const [loadingCommissions, setLoadingCommissions] = useState(false);
+  const [commissionStatusFilter, setCommissionStatusFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [commissionAction, setCommissionAction] = useState<number | null>(null);
+
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
     loadData();
@@ -188,6 +208,7 @@ export function Admin() {
     if (activeTab === "launchpad") loadLaunchpad();
     if (activeTab === "payments") loadPayments();
     if (activeTab === "updates") loadUpdates();
+    if (activeTab === "commissions") loadCommissions();
   }, [activeTab]);
 
   async function loadData() {
@@ -230,6 +251,29 @@ export function Admin() {
       setUpdates(Array.isArray(data) ? data : []);
     } catch { setUpdates([]); }
     finally { setLoadingUpdates(false); }
+  }
+
+  async function loadCommissions() {
+    setLoadingCommissions(true);
+    try {
+      const res = await fetch(`${API}/admin/commissions`, { headers: authHeaders() });
+      const data = await res.json();
+      setCommissions(Array.isArray(data) ? data : []);
+    } catch { setCommissions([]); }
+    finally { setLoadingCommissions(false); }
+  }
+
+  async function updateCommissionStatus(id: number, status: "approved" | "rejected") {
+    setCommissionAction(id);
+    try {
+      const res = await fetch(`${API}/admin/commissions/${id}`, {
+        method: "PATCH", headers: authHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        setCommissions(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+      }
+    } finally { setCommissionAction(null); }
   }
 
   async function postUpdate() {
@@ -451,6 +495,7 @@ export function Admin() {
         {[
           { key: "users" as const, label: "Users", icon: Users },
           { key: "payments" as const, label: "Payments", icon: CreditCard },
+          { key: "commissions" as const, label: "Commissions", icon: Coins },
           { key: "report" as const, label: "Report", icon: BarChart3 },
           { key: "reports" as const, label: "Flagged", icon: Flag },
           { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
@@ -1206,6 +1251,130 @@ export function Admin() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === "commissions" && (
+        <div className="space-y-4">
+          {/* Filter bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {(["pending", "approved", "rejected", "all"] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setCommissionStatusFilter(f)}
+                className={`px-3 py-1.5 rounded text-xs font-mono uppercase tracking-wider whitespace-nowrap transition-colors ${
+                  commissionStatusFilter === f
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card border border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+            <button
+              onClick={loadCommissions}
+              className="ml-auto p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingCommissions ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          {loadingCommissions ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (() => {
+            const filtered = commissions.filter(c =>
+              commissionStatusFilter === "all" ? true : c.status === commissionStatusFilter
+            );
+            if (filtered.length === 0) {
+              return (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Coins className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+                  <p className="font-mono text-sm">No {commissionStatusFilter === "all" ? "" : commissionStatusFilter + " "}commissions</p>
+                </div>
+              );
+            }
+            return (
+              <div className="space-y-3">
+                {filtered.map(c => (
+                  <div key={c.id} className="bg-card border border-border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                            c.status === "approved" ? "text-green-400 bg-green-500/10 border-green-500/30"
+                            : c.status === "rejected" ? "text-red-400 bg-red-500/10 border-red-500/30"
+                            : c.status === "paid" ? "text-blue-400 bg-blue-500/10 border-blue-500/30"
+                            : "text-yellow-400 bg-yellow-500/10 border-yellow-500/30"
+                          }`}>
+                            {c.status}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground uppercase">
+                            {c.plan}
+                          </span>
+                          <span className="font-mono text-sm font-bold text-foreground">${c.amount.toFixed(2)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="text-foreground font-mono">@{c.referrerUsername}</span>
+                          {" "}referred{" "}
+                          <span className="text-foreground font-mono">@{c.referredUsername}</span>
+                        </p>
+                        <p className="font-mono text-[10px] text-muted-foreground/60">
+                          {new Date(c.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    {c.status === "pending" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateCommissionStatus(c.id, "approved")}
+                          disabled={commissionAction === c.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-green-500/30 text-green-400 hover:bg-green-500/10 disabled:opacity-40 transition-colors"
+                        >
+                          {commissionAction === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => updateCommissionStatus(c.id, "rejected")}
+                          disabled={commissionAction === c.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
+                        >
+                          {commissionAction === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                    {(c.status === "approved" || c.status === "rejected") && (
+                      <div className="flex items-center gap-2">
+                        {c.status === "approved" && (
+                          <button
+                            onClick={() => updateCommissionStatus(c.id, "rejected")}
+                            disabled={commissionAction === c.id}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
+                          >
+                            {commissionAction === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                            Reject
+                          </button>
+                        )}
+                        {c.status === "rejected" && (
+                          <button
+                            onClick={() => updateCommissionStatus(c.id, "approved")}
+                            disabled={commissionAction === c.id}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-green-500/30 text-green-400 hover:bg-green-500/10 disabled:opacity-40 transition-colors"
+                          >
+                            {commissionAction === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            Approve
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 

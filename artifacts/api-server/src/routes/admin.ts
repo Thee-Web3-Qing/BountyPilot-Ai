@@ -515,6 +515,80 @@ adminRouter.get("/dau", requireAuth, requireAdmin, async (_req, res) => {
   }
 });
 
+// ── GET /admin/commissions — list all commissions ────────────
+adminRouter.get("/commissions", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { status } = req.query;
+
+    const rows = await db
+      .select({
+        id: affiliateCommissionsTable.id,
+        referrerId: affiliateCommissionsTable.referrerId,
+        referredUserId: affiliateCommissionsTable.referredUserId,
+        plan: affiliateCommissionsTable.plan,
+        amount: affiliateCommissionsTable.amount,
+        status: affiliateCommissionsTable.status,
+        createdAt: affiliateCommissionsTable.createdAt,
+        referrerUsername: sql<string>`referrer.username`,
+        referrerEmail: sql<string>`referrer.email`,
+        referredUsername: sql<string>`referred.username`,
+        referredEmail: sql<string>`referred.email`,
+      })
+      .from(affiliateCommissionsTable)
+      .innerJoin(
+        sql`${usersTable} AS referrer`,
+        sql`referrer.id = ${affiliateCommissionsTable.referrerId}`
+      )
+      .innerJoin(
+        sql`${usersTable} AS referred`,
+        sql`referred.id = ${affiliateCommissionsTable.referredUserId}`
+      )
+      .where(status ? eq(affiliateCommissionsTable.status, status as string) : sql`1=1`)
+      .orderBy(desc(affiliateCommissionsTable.createdAt));
+
+    res.json(rows.map(r => ({
+      ...r,
+      amount: parseFloat(r.amount),
+    })));
+  } catch (err) {
+    logger.error(err, "Admin commissions list error");
+    res.status(500).json({ error: "Failed to get commissions" });
+  }
+});
+
+// ── PATCH /admin/commissions/:id — approve or reject ─────────
+adminRouter.patch("/commissions/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id as string);
+    if (Number.isNaN(id)) {
+      res.status(400).json({ error: "Invalid commission ID" });
+      return;
+    }
+    const { status } = req.body;
+    if (status !== "approved" && status !== "rejected") {
+      res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(affiliateCommissionsTable)
+      .set({ status })
+      .where(eq(affiliateCommissionsTable.id, id))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "Commission not found" });
+      return;
+    }
+
+    logger.info({ id, status }, "Commission status updated by admin");
+    res.json({ ok: true, commission: { ...updated, amount: parseFloat(updated.amount) } });
+  } catch (err) {
+    logger.error(err, "Admin commission update error");
+    res.status(500).json({ error: "Failed to update commission" });
+  }
+});
+
 // ── POST /admin/backfill-commissions ──────────────────────────
 // One-time idempotent backfill: creates affiliate_commissions rows for any
 // referral that has already converted to a paid plan but has no commission row.
