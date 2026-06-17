@@ -1,0 +1,330 @@
+Redesign the existing BountyPilot Refer & Earn page.
+
+Important:
+
+* Do not delete any referral data.
+* Do not reset any referral progress.
+* Do not remove any backend campaign logic.
+* Keep all existing referral tracking operational.
+* Only redesign the Refer & Earn experience and add affiliate functionality.
+
+The existing referral competitions already exist on the Launchpad page. Therefore, remove campaign-heavy UI from Refer & Earn and transform it into an Affiliate & Creator Earnings Hub.
+
+Page Goal
+
+The Refer & Earn page should become a place where users:
+
+* Access their referral link
+* Track commissions
+* Monitor affiliate earnings
+* Withdraw earnings
+* Learn how to grow referrals through content creation
+* View referral performance metrics
+
+Referral competitions should remain available on Launchpad.
+
+Page Header
+
+Title:
+
+Refer & Earn
+
+Subtitle:
+
+Share BountyPilot, help creators discover opportunities, and earn affiliate commissions when people subscribe through your referral link.
+
+Section 1: Referral Link Card
+
+Display:
+
+* Referral Link
+* Referral Code
+* Copy Button
+* Share Button
+
+Description:
+
+Your referral link automatically tracks:
+
+* Free user referrals
+* Paid user referrals
+* Stars rewards
+* Referral competitions
+* Affiliate commissions
+
+No separate affiliate link is required.
+
+Section 2: Launch Pricing Banner
+
+Display a prominent banner:
+
+Launch Pricing Ends August 7
+
+Current Pricing:
+
+* Monthly: $5
+* Yearly: $45 (Launch Price)
+* Lifetime: $250 (Launch Price)
+
+After August 7:
+
+* Yearly: $50
+* Lifetime: $300
+
+Users who subscribe before August 7 lock in launch pricing.
+
+Section 3: Affiliate Rewards
+
+Title:
+
+Affiliate Rewards
+
+Description:
+
+Earn commissions whenever people subscribe through your referral link.
+
+Commission Structure:
+
+Monthly Plan ($5)
+
+* Earn $1/month
+* Paid for up to 6 months
+* Only while the referred user remains subscribed and actively paying
+* If the referred user cancels, future commissions stop
+
+Yearly Plan ($45 Launch Price)
+
+* Earn $9 commission
+
+After August 7:
+
+* Yearly commission becomes $10
+
+Lifetime Plan ($250 Launch Price)
+
+* Earn $50 commission
+
+After August 7:
+
+* Lifetime commission becomes $60
+
+Add a highlighted callout:
+
+Your referral link earns you affiliate commissions, Stars rewards, and referral competition rewards at the same time.
+
+Section 4: Earnings Overview
+
+Create stat cards:
+
+* Available Balance
+* Pending Earnings
+* Lifetime Earnings
+* Total Withdrawn
+
+Additional Stats:
+
+* Total Paying Referrals
+* Monthly Subscribers Referred
+* Yearly Subscribers Referred
+* Lifetime Subscribers Referred
+
+Section 5: Commission History
+
+Create a table:
+
+Columns:
+
+* Referred User
+* Plan Purchased
+* Commission Earned
+* Status
+* Date
+
+Statuses:
+
+* Pending
+* Approved
+* Paid
+
+Empty State:
+
+No affiliate earnings yet.
+
+Share your referral link and start earning commissions when your referrals subscribe.
+
+Section 6: Withdraw Earnings
+
+Title:
+
+Withdraw Earnings
+
+Display:
+
+* Available Balance
+* Pending Balance
+* Total Withdrawn
+
+Rules:
+
+* Minimum withdrawal is $5
+* Earnings must be approved before withdrawal
+* Refunded purchases do not qualify
+* Fraudulent referrals do not qualify
+* Admin can approve and mark payouts as paid
+
+Button:
+
+Withdraw Earnings
+
+If balance is below $5:
+
+Disable button and display:
+
+You need at least $5 in approved earnings before you can withdraw.
+
+Section 7: Create Content. Earn More.
+
+Create a dedicated creator growth card.
+
+Title:
+
+Create Content. Earn More.
+
+Description:
+
+The easiest way to earn more referrals is by creating content around opportunities.
+
+Talk about:
+
+* Bounties
+* Grants
+* Hackathons
+* Ambassador programs
+* Creator opportunities
+* Your wins using BountyPilot
+* Interesting opportunities you discover
+
+Every piece of content can introduce new users to BountyPilot.
+
+The more people who join through your referral link, the more commissions you can earn.
+
+Suggested Content Platforms:
+
+* X
+* TikTok
+* YouTube
+* LinkedIn
+* Threads
+* Telegram
+* Discord
+
+Buttons:
+
+* Copy Referral Link
+* Share Referral Link
+
+Section 8: Performance Metrics
+
+Create a creator analytics section.
+
+Display:
+
+* Total Referrals
+* Free Referrals
+* Paid Referrals
+* Referral Conversion Rate
+* Revenue Generated
+* Affiliate Earnings
+
+Provide trend indicators where possible.
+
+Section 9: Top Ambassadors
+
+Create a leaderboard section.
+
+Track:
+
+* Paying Referrals
+* Revenue Generated
+* Affiliate Earnings
+
+Purpose:
+
+Reward users who actively promote BountyPilot through content and referrals.
+
+Display:
+
+* Rank
+* Username
+* Paying Referrals
+* Revenue Generated
+
+Section 10: How It Works
+
+Replace the long campaign explanation with a simple guide.
+
+Step 1
+
+Share your referral link.
+
+Step 2
+
+Users sign up through your link.
+
+Step 3
+
+When they subscribe, you earn commissions.
+
+Step 4
+
+Approved commissions become available for withdrawal.
+
+Step 5
+
+Continue creating content and growing your referrals.
+
+Remove From Refer & Earn Page
+
+Remove:
+
+* $50 Crypto Pool card
+* 2 Months Free card
+* Yearly Challenge card
+* Lifetime Challenge card
+* Challenge Leaderboards
+* Challenge Progress Bars
+* Challenge Reward Explanations
+* Long Campaign Instructions
+
+These already exist on Launchpad and should remain there.
+
+Anti-Abuse Rules
+
+Implement:
+
+* Self-referral prevention
+* Duplicate account detection
+* Email verification requirements
+* Fraud detection
+* Refunded purchases removed from commission calculations
+
+Design Requirements
+
+Keep existing BountyPilot branding.
+
+Use:
+
+* Dark theme
+* Neon green accents
+* Modern creator economy aesthetic
+* Financial dashboard feel
+
+The Refer & Earn page should feel like a hybrid of:
+
+* An affiliate dashboard
+* A creator monetization hub
+* A referral earnings center
+
+The page should encourage users to think:
+
+“I can earn from opportunities on BountyPilot and I can earn by helping other people discover them.”
