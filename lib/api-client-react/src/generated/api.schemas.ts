@@ -70,6 +70,8 @@ export interface Bounty {
   hoursSaved?: number | null;
   /** @nullable */
   tags?: string | null;
+  /** @nullable */
+  opportunityType?: string | null;
   createdAt: string;
   /** @nullable */
   updatedAt?: string | null;

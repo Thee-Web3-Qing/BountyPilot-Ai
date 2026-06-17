@@ -8,4 +8,5 @@
 - [Launchpad](launchpad.md) — Campaign hub with 4 isolated campaigns (crypto-50, free-access, yearly-challenge, lifetime-challenge). campaign_enrollments table. /launchpad/campaign/:slug detail pages.
 - [Telegram Alerts](telegram-alerts.md) — bot @Bountypilotaibot; one-time token connect flow; webhook at /api/telegram/webhook; fan-out on site updates; Connect UI in /settings.
 - [Novus MCP Auth](novus-mcp-auth.md) — OAuth2 client_credentials via NOVUS_CLIENT_ID/SECRET/APP_ID; token endpoint /mcp-auth/token; SSE (text/event-stream) transport; Accept header must include both application/json and text/event-stream.
+- [API Client Rebuild](api-client-rebuild.md) — api-client-react is a composite TS project; edits to src/ need `tsc -p tsconfig.json` in lib/api-client-react to take effect in consuming apps.
 - **No Stripe** — payments are crypto-only via Dextopus.

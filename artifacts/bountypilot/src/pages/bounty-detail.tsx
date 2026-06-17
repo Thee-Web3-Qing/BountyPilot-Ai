@@ -167,17 +167,27 @@ function daysLeft(deadline: string | null): number | null {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  discovered: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  discovered:    "bg-blue-500/20 text-blue-300 border-blue-500/30",
   saved_for_later: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
-  approved: "bg-green-500/20 text-green-300 border-green-500/30",
-  rejected: "bg-red-500/20 text-red-300 border-red-500/30",
-  researching: "bg-purple-500/20 text-purple-300 border-purple-500/30",
-  scripting: "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  recording: "bg-pink-500/20 text-pink-300 border-pink-500/30",
-  editing: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-  submitted: "bg-teal-500/20 text-teal-300 border-teal-500/30",
-  won: "bg-primary/20 text-primary border-primary/30",
-  lost: "bg-muted text-muted-foreground border-border",
+  approved:      "bg-green-500/20 text-green-300 border-green-500/30",
+  rejected:      "bg-red-500/20 text-red-300 border-red-500/30",
+  researching:   "bg-purple-500/20 text-purple-300 border-purple-500/30",
+  scripting:     "bg-orange-500/20 text-orange-300 border-orange-500/30",
+  recording:     "bg-pink-500/20 text-pink-300 border-pink-500/30",
+  editing:       "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+  drafting:      "bg-sky-500/20 text-sky-300 border-sky-500/30",
+  reviewing:     "bg-lime-500/20 text-lime-300 border-lime-500/30",
+  planning:      "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+  building:      "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  testing:       "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  concepting:    "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30",
+  designing:     "bg-rose-500/20 text-rose-300 border-rose-500/30",
+  revising:      "bg-red-400/20 text-red-300 border-red-400/30",
+  executing:     "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  applying:      "bg-blue-400/20 text-blue-200 border-blue-400/30",
+  submitted:     "bg-teal-500/20 text-teal-300 border-teal-500/30",
+  won:           "bg-primary/20 text-primary border-primary/30",
+  lost:          "bg-muted text-muted-foreground border-border",
 };
 
 const SCORE_COLOR = (score: number) => {
@@ -186,9 +196,96 @@ const SCORE_COLOR = (score: number) => {
   return "text-red-400";
 };
 
-const WORKFLOW_STATUSES = [
-  "approved", "researching", "scripting", "recording", "editing",
-];
+interface OpportunityConfig {
+  workflowStatuses: string[];
+  showContentFormat: boolean;
+  briefCardTitle: string;
+  planCardTitle: string;
+  planLabels: { scriptOutline: string; shotList: string; captionDraft: string };
+}
+
+function getOpportunityConfig(
+  opportunityType: string | null | undefined,
+  contentFormat: string | null | undefined,
+): OpportunityConfig {
+  const t = (opportunityType || "").toLowerCase();
+  const f = (contentFormat || "").toLowerCase();
+
+  const isHackathon = t === "hackathon" || t.includes("hackathon");
+  const isBugBounty = t === "bug bounty" || t.includes("bug bounty") || t.includes("security");
+  const isJob = t === "job";
+  const isGrant = t === "grant";
+  const isVideo = f.includes("video") || f.includes("youtube") || f.includes("tiktok") || f.includes("reel") || f.includes("short");
+  const isPodcast = f.includes("podcast") || f.includes("audio") || f.includes("space");
+  const isThread = f.includes("thread") || f.includes("tweet") || f.includes("twitter") || f.includes("x post");
+  const isArticle = f.includes("article") || f.includes("blog") || f.includes("mirror") || f.includes("newsletter") || f.includes("writ");
+  const isDesign = f.includes("design") || f.includes("ui") || f.includes("ux") || f.includes("figma") || f.includes("art") || f.includes("graphic");
+  const isDev = isBugBounty || f.includes("code") || f.includes("develop") || f.includes("smart contract") || f.includes("github");
+
+  if (isHackathon) return {
+    workflowStatuses: ["approved", "planning", "building", "testing"],
+    showContentFormat: false,
+    briefCardTitle: "Project Brief",
+    planCardTitle: "Build Plan",
+    planLabels: { scriptOutline: "Build Plan", shotList: "Architecture Notes", captionDraft: "Submission Pitch" },
+  };
+  if (isDev) return {
+    workflowStatuses: ["approved", "planning", "building", "testing"],
+    showContentFormat: false,
+    briefCardTitle: "Research Brief",
+    planCardTitle: "Build Plan",
+    planLabels: { scriptOutline: "Implementation Plan", shotList: "Technical Notes", captionDraft: "Submission Pitch" },
+  };
+  if (isJob) return {
+    workflowStatuses: ["approved", "researching", "applying"],
+    showContentFormat: false,
+    briefCardTitle: "Company Research",
+    planCardTitle: "Application Plan",
+    planLabels: { scriptOutline: "Application Outline", shotList: "Portfolio Items", captionDraft: "Cover Letter Opening" },
+  };
+  if (isGrant) return {
+    workflowStatuses: ["approved", "researching", "drafting", "reviewing"],
+    showContentFormat: false,
+    briefCardTitle: "Research Brief",
+    planCardTitle: "Proposal Plan",
+    planLabels: { scriptOutline: "Proposal Outline", shotList: "Supporting Materials", captionDraft: "Executive Summary" },
+  };
+  if (isVideo || isPodcast) return {
+    workflowStatuses: ["approved", "researching", "scripting", "recording", "editing"],
+    showContentFormat: true,
+    briefCardTitle: "Research Brief",
+    planCardTitle: "Production Plan",
+    planLabels: { scriptOutline: "Script Outline", shotList: isPodcast ? "Episode Structure" : "Shot List", captionDraft: "Caption Draft" },
+  };
+  if (isThread) return {
+    workflowStatuses: ["approved", "researching", "drafting", "reviewing"],
+    showContentFormat: true,
+    briefCardTitle: "Research Brief",
+    planCardTitle: "Content Plan",
+    planLabels: { scriptOutline: "Thread Outline", shotList: "Tweet Structure", captionDraft: "Promo Caption" },
+  };
+  if (isArticle) return {
+    workflowStatuses: ["approved", "researching", "drafting", "reviewing"],
+    showContentFormat: true,
+    briefCardTitle: "Research Brief",
+    planCardTitle: "Content Plan",
+    planLabels: { scriptOutline: "Article Outline", shotList: "Section Structure", captionDraft: "Promo Caption" },
+  };
+  if (isDesign) return {
+    workflowStatuses: ["approved", "concepting", "designing", "revising"],
+    showContentFormat: true,
+    briefCardTitle: "Design Brief",
+    planCardTitle: "Design Plan",
+    planLabels: { scriptOutline: "Design Brief", shotList: "Asset List", captionDraft: "Submission Note" },
+  };
+  return {
+    workflowStatuses: ["approved", "researching", "scripting", "recording", "editing"],
+    showContentFormat: true,
+    briefCardTitle: "Research Brief",
+    planCardTitle: "Production Plan",
+    planLabels: { scriptOutline: "Script Outline", shotList: "Shot List", captionDraft: "Caption Draft" },
+  };
+}
 
 export function BountyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -404,6 +501,7 @@ export function BountyDetail() {
 
   const confidencePct = Math.round(bounty.confidenceScore ?? 0);
   const lowConfidence = (bounty.confidenceScore ?? 100) < 55;
+  const config = getOpportunityConfig(bounty.opportunityType, bounty.contentFormat);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden">
@@ -579,7 +677,12 @@ export function BountyDetail() {
           <Field label="Platform" value={bounty.platform} />
           <Field label="Project" value={bounty.projectName} />
           <Field label="Deadline" value={bounty.deadline ? `${timeLeft(bounty.deadline)} (${new Date(bounty.deadline).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })})` : null} />
-          <Field label="Content Format" value={bounty.contentFormat} />
+          {bounty.opportunityType && (
+            <Field label="Opportunity Type" value={bounty.opportunityType} />
+          )}
+          {config.showContentFormat && bounty.contentFormat && (
+            <Field label="Content Format" value={bounty.contentFormat} />
+          )}
           <Field label="Deliverables" value={bounty.deliverables} className="md:col-span-2" />
           <Field label="Submission Requirements" value={bounty.submissionRequirements} className="md:col-span-2" />
           <Field label="Eligibility Rules" value={bounty.eligibilityRules} className="md:col-span-2" />
@@ -616,7 +719,7 @@ export function BountyDetail() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
-              {WORKFLOW_STATUSES.map((s) => (
+              {config.workflowStatuses.map((s) => (
                 <Button
                   key={s}
                   variant={bounty.status === s ? "default" : "outline"}
@@ -727,7 +830,7 @@ export function BountyDetail() {
         ) : (
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Research Brief</CardTitle>
+              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{config.briefCardTitle}</CardTitle>
               <Button
                 variant="outline"
                 size="sm"
@@ -769,7 +872,7 @@ export function BountyDetail() {
         ) : (
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Production Plan</CardTitle>
+              <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{config.planCardTitle}</CardTitle>
               <Button
                 variant="outline"
                 size="sm"
@@ -791,9 +894,9 @@ export function BountyDetail() {
                       <p className="text-primary font-bold font-mono">{plan.estimatedHours}h</p>
                     </div>
                   )}
-                  <PreField label="Script Outline" value={plan.scriptOutline} />
-                  <PreField label="Shot List" value={plan.shotList} />
-                  <Field label="Caption Draft" value={plan.captionDraft} />
+                  <PreField label={config.planLabels.scriptOutline} value={plan.scriptOutline} />
+                  <PreField label={config.planLabels.shotList} value={plan.shotList} />
+                  <Field label={config.planLabels.captionDraft} value={plan.captionDraft} />
                   <PreField label="Submission Checklist" value={plan.submissionChecklist} />
                 </>
               ) : (

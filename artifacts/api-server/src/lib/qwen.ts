@@ -240,38 +240,89 @@ function templateResearchBrief(scraped: ScrapedBounty): ResearchBriefContent {
   };
 }
 
+function classifyFormat(scraped: ScrapedBounty): "hackathon" | "dev" | "video" | "podcast" | "thread" | "article" | "design" | "other" {
+  const f = (scraped.contentFormat || "").toLowerCase();
+  const t = (scraped.opportunityType || "").toLowerCase();
+  if (t === "hackathon" || t.includes("hackathon")) return "hackathon";
+  if (t === "bug bounty" || t.includes("bug bounty") || t.includes("security")) return "dev";
+  if (f.includes("video") || f.includes("youtube") || f.includes("tiktok") || f.includes("reel")) return "video";
+  if (f.includes("podcast") || f.includes("audio") || f.includes("space")) return "podcast";
+  if (f.includes("thread") || f.includes("tweet") || f.includes("twitter")) return "thread";
+  if (f.includes("article") || f.includes("blog") || f.includes("mirror") || f.includes("writ") || f.includes("newsletter")) return "article";
+  if (f.includes("design") || f.includes("ui") || f.includes("ux") || f.includes("figma") || f.includes("art") || f.includes("graphic")) return "design";
+  if (f.includes("code") || f.includes("develop") || f.includes("smart contract") || f.includes("github")) return "dev";
+  return "other";
+}
+
 function templateProductionPlan(scraped: ScrapedBounty): ProductionPlanContent {
   const subject = getSubject(scraped);
-  const hasVideo = scraped.contentFormat.toLowerCase().includes("video");
-  const hasThread = scraped.contentFormat.toLowerCase().includes("thread") || scraped.contentFormat.toLowerCase().includes("twitter");
-  const hasArticle = scraped.contentFormat.toLowerCase().includes("article") || scraped.contentFormat.toLowerCase().includes("blog");
+  const kind = classifyFormat(scraped);
 
-  const scriptOutline = hasVideo
-    ? `HOOK (0-30s): Open with a surprising stat or bold claim about ${subject}\nSECTION 1 (30-90s): What is it and why does it exist?\nSECTION 2 (90-180s): How does it work — live demo if possible\nSECTION 3 (180-240s): Why should the viewer care?\nOUTRO (240-300s): CTA — link in bio, subscribe, submit before ${scraped.deadline || "deadline"}`
-    : `HOOK: Lead with a surprising angle about ${subject}\nSECTION 1: Context and background\nSECTION 2: Core mechanics or value proposition\nSECTION 3: Real implications and use cases\nCLOSING: Call to action`;
+  if (kind === "hackathon" || kind === "dev") {
+    return {
+      scriptOutline: `PHASE 1 — Planning\n- Define scope and core features\n- Choose tech stack and architecture\n- Set up repository and project structure\n\nPHASE 2 — Development\n- Implement core functionality\n- Integrate required APIs/SDKs\n- Handle edge cases and errors\n\nPHASE 3 — Testing & Polish\n- End-to-end testing\n- Fix bugs and UX issues\n- Write README and docs\n\nPHASE 4 — Submission\n- Record demo video\n- Deploy to public URL\n- Submit before ${scraped.deadline || "deadline"}`,
+      shotList: `Architecture overview:\n- Frontend: [framework]\n- Backend: [runtime]\n- DB: [database]\n- Key integrations: ${scraped.deliverables || "see requirements"}\n\nKey components to build:\n1. Core feature implementation\n2. API integration layer\n3. Authentication / user flow\n4. UI / dashboard\n5. Demo-ready polish`,
+      captionDraft: `Built ${subject} for the ${scraped.platform || "hackathon"} — here's what I shipped, the tech stack, and how it works. #Hackathon #Web3 #Build`,
+      submissionChecklist: `[ ] Working demo deployed to public URL\n[ ] Source code pushed to public GitHub repo\n[ ] Demo video recorded (< 3 min)\n[ ] README with setup instructions\n[ ] All required deliverables: ${scraped.deliverables || "see listing"}\n[ ] Submitted before deadline: ${scraped.deadline || "check listing"}\n[ ] Submission form completed: ${scraped.submissionLink || "check listing"}`,
+      estimatedHours: 20,
+    };
+  }
 
-  const shotList = hasVideo
-    ? `1. Talking head intro — clean background, good lighting\n2. Screen recording — product/protocol walkthrough\n3. Graphic overlay — key stats and comparisons\n4. B-roll — community, ecosystem, relevant visuals\n5. Outro card — social links + submission URL`
-    : hasThread
-    ? `Tweet 1: Hook with bold statement\nTweets 2-5: Core explanation broken into digestible chunks\nTweets 6-8: Supporting evidence and examples\nTweet 9: Implications / what this means for you\nTweet 10: CTA + link to submission`
-    : `Section 1: Intro + hook (200 words)\nSection 2: Background context (300 words)\nSection 3: Deep dive (400 words)\nSection 4: Practical takeaways (200 words)\nConclusion + CTA (100 words)`;
+  if (kind === "podcast") {
+    return {
+      scriptOutline: `INTRO (0-60s): Welcome + episode teaser — what listeners will learn\nSEGMENT 1 (1-5 min): What is ${subject} and why does it matter?\nSEGMENT 2 (5-12 min): Deep dive — mechanics, use cases, unique angles\nSEGMENT 3 (12-18 min): Who's building it, who's using it, what's next\nOUTRO (18-20 min): Key takeaways + CTA — links, submission URL`,
+      shotList: `Episode structure:\n1. Cold open (hook quote or stat)\n2. Host intro + context\n3. Main interview / monologue breakdown\n4. Lightning round / rapid insights\n5. Resources + links shoutout\n6. Sign-off`,
+      captionDraft: `New episode: breaking down ${subject} — everything you need to know as a Web3 builder or creator. Listen now 🎙️ #Web3 #Podcast #${(scraped.platform || "").replace(/\s/g, "")}`,
+      submissionChecklist: `[ ] Audio exported as MP3/WAV, clean quality\n[ ] Episode published publicly (not private)\n[ ] Show notes / transcript provided\n[ ] All deliverables: ${scraped.deliverables || "see listing"}\n[ ] Submitted before deadline: ${scraped.deadline || "check listing"}\n[ ] Submission link completed: ${scraped.submissionLink || "check listing"}`,
+      estimatedHours: 6,
+    };
+  }
 
-  const captionDraft = `Breaking down ${subject} for you — here's everything creators and builders need to know. ${hasThread ? "Thread 🧵" : hasVideo ? "Full video 👆" : "Full article linked."} #Web3 #${(scraped.platform || "").replace(/\s/g, "")} #Crypto`;
+  if (kind === "thread") {
+    return {
+      scriptOutline: `Tweet 1 (Hook): Bold claim or surprising stat about ${subject}\nTweet 2: What it is — plain English, no jargon\nTweet 3: Why it was built / problem it solves\nTweet 4: How it works (simplified)\nTweet 5: Real use case or example\nTweet 6: Key numbers / traction / stats\nTweet 7: Who's behind it and why it matters\nTweet 8: Comparison / differentiation\nTweet 9: What to watch for next\nTweet 10: CTA + submission link`,
+      shotList: `Tweet-by-tweet structure:\n1. Hook (must stop the scroll)\n2-3: Context (2 tweets max)\n4-5: Core mechanics (short + visual-friendly)\n6-7: Evidence (data, traction, quotes)\n8-9: Opinion / angle (makes it shareable)\n10: CTA`,
+      captionDraft: `🧵 Everything you need to know about ${subject} — thread below`,
+      submissionChecklist: `[ ] Thread posted publicly on Twitter/X\n[ ] Minimum tweet count met\n[ ] All deliverables covered: ${scraped.deliverables || "see listing"}\n[ ] Submitted before deadline: ${scraped.deadline || "check listing"}\n[ ] Submission form completed: ${scraped.submissionLink || "check listing"}`,
+      estimatedHours: 3,
+    };
+  }
 
-  const checklist = [
-    `[ ] Content published publicly (not draft/private)`,
-    scraped.contentFormat.toLowerCase().includes("video") ? `[ ] Video is minimum required length` : null,
-    `[ ] All required deliverables included: ${scraped.deliverables}`,
-    scraped.deadline ? `[ ] Submitted before deadline: ${scraped.deadline}` : `[ ] Submitted before the listed deadline`,
-    `[ ] Submission form/link completed: ${scraped.submissionLink}`,
-    `[ ] All original work — no AI-generated filler text`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  if (kind === "article") {
+    return {
+      scriptOutline: `HEADLINE: Compelling, SEO-aware title about ${subject}\n\nINTRO (200 words): Hook with a stat or story, then orient the reader\n\nSECTION 1 (300 words): What is ${subject} and why now?\nSECTION 2 (400 words): How it works — go deeper than surface level\nSECTION 3 (300 words): Who's using it and real-world outcomes\nSECTION 4 (200 words): What's next / future implications\n\nCONCLUSION (100 words): Key takeaways + CTA`,
+      shotList: `Section-by-section structure:\n1. Intro hook (stat, story, or provocative question)\n2. Background / context (brief)\n3. Core mechanics / product breakdown\n4. Evidence — data, case studies, quotes\n5. Forward-looking analysis\n6. Conclusion with CTA and submission link`,
+      captionDraft: `Just published: ${subject} explained — everything Web3 builders and creators need to know. Full article linked 👇 #Web3 #${(scraped.platform || "").replace(/\s/g, "")}`,
+      submissionChecklist: `[ ] Article published publicly (not draft)\n[ ] Word count meets requirements\n[ ] All deliverables: ${scraped.deliverables || "see listing"}\n[ ] Submitted before deadline: ${scraped.deadline || "check listing"}\n[ ] Submission link completed: ${scraped.submissionLink || "check listing"}\n[ ] Original work — no plagiarism`,
+      estimatedHours: 5,
+    };
+  }
 
-  const hours = hasVideo ? 10 : hasArticle && hasThread ? 6 : hasThread ? 3 : 5;
+  if (kind === "design") {
+    return {
+      scriptOutline: `BRIEF:\n- Project: ${subject}\n- Deliverables: ${scraped.deliverables || "see listing"}\n- Style direction: Clean, Web3-native, brand-aligned\n\nPHASE 1 — Concepting: Moodboard, style references, initial sketches\nPHASE 2 — Design: Hi-fi execution in Figma/tool of choice\nPHASE 3 — Revisions: Refinement based on self-review vs requirements\nPHASE 4 — Export: Final assets in required formats`,
+      shotList: `Asset checklist:\n1. Primary deliverable (logo / UI / artwork)\n2. Required formats (PNG, SVG, etc.)\n3. Size variants if needed\n4. Source file (Figma link or editable file)\n5. Usage guide / notes if required`,
+      captionDraft: `Designed for ${subject} — here's the creative direction, process, and final result. #Web3Design #${(scraped.platform || "").replace(/\s/g, "")}`,
+      submissionChecklist: `[ ] All design assets exported in required formats\n[ ] Source file provided\n[ ] Deliverables met: ${scraped.deliverables || "see listing"}\n[ ] Submitted before deadline: ${scraped.deadline || "check listing"}\n[ ] Submission form completed: ${scraped.submissionLink || "check listing"}`,
+      estimatedHours: 8,
+    };
+  }
 
-  return { scriptOutline, shotList, captionDraft, submissionChecklist: checklist, estimatedHours: hours };
+  // Default: video
+  return {
+    scriptOutline: `HOOK (0-30s): Open with a surprising stat or bold claim about ${subject}\nSECTION 1 (30-90s): What is it and why does it exist?\nSECTION 2 (90-180s): How does it work — live demo if possible\nSECTION 3 (180-240s): Why should the viewer care?\nOUTRO (240-300s): CTA — link in bio, subscribe, submit before ${scraped.deadline || "deadline"}`,
+    shotList: `1. Talking head intro — clean background, good lighting\n2. Screen recording — product/protocol walkthrough\n3. Graphic overlay — key stats and comparisons\n4. B-roll — community, ecosystem, relevant visuals\n5. Outro card — social links + submission URL`,
+    captionDraft: `Breaking down ${subject} — here's everything creators and builders need to know. Full video 👆 #Web3 #${(scraped.platform || "").replace(/\s/g, "")} #Crypto`,
+    submissionChecklist: [
+      `[ ] Content published publicly (not draft/private)`,
+      `[ ] Video is minimum required length`,
+      `[ ] All required deliverables included: ${scraped.deliverables}`,
+      scraped.deadline ? `[ ] Submitted before deadline: ${scraped.deadline}` : `[ ] Submitted before the listed deadline`,
+      `[ ] Submission form/link completed: ${scraped.submissionLink}`,
+      `[ ] All original work — no AI-generated filler text`,
+    ].join("\n"),
+    estimatedHours: 10,
+  };
 }
 
 // ── Public API ─────────────────────────────────────────────────
@@ -484,12 +535,25 @@ export async function generateProductionPlan(scraped: ScrapedBounty): Promise<Pr
     },
   };
 
+  const kind = classifyFormat(scraped);
+  const kindInstructions: Record<string, string> = {
+    hackathon: "This is a HACKATHON. Fill scriptOutline with a phased build plan (Planning → Development → Testing → Submission). Fill shotList with architecture notes and key components. Fill captionDraft with a submission pitch. Fill submissionChecklist with hackathon-specific items (repo, demo video, README, deployed URL).",
+    dev: "This is a DEVELOPMENT/CODE bounty. Fill scriptOutline with an implementation plan. Fill shotList with technical architecture notes. Fill captionDraft with a submission pitch. Fill submissionChecklist with code-specific items.",
+    podcast: "This is a PODCAST bounty. Fill scriptOutline with a timed episode outline. Fill shotList with episode structure and segment breakdown. Fill captionDraft with an episode promo caption. Fill submissionChecklist with audio-specific requirements.",
+    thread: "This is a TWITTER/THREAD bounty. Fill scriptOutline with a tweet-by-tweet thread outline. Fill shotList with the tweet structure (hook, core, evidence, CTA). Fill captionDraft with a promo tweet. Fill submissionChecklist with thread-specific requirements.",
+    article: "This is an ARTICLE/WRITING bounty. Fill scriptOutline with a detailed article outline with section headings and word counts. Fill shotList with section-by-section structure. Fill captionDraft with a social promo caption. Fill submissionChecklist with writing-specific requirements.",
+    design: "This is a DESIGN bounty. Fill scriptOutline with a design brief and phased approach. Fill shotList with a list of assets and deliverables to produce. Fill captionDraft with a portfolio/submission note. Fill submissionChecklist with design export requirements.",
+    other: "This is a VIDEO/CONTENT bounty. Fill scriptOutline with a timed script. Fill shotList with a shot-by-shot production list. Fill captionDraft with a social caption. Fill submissionChecklist with video submission requirements.",
+    video: "This is a VIDEO bounty. Fill scriptOutline with a timed script with hooks and sections. Fill shotList with a shot-by-shot list. Fill captionDraft with a social caption. Fill submissionChecklist with video submission requirements.",
+  };
+  const typeInstruction = kindInstructions[kind] || kindInstructions.other;
+
   try {
     const result = await callQwenWithTool<ProductionPlanContent>(
       [
         {
           role: "system",
-          content: "You are BountyPilot, helping content creators plan and produce winning crypto bounty submissions. Call submit_production_plan with a complete, actionable plan tailored to the bounty format.",
+          content: `You are BountyPilot, helping creators plan and produce winning crypto bounty submissions. Call submit_production_plan with a complete, actionable plan. ${typeInstruction}`,
         },
         {
           role: "user",
@@ -497,6 +561,7 @@ export async function generateProductionPlan(scraped: ScrapedBounty): Promise<Pr
 - Title: ${scraped.title}
 - Platform: ${scraped.platform}
 - Project: ${scraped.projectName}
+- Opportunity Type: ${scraped.opportunityType || "Bounty"}
 - Format: ${scraped.contentFormat}
 - Deliverables: ${scraped.deliverables}
 - Deadline: ${scraped.deadline || "check listing"}
