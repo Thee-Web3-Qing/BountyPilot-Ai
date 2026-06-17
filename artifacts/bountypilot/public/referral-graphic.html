@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>BountyPilot Referral Campaigns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 1280px; height: 720px; overflow: hidden; background: #000; }
+
+    .slide {
+      width: 1280px;
+      height: 720px;
+      background: linear-gradient(135deg, #000000 0%, #0a1200 45%, #172800 100%);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+    }
+
+    /* Grid overlay */
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(195,255,0,0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(195,255,0,0.10) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Green glow */
+    .glow {
+      position: absolute;
+      bottom: -150px;
+      right: -100px;
+      width: 560px;
+      height: 560px;
+      background: radial-gradient(circle, rgba(195,255,0,0.14) 0%, transparent 70%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 26px 48px 0;
+      position: relative;
+      z-index: 2;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-sq { width: 22px; height: 22px; background: #c3ff00; border-radius: 3px; flex-shrink: 0; }
+    .logo-text { color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .year { color: rgba(255,255,255,0.35); font-size: 13px; font-family: 'Space Mono', monospace; letter-spacing: 0.05em; }
+
+    .content {
+      flex: 1;
+      display: flex;
+      gap: 40px;
+      padding: 28px 48px 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Left column */
+    .left {
+      display: flex;
+      flex-direction: column;
+      width: 330px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(195,255,0,0.45);
+      border-radius: 100px;
+      padding: 5px 14px;
+      margin-bottom: 18px;
+      width: fit-content;
+      background: rgba(195,255,0,0.06);
+    }
+    .pill span {
+      color: rgba(255,255,255,0.9);
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .headline {
+      font-size: 62px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+    }
+    .headline .white { color: #fff; }
+    .headline .green { color: #c3ff00; }
+    .tagline {
+      color: rgba(255,255,255,0.65);
+      font-size: 14px;
+      font-family: 'Space Mono', monospace;
+      line-height: 1.65;
+      margin-top: 16px;
+    }
+    .prize-box {
+      margin-top: 22px;
+      padding: 14px 18px;
+      background: rgba(195,255,0,0.08);
+      border: 1px solid rgba(195,255,0,0.25);
+      border-radius: 6px;
+    }
+    .prize-label {
+      color: rgba(255,255,255,0.5);
+      font-size: 10px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .prize-amount {
+      color: #c3ff00;
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .url {
+      margin-top: auto;
+      color: #c3ff00;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.04em;
+      padding-bottom: 2px;
+    }
+
+    /* Right column — cards */
+    .cards {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 10px;
+    }
+    .card {
+      background: rgba(8,8,8,0.88);
+      border: 1px solid rgba(195,255,0,0.2);
+      border-radius: 6px;
+      padding: 16px 18px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 14px;
+      bottom: 14px;
+      width: 3px;
+      background: #c3ff00;
+      border-radius: 0 2px 2px 0;
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-meta { display: flex; align-items: center; gap: 8px; }
+    .card-num {
+      color: rgba(195,255,0,0.5);
+      font-size: 10px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+    .badge {
+      color: rgba(255,255,255,0.55);
+      font-size: 9px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(195,255,0,0.1);
+      border: 1px solid rgba(195,255,0,0.25);
+      border-radius: 3px;
+      padding: 1px 6px;
+    }
+    .card-prize-wrap { text-align: right; }
+    .card-prize {
+      color: #c3ff00;
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.01em;
+    }
+    .card-prize-sub {
+      color: rgba(255,255,255,0.4);
+      font-size: 9px;
+      font-family: 'Space Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .card-title {
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+    }
+    .card-desc {
+      color: #ffffff;
+      font-size: 12.5px;
+      font-family: 'Space Mono', monospace;
+      line-height: 1.6;
+      opacity: 0.82;
+    }
+
+    .bottombar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 48px 18px;
+      position: relative;
+      z-index: 2;
+    }
+    .footer-left {
+      color: rgba(255,255,255,0.2);
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .footer-right {
+      color: rgba(255,255,255,0.3);
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <div class="glow"></div>
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="logo">
+        <div class="logo-sq"></div>
+        <span class="logo-text">BountyPilot AI</span>
+      </div>
+      <span class="year">2026</span>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Left -->
+      <div class="left">
+        <div class="pill"><span>Referral Campaigns</span></div>
+        <div class="headline">
+          <span class="white">Invite</span> <span class="green">Friends.</span><br>
+          <span class="white">Win Big.</span>
+        </div>
+        <p class="tagline">
+          Share your link. Climb<br>
+          the leaderboard. Every<br>
+          campaign is isolated.
+        </p>
+        <div class="prize-box">
+          <div class="prize-label">Total Prize Pool</div>
+          <div class="prize-amount">$750+</div>
+        </div>
+        <div class="url">BountyPilot.xyz/launchpad</div>
+      </div>
+
+      <!-- Cards -->
+      <div class="cards">
+        <div class="card">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="card-num">01</span>
+              <span class="badge">Active</span>
+            </div>
+            <div class="card-prize-wrap">
+              <div class="card-prize">$50</div>
+              <div class="card-prize-sub">prize pool</div>
+            </div>
+          </div>
+          <div class="card-title">Refer &amp; Win $50 Crypto</div>
+          <p class="card-desc">Refer the most monthly paying users. Top 2 referrers each win $25 in crypto sent to your wallet.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="card-num">02</span>
+              <span class="badge">Active</span>
+            </div>
+            <div class="card-prize-wrap">
+              <div class="card-prize">2 Mo Free</div>
+              <div class="card-prize-sub">top 10 win</div>
+            </div>
+          </div>
+          <div class="card-title">Refer &amp; Get 2 Months Free</div>
+          <p class="card-desc">Refer the most free signups. Top 10 referrers with 10+ signups each win 2 months free on their account.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="card-num">03</span>
+              <span class="badge">Active</span>
+            </div>
+            <div class="card-prize-wrap">
+              <div class="card-prize">$200</div>
+              <div class="card-prize-sub">prize pool</div>
+            </div>
+          </div>
+          <div class="card-title">Yearly Challenge</div>
+          <p class="card-desc">Refer the most yearly subscribers. $200 prize pool unlocks progressively as the leaderboard fills.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="card-num">04</span>
+              <span class="badge">Active</span>
+            </div>
+            <div class="card-prize-wrap">
+              <div class="card-prize">$500</div>
+              <div class="card-prize-sub">prize pool</div>
+            </div>
+          </div>
+          <div class="card-title">Lifetime Challenge</div>
+          <p class="card-desc">Refer the most lifetime members. $500 prize pool unlocks progressively. The biggest campaign on the board.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="bottombar">
+      <span class="footer-left">BountyPilot AI, Inc.</span>
+      <span class="footer-right">Join 134 hunters already competing</span>
+    </div>
+  </div>
+</body>
+</html>
