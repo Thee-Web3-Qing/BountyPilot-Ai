@@ -1,5 +1,16 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "gyklOv1u-8g_lOzYM05ZA"
+uri = "file://attached_assets/bountypilot-referral-campaign-portrait.png"
+type = "image"
+title = "bountypilot referral campaign portrait"
+
+[[generated]]
+id = "W6gcI_drLbVEzcPEK8Ckp"
+uri = "file://attached_assets/bountypilot-referral-campaign-banner.png"
+type = "image"
+title = "bountypilot referral campaign banner"
 
 [[outputs]]
 id = "L2dntPalA3OxLGXTqVtHj"
@@ -18,3 +29,15 @@ id = "26YLXkFHpoMJ_egU1iNf4"
 uri = "file://attached_assets/architecture_diagram.png"
 type = "image"
 title = "BountyPilot AI Architecture Diagram"
+
+[[outputs]]
+id = "gQr4jBPtMdksfTDsQ1kRi"
+uri = "file://attached_assets/bountypilot-referral-campaign-portrait.png"
+type = "image"
+title = "BountyPilot Referral Campaign — Portrait (9:16)"
+
+[[outputs]]
+id = "ByoPDlPco9qzr09sI1cLR"
+uri = "file://attached_assets/bountypilot-referral-campaign-banner.png"
+type = "image"
+title = "BountyPilot Referral Campaign — Banner (16:9)"
