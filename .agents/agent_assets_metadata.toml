@@ -47,3 +47,9 @@ id = "yHtoQ0k7bLoo1-m1yeIcN"
 uri = "file://attached_assets/bountypilot-referral-campaign-final.png"
 type = "image"
 title = "BountyPilot Referral Campaign Graphic"
+
+[[outputs]]
+id = "tw8i_neBt7_3QYBs2y8if"
+uri = "file://exports/bountypilot-referral-campaigns.jpg"
+type = "image"
+title = "BountyPilot Referral Campaigns — 1280×720"
