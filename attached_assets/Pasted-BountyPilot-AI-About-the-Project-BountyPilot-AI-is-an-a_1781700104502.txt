@@ -1,0 +1,87 @@
+BountyPilot AI
+
+About the Project
+
+BountyPilot AI is an autonomous workflow agent that helps creators discover, evaluate, and execute opportunities.
+
+From content bounties and creator campaigns to hackathons, grants, competitions, and innovation programs, creators often spend more time searching, researching, and organizing than actually building. BountyPilot AI was created to automate that process.
+
+The platform analyzes opportunities, extracts requirements, generates research briefs, creates execution plans, tracks submissions, and helps users manage their journey from discovery to outcome.
+
+Our goal is simple: help creators spend less time managing opportunities and more time creating.
+
+⸻
+
+Inspiration
+
+The idea started from a personal challenge: going from $0 to $1000 through content opportunities.
+
+I initially built a Google Sheets system to manually track content bounties, research projects, manage scripts, track submissions, and record earnings. While the spreadsheet worked, I quickly realized that the real problem wasn’t organization. The real problem was the amount of manual work required before creating anything.
+
+Every opportunity required the same repetitive process:
+
+* Find opportunities
+* Read requirements
+* Research the project
+* Decide whether it was worth pursuing
+* Create a plan
+* Submit work
+* Track results
+
+As I explored more platforms, I discovered that this problem extended beyond content bounties. Hackathons, grants, creator competitions, and innovation programs all followed similar workflows.
+
+While participating in the Qwen Cloud Global AI Hackathon, I realized I could build the tool I wished I had when starting my challenge.
+
+That became BountyPilot AI.
+
+⸻
+
+How We Built It
+
+BountyPilot AI was built using Replit, Python, SQLite, Playwright, BeautifulSoup, and Qwen Cloud.
+
+The system combines web extraction, AI reasoning, workflow automation, and human approval checkpoints to help creators move from opportunity discovery to execution.
+
+The workflow follows:
+
+Discover → Analyze → Approve → Research → Build → Submit → Track Results
+
+Users can paste opportunity links from supported platforms and receive structured insights, research briefs, execution plans, and submission tracking tools within a single dashboard.
+
+⸻
+
+Challenges We Faced
+
+One of the first challenges was building primarily through vibecoding on Replit. Development moved quickly, but I frequently encountered daily credit limits and had to wait for refresh cycles before continuing work.
+
+Another challenge was waiting for Qwen API access through the hackathon program. Since the application depended heavily on AI reasoning, I had to build portions of the workflow using mock responses while preparing the architecture for future integration.
+
+Fetching reliable data from opportunity platforms was also difficult. Many websites use dynamic content loading, inconsistent page structures, or incomplete metadata, making it challenging to extract rewards, deadlines, and requirements accurately.
+
+Perhaps the most interesting challenge involved teaching the AI to understand the correct subject of an opportunity. Early versions sometimes generated research briefs about the platform hosting an opportunity rather than the actual project sponsoring it. For example, a bounty listed on a marketplace could result in research about the marketplace itself instead of the company requesting the work. Solving this required additional reasoning layers to distinguish between the platform and the project behind the opportunity.
+
+Despite these challenges, each obstacle improved the product’s architecture and made the workflow more reliable.
+
+⸻
+
+What We Learned
+
+The biggest lesson from building BountyPilot AI is that creators do not need more dashboards. They need systems that reduce friction.
+
+We learned that successful AI products are not built solely on model intelligence. Context understanding, data quality, workflow design, and human oversight are equally important.
+
+Most importantly, we learned that some of the best products emerge from solving problems you experience personally. What started as a simple challenge to earn money through content opportunities evolved into a platform designed to help creators and builders discover opportunities, execute projects, and achieve better outcomes.
+
+⸻
+
+Long-Term Vision
+
+Our vision is to build the operating system for opportunity-driven creators.
+
+We want BountyPilot AI to become the platform where creators discover opportunities, build projects, submit work, and grow sustainable careers.
+
+Whether someone is pursuing content bounties, hackathons, grants, competitions, or creator campaigns, BountyPilot AI should help them move from opportunity to execution with greater speed and confidence.
+
+Beyond the hackathon, our goal is to build a world-class product that users are willing to pay for because it delivers measurable value. We want BountyPilot AI to become a sustainable business capable of generating revenue on its own, with or without external investment.
+
+What began as a personal $0 to $1000 challenge is evolving into a platform designed to help creators turn opportunities into outcomes.
