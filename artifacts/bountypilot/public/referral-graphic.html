@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=1280" />
+  <meta name="viewport" content="width=2560" />
   <title>BountyPilot Referral Campaigns</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { width: 1280px; height: 720px; overflow: hidden; background: #000; }
+    body { width: 2560px; height: 1440px; overflow: hidden; background: #000; }
 
     .slide {
-      width: 1280px;
-      height: 720px;
+      width: 2560px;
+      height: 1440px;
       background: linear-gradient(135deg, #000000 0%, #0a1200 45%, #172800 100%);
       position: relative;
       overflow: hidden;
@@ -29,7 +29,7 @@
       background-image:
         linear-gradient(rgba(195,255,0,0.10) 1px, transparent 1px),
         linear-gradient(90deg, rgba(195,255,0,0.10) 1px, transparent 1px);
-      background-size: 60px 60px;
+      background-size: 120px 120px;
       z-index: 1;
       pointer-events: none;
     }
@@ -37,10 +37,10 @@
     /* Green glow */
     .glow {
       position: absolute;
-      bottom: -150px;
-      right: -100px;
-      width: 560px;
-      height: 560px;
+      bottom: -300px;
+      right: -200px;
+      width: 1120px;
+      height: 1120px;
       background: radial-gradient(circle, rgba(195,255,0,0.14) 0%, transparent 70%);
       z-index: 1;
       pointer-events: none;
@@ -50,20 +50,20 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 26px 48px 0;
+      padding: 52px 96px 0;
       position: relative;
       z-index: 2;
     }
-    .logo { display: flex; align-items: center; gap: 10px; }
-    .logo-sq { width: 22px; height: 22px; background: #c3ff00; border-radius: 3px; flex-shrink: 0; }
-    .logo-text { color: #fff; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-    .year { color: rgba(255,255,255,0.35); font-size: 13px; font-family: 'Space Mono', monospace; letter-spacing: 0.05em; }
+    .logo { display: flex; align-items: center; gap: 20px; }
+    .logo-sq { width: 44px; height: 44px; background: #c3ff00; border-radius: 6px; flex-shrink: 0; }
+    .logo-text { color: #fff; font-size: 30px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .year { color: rgba(255,255,255,0.7); font-size: 26px; font-family: 'Space Mono', monospace; letter-spacing: 0.05em; }
 
     .content {
       flex: 1;
       display: flex;
-      gap: 40px;
-      padding: 28px 48px 0;
+      gap: 80px;
+      padding: 56px 96px 0;
       position: relative;
       z-index: 2;
     }
@@ -72,30 +72,30 @@
     .left {
       display: flex;
       flex-direction: column;
-      width: 330px;
+      width: 660px;
       flex-shrink: 0;
-      padding-top: 2px;
+      padding-top: 4px;
     }
     .pill {
       display: inline-flex;
       align-items: center;
-      border: 1px solid rgba(195,255,0,0.45);
+      border: 2px solid rgba(195,255,0,0.45);
       border-radius: 100px;
-      padding: 5px 14px;
-      margin-bottom: 18px;
+      padding: 10px 28px;
+      margin-bottom: 36px;
       width: fit-content;
       background: rgba(195,255,0,0.06);
     }
     .pill span {
-      color: rgba(255,255,255,0.9);
-      font-size: 11px;
+      color: #fff;
+      font-size: 22px;
       font-family: 'Space Mono', monospace;
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
     }
     .headline {
-      font-size: 62px;
+      font-size: 124px;
       font-weight: 800;
       line-height: 1;
       letter-spacing: -0.02em;
@@ -104,30 +104,30 @@
     .headline .white { color: #fff; }
     .headline .green { color: #c3ff00; }
     .tagline {
-      color: rgba(255,255,255,0.65);
-      font-size: 14px;
+      color: #fff;
+      font-size: 28px;
       font-family: 'Space Mono', monospace;
       line-height: 1.65;
-      margin-top: 16px;
+      margin-top: 32px;
     }
     .prize-box {
-      margin-top: 22px;
-      padding: 14px 18px;
+      margin-top: 44px;
+      padding: 28px 36px;
       background: rgba(195,255,0,0.08);
-      border: 1px solid rgba(195,255,0,0.25);
-      border-radius: 6px;
+      border: 2px solid rgba(195,255,0,0.25);
+      border-radius: 12px;
     }
     .prize-label {
-      color: rgba(255,255,255,0.5);
-      font-size: 10px;
+      color: rgba(255,255,255,0.9);
+      font-size: 20px;
       font-family: 'Space Mono', monospace;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
     }
     .prize-amount {
       color: #c3ff00;
-      font-size: 34px;
+      font-size: 68px;
       font-weight: 800;
       letter-spacing: -0.02em;
       line-height: 1;
@@ -135,11 +135,11 @@
     .url {
       margin-top: auto;
       color: #c3ff00;
-      font-size: 13px;
+      font-size: 26px;
       font-weight: 700;
       font-family: 'Space Mono', monospace;
       letter-spacing: 0.04em;
-      padding-bottom: 2px;
+      padding-bottom: 4px;
     }
 
     /* Right column — cards */
@@ -148,16 +148,16 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr;
-      gap: 10px;
+      gap: 20px;
     }
     .card {
       background: rgba(8,8,8,0.88);
-      border: 1px solid rgba(195,255,0,0.2);
-      border-radius: 6px;
-      padding: 16px 18px 16px 24px;
+      border: 2px solid rgba(195,255,0,0.2);
+      border-radius: 12px;
+      padding: 32px 36px 32px 48px;
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 14px;
       position: relative;
       overflow: hidden;
     }
@@ -165,84 +165,83 @@
       content: '';
       position: absolute;
       left: 0;
-      top: 14px;
-      bottom: 14px;
-      width: 3px;
+      top: 28px;
+      bottom: 28px;
+      width: 6px;
       background: #c3ff00;
-      border-radius: 0 2px 2px 0;
+      border-radius: 0 4px 4px 0;
     }
     .card-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .card-meta { display: flex; align-items: center; gap: 8px; }
+    .card-meta { display: flex; align-items: center; gap: 16px; }
     .card-num {
-      color: rgba(195,255,0,0.5);
-      font-size: 10px;
+      color: rgba(195,255,0,0.9);
+      font-size: 20px;
       font-family: 'Space Mono', monospace;
       font-weight: 700;
       letter-spacing: 0.1em;
     }
     .badge {
-      color: rgba(255,255,255,0.55);
-      font-size: 9px;
+      color: #fff;
+      font-size: 18px;
       font-family: 'Space Mono', monospace;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       background: rgba(195,255,0,0.1);
-      border: 1px solid rgba(195,255,0,0.25);
-      border-radius: 3px;
-      padding: 1px 6px;
+      border: 1px solid rgba(195,255,0,0.35);
+      border-radius: 6px;
+      padding: 3px 12px;
     }
     .card-prize-wrap { text-align: right; }
     .card-prize {
       color: #c3ff00;
-      font-size: 22px;
+      font-size: 44px;
       font-weight: 800;
       line-height: 1;
       letter-spacing: -0.01em;
     }
     .card-prize-sub {
-      color: rgba(255,255,255,0.4);
-      font-size: 9px;
+      color: rgba(255,255,255,0.85);
+      font-size: 18px;
       font-family: 'Space Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
     .card-title {
       color: #ffffff;
-      font-size: 15px;
+      font-size: 30px;
       font-weight: 700;
       letter-spacing: 0.01em;
       line-height: 1.2;
     }
     .card-desc {
       color: #ffffff;
-      font-size: 12.5px;
+      font-size: 25px;
       font-family: 'Space Mono', monospace;
       line-height: 1.6;
-      opacity: 0.82;
     }
 
     .bottombar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 48px 18px;
+      padding: 28px 96px 36px;
       position: relative;
       z-index: 2;
     }
     .footer-left {
-      color: rgba(255,255,255,0.2);
-      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      font-size: 22px;
       font-family: 'Space Mono', monospace;
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
     .footer-right {
-      color: rgba(255,255,255,0.3);
-      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      font-size: 22px;
       font-family: 'Space Mono', monospace;
       letter-spacing: 0.06em;
     }
