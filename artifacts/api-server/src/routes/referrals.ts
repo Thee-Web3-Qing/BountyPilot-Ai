@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, referralsTable, campaignEnrollmentsTable } from "@workspace/db";
+import { usersTable, referralsTable, campaignEnrollmentsTable, affiliateCommissionsTable } from "@workspace/db";
 import { eq, desc, count, sql, and, or, isNull } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -464,11 +464,47 @@ referralsRouter.post("/record", async (req, res) => {
   }
 });
 
+const REFERRAL_INTERNAL_SECRET = process.env.REFERRAL_INTERNAL_SECRET || "";
+
+// Commission helpers (plan stored as tier semantics: monthly | yearly | lifetime)
+function resolveCommPlan(plan: string, tier: string | null | undefined): string {
+  if (tier === "lifetime" || plan === "lifetime") return "lifetime";
+  if (tier === "yearly") return "yearly";
+  return "monthly";
+}
+
+function resolveCommAmount(commPlan: string): number {
+  if (commPlan === "lifetime") return 50;
+  if (commPlan === "yearly") return 9;
+  if (commPlan === "monthly") return 1;
+  return 0;
+}
+
+function resolveCommStatus(commPlan: string): string {
+  if (commPlan === "lifetime" || commPlan === "yearly") return "approved";
+  return "pending";
+}
+
 // ── PATCH /referrals/:referredUserId/plan ─────────────────────
+// Internal-only endpoint — requires X-Internal-Secret header matching
+// the REFERRAL_INTERNAL_SECRET env var (if configured).
 referralsRouter.patch("/:referredUserId/plan", async (req, res) => {
   try {
+    if (REFERRAL_INTERNAL_SECRET) {
+      const provided = req.headers["x-internal-secret"];
+      if (!provided || provided !== REFERRAL_INTERNAL_SECRET) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+    }
+
     const { plan, tier } = req.body;
     const referredUserId = parseInt(req.params.referredUserId);
+
+    const [existing] = await db
+      .select({ id: referralsTable.id, referrerId: referralsTable.referrerId })
+      .from(referralsTable)
+      .where(eq(referralsTable.referredUserId, referredUserId));
 
     await db.update(referralsTable)
       .set({
@@ -478,10 +514,103 @@ referralsRouter.patch("/:referredUserId/plan", async (req, res) => {
       })
       .where(eq(referralsTable.referredUserId, referredUserId));
 
+    if (existing) {
+      const isCommissionable = plan === "active" || plan === "lifetime";
+
+      if (isCommissionable) {
+        // Upsert commission row — atomic, idempotent via unique constraint on referral_id
+        const commPlan = resolveCommPlan(plan, tier);
+        const commAmount = resolveCommAmount(commPlan);
+        const commStatus = resolveCommStatus(commPlan);
+        await db.insert(affiliateCommissionsTable)
+          .values({
+            referrerId: existing.referrerId,
+            referredUserId,
+            referralId: existing.id,
+            plan: commPlan,
+            amount: commAmount.toFixed(2),
+            status: commStatus,
+          })
+          .onConflictDoUpdate({
+            target: affiliateCommissionsTable.referralId,
+            set: { plan: commPlan, amount: commAmount.toFixed(2), status: commStatus },
+          });
+        logger.info({ referralId: existing.id, commPlan, commAmount }, "Commission upserted via plan patch");
+      } else {
+        // Plan reverted to non-paying — cancel any open commission row
+        await db.update(affiliateCommissionsTable)
+          .set({ status: "cancelled", amount: "0.00" })
+          .where(
+            and(
+              eq(affiliateCommissionsTable.referralId, existing.id),
+              sql`${affiliateCommissionsTable.status} IN ('pending', 'approved')`
+            )
+          );
+        logger.info({ referralId: existing.id, plan }, "Commission cancelled — plan reverted to non-paying");
+      }
+    }
+
     res.json({ updated: true });
   } catch (err) {
     logger.error(err, "Update referral plan error");
     res.status(500).json({ error: "Failed to update" });
+  }
+});
+
+// ── GET /referrals/commissions — real commission rows ─────────
+referralsRouter.get("/commissions", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const rows = await db
+      .select({
+        id: affiliateCommissionsTable.id,
+        referredUserId: affiliateCommissionsTable.referredUserId,
+        referredUsername: usersTable.username,
+        plan: affiliateCommissionsTable.plan,
+        amount: affiliateCommissionsTable.amount,
+        status: affiliateCommissionsTable.status,
+        createdAt: affiliateCommissionsTable.createdAt,
+      })
+      .from(affiliateCommissionsTable)
+      .innerJoin(usersTable, eq(usersTable.id, affiliateCommissionsTable.referredUserId))
+      .where(eq(affiliateCommissionsTable.referrerId, userId))
+      .orderBy(desc(affiliateCommissionsTable.createdAt));
+
+    const availableBalance = rows
+      .filter(r => r.status === "approved")
+      .reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+    const pendingBalance = rows
+      .filter(r => r.status === "pending")
+      .reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+    const lifetimeEarnings = rows
+      .filter(r => r.status === "pending" || r.status === "approved" || r.status === "paid")
+      .reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+    const totalWithdrawn = rows
+      .filter(r => r.status === "paid")
+      .reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+    res.json({
+      commissions: rows.map(r => ({
+        id: r.id,
+        referredUserId: r.referredUserId,
+        referredUsername: r.referredUsername,
+        plan: r.plan,
+        amount: parseFloat(r.amount),
+        status: r.status,
+        createdAt: r.createdAt,
+      })),
+      availableBalance,
+      pendingBalance,
+      lifetimeEarnings,
+      totalWithdrawn,
+    });
+  } catch (err) {
+    logger.error(err, "Get commissions error");
+    res.status(500).json({ error: "Failed to get commissions" });
   }
 });
 

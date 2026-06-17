@@ -9,37 +9,12 @@ import {
   AlertCircle, ExternalLink, ChevronRight, Megaphone,
 } from "lucide-react";
 
-// ── Commission rates ──────────────────────────────────────────
-const COMMISSION = {
-  monthly: 1,    // $1/month (ongoing)
-  yearly: 9,     // $9 one-time
-  lifetime: 50,  // $50 one-time
-};
-
 // ── Helpers ───────────────────────────────────────────────────
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function getCommission(ref: { tier?: string | null; referredUserPlan: string; isPaid: boolean }) {
-  if (ref.tier === "lifetime" || ref.referredUserPlan === "lifetime") return COMMISSION.lifetime;
-  if (ref.tier === "yearly") return COMMISSION.yearly;
-  if (ref.isPaid) return COMMISSION.monthly;
-  return 0;
-}
-
-function getStatus(ref: { tier?: string | null; referredUserPlan: string; isPaid: boolean }): "approved" | "pending" | "free" {
-  if (ref.tier === "lifetime" || ref.referredUserPlan === "lifetime") return "approved";
-  if (ref.tier === "yearly") return "approved";
-  if (ref.isPaid) return "pending";
-  return "free";
-}
-
-function getPlan(ref: { tier?: string | null; referredUserPlan: string }) {
-  if (ref.tier === "lifetime" || ref.referredUserPlan === "lifetime") return "Lifetime ($250)";
-  if (ref.tier === "yearly") return "Yearly ($45)";
-  if (ref.referredUserPlan === "active") return "Monthly ($5)";
-  return "Free";
+function getPlanLabel(plan: string) {
+  if (plan === "lifetime") return "Lifetime ($250)";
+  if (plan === "yearly") return "Yearly ($45)";
+  if (plan === "monthly" || plan === "active") return "Monthly ($5)";
+  return plan;
 }
 
 // ── Sub-components ────────────────────────────────────────────
@@ -102,6 +77,24 @@ interface ReferralStats {
   referrals: ReferredUser[];
 }
 
+interface Commission {
+  id: number;
+  referredUserId: number;
+  referredUsername: string;
+  plan: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+}
+
+interface CommissionData {
+  commissions: Commission[];
+  availableBalance: number;
+  pendingBalance: number;
+  lifetimeEarnings: number;
+  totalWithdrawn: number;
+}
+
 interface LeaderboardEntry {
   rank: number;
   username: string;
@@ -115,6 +108,7 @@ export function Referral() {
   usePageMeta({ title: "Refer & Earn", description: "Your BountyPilot affiliate & referral earnings hub", canonical: "/referral" });
   const { user, token } = useAuth();
   const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [commissionData, setCommissionData] = useState<CommissionData | null>(null);
   const [lb, setLb] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -130,9 +124,11 @@ export function Referral() {
     Promise.all([
       fetch("/api/referrals/my", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch("/api/referrals/leaderboard").then(r => r.json()),
-    ]).then(([myStats, lbData]) => {
+      fetch("/api/referrals/commissions", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+    ]).then(([myStats, lbData, comData]) => {
       if (myStats && !myStats.error) setStats(myStats);
       if (lbData?.paidLeaderboard) setLb(lbData.paidLeaderboard);
+      if (comData && !comData.error) setCommissionData(comData);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [token]);
 
@@ -155,15 +151,13 @@ export function Referral() {
   };
 
   // ── Derived numbers ──────────────────────────────────────────
-  const referrals = stats?.referrals ?? [];
-  const paidRefs = referrals.filter(r => r.isPaid);
-  const freeRefs = referrals.filter(r => !r.isPaid);
-  const approvedRefs = paidRefs.filter(r => getStatus(r) === "approved");
-  const pendingRefs = paidRefs.filter(r => getStatus(r) === "pending");
+  const commissions = commissionData?.commissions ?? [];
+  const freeRefs = (stats?.referrals ?? []).filter(r => !r.isPaid);
 
-  const availableBalance = approvedRefs.reduce((sum, r) => sum + getCommission(r), 0);
-  const pendingEarnings = pendingRefs.reduce((sum, r) => sum + getCommission(r), 0);
-  const lifetimeEarnings = paidRefs.reduce((sum, r) => sum + getCommission(r), 0);
+  const availableBalance = commissionData?.availableBalance ?? 0;
+  const pendingEarnings = commissionData?.pendingBalance ?? 0;
+  const lifetimeEarnings = commissionData?.lifetimeEarnings ?? 0;
+  const totalWithdrawn = commissionData?.totalWithdrawn ?? 0;
 
   const totalReferrals = stats?.totalReferrals ?? 0;
   const paidCount = stats?.paidReferrals ?? 0;
@@ -305,7 +299,7 @@ export function Referral() {
           <StatCard icon={DollarSign} label="Available Balance" value={`$${availableBalance.toFixed(2)}`} sub="Approved & ready" accent />
           <StatCard icon={Clock} label="Pending Earnings" value={`$${pendingEarnings.toFixed(2)}`} sub="Awaiting approval" />
           <StatCard icon={TrendingUp} label="Lifetime Earnings" value={`$${lifetimeEarnings.toFixed(2)}`} sub="All-time total" />
-          <StatCard icon={ArrowDownCircle} label="Total Withdrawn" value="$0.00" sub="Paid out to date" />
+          <StatCard icon={ArrowDownCircle} label="Total Withdrawn" value={`$${totalWithdrawn.toFixed(2)}`} sub="Paid out to date" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <StatCard icon={Users} label="Total Paying" value={paidCount} />
@@ -319,7 +313,7 @@ export function Referral() {
       <Card className="bg-card border-border">
         <CardContent className="p-5 flex flex-col gap-4">
           <SectionHead label="Commission History" />
-          {paidRefs.length === 0 ? (
+          {commissions.length === 0 ? (
             <div className="py-8 text-center flex flex-col items-center gap-2">
               <DollarSign className="w-8 h-8 text-muted-foreground/20" />
               <p className="font-mono text-sm text-muted-foreground">No affiliate earnings yet.</p>
@@ -329,33 +323,28 @@ export function Referral() {
             </div>
           ) : (
             <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-              {/* Header row */}
               <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1">
                 {["User", "Plan", "Commission", "Status"].map(h => (
                   <p key={h} className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground/60">{h}</p>
                 ))}
               </div>
-              {paidRefs.map(r => {
-                const status = getStatus(r);
-                const commission = getCommission(r);
-                return (
-                  <div
-                    key={r.id}
-                    className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center px-3 py-2 rounded-sm border border-border bg-background"
-                  >
-                    <span className="font-mono text-xs text-foreground truncate">@{r.referredUsername}</span>
-                    <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">{getPlan(r)}</span>
-                    <span className="font-mono text-xs font-bold text-primary whitespace-nowrap">+${commission}</span>
-                    <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border whitespace-nowrap ${
-                      status === "approved"
-                        ? "text-green-400 border-green-500/30 bg-green-500/10"
-                        : "text-amber-400 border-amber-500/30 bg-amber-500/10"
-                    }`}>
-                      {status}
-                    </span>
-                  </div>
-                );
-              })}
+              {commissions.map(c => (
+                <div
+                  key={c.id}
+                  className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center px-3 py-2 rounded-sm border border-border bg-background"
+                >
+                  <span className="font-mono text-xs text-foreground truncate">@{c.referredUsername}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">{getPlanLabel(c.plan)}</span>
+                  <span className="font-mono text-xs font-bold text-primary whitespace-nowrap">+${c.amount.toFixed(2)}</span>
+                  <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                    c.status === "approved" || c.status === "paid"
+                      ? "text-green-400 border-green-500/30 bg-green-500/10"
+                      : "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                  }`}>
+                    {c.status}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
           {freeRefs.length > 0 && (
@@ -374,7 +363,7 @@ export function Referral() {
             {[
               { label: "Available", value: `$${availableBalance.toFixed(2)}`, accent: true },
               { label: "Pending", value: `$${pendingEarnings.toFixed(2)}`, accent: false },
-              { label: "Withdrawn", value: "$0.00", accent: false },
+              { label: "Withdrawn", value: `$${totalWithdrawn.toFixed(2)}`, accent: false },
             ].map(s => (
               <div key={s.label} className={`rounded-sm border p-3 ${s.accent ? "border-primary/30 bg-primary/5" : "border-border bg-background"}`}>
                 <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</p>

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
-import { usersTable, referralsTable } from "@workspace/db";
+import { usersTable, referralsTable, affiliateCommissionsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import {
@@ -128,10 +128,40 @@ router.post("/webhook", async (req, res) => {
         .where(eq(usersTable.id, deposit.userId));
 
       // Track tier on the referral record for campaign leaderboard isolation
-      await db
+      const [updatedReferral] = await db
         .update(referralsTable)
         .set({ tier: deposit.tier, referredUserPlan: newPlan, qualifies: true })
-        .where(eq(referralsTable.referredUserId, deposit.userId));
+        .where(eq(referralsTable.referredUserId, deposit.userId))
+        .returning({ id: referralsTable.id, referrerId: referralsTable.referrerId });
+
+      // Create/update affiliate commission for the referrer (trusted path — webhook-only)
+      // plan stored as tier semantics: monthly | yearly | lifetime (not active/lifetime plan status)
+      if (updatedReferral) {
+        const tier = deposit.tier as string;
+        let commAmount = 0;
+        let commStatus = "pending";
+        let commPlan = tier;
+        if (tier === "lifetime") { commAmount = 50; commStatus = "approved"; }
+        else if (tier === "yearly") { commAmount = 9; commStatus = "approved"; }
+        else if (tier === "monthly" || newPlan === "active") { commAmount = 1; commStatus = "pending"; commPlan = "monthly"; }
+
+        if (commAmount > 0) {
+          await db.insert(affiliateCommissionsTable)
+            .values({
+              referrerId: updatedReferral.referrerId,
+              referredUserId: deposit.userId,
+              referralId: updatedReferral.id,
+              plan: commPlan,
+              amount: commAmount.toFixed(2),
+              status: commStatus,
+            })
+            .onConflictDoUpdate({
+              target: affiliateCommissionsTable.referralId,
+              set: { plan: commPlan, amount: commAmount.toFixed(2), status: commStatus },
+            });
+          logger.info({ referralId: updatedReferral.id, commAmount, commStatus, commPlan }, "Affiliate commission upserted");
+        }
+      }
 
       logger.info(
         { userId: deposit.userId, depositId, tier: deposit.tier, plan: newPlan, subscriptionEndsAt },
