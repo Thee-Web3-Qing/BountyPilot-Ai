@@ -1,47 +1,111 @@
 import { logger } from "./logger.js";
 import { callQwen } from "./qwen.js";
 
-const NOVUS_BASE_URL = process.env.NOVUS_BASE_URL || "https://novus-api.pendo.io/mcp";
-const NOVUS_API_KEY = process.env.NOVUS_API_KEY || "";
+const NOVUS_MCP_URL = process.env.NOVUS_BASE_URL || "https://novus-api.pendo.io/mcp";
+const NOVUS_TOKEN_URL = "https://novus-api.pendo.io/mcp-auth/token";
+const NOVUS_CLIENT_ID = process.env.NOVUS_CLIENT_ID || "";
+const NOVUS_CLIENT_SECRET = process.env.NOVUS_CLIENT_SECRET || "";
+const NOVUS_APP_ID = process.env.NOVUS_APP_ID || "";
 
 export function hasNovusKey(): boolean {
-  return !!NOVUS_API_KEY;
+  return !!(NOVUS_CLIENT_ID && NOVUS_CLIENT_SECRET);
 }
 
-interface JsonRpcRequest {
-  jsonrpc: "2.0";
-  id: number;
-  method: string;
-  params?: unknown;
+// ── OAuth2 token cache ────────────────────────────────────────
+let cachedToken: string | null = null;
+let tokenExpiresAt = 0;
+
+async function getNovusToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiresAt - 60_000) return cachedToken;
+
+  const params = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: NOVUS_CLIENT_ID,
+    client_secret: NOVUS_CLIENT_SECRET,
+    scope: "mcp",
+    ...(NOVUS_APP_ID ? { app_id: NOVUS_APP_ID } : {}),
+  });
+
+  const resp = await fetch(NOVUS_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Novus token fetch failed (${resp.status}): ${err}`);
+  }
+
+  const data = (await resp.json()) as { access_token: string; expires_in: number };
+  cachedToken = data.access_token;
+  tokenExpiresAt = now + data.expires_in * 1000;
+  logger.info("Novus OAuth2 token refreshed");
+  return cachedToken;
 }
 
-interface JsonRpcResponse {
-  jsonrpc: "2.0";
-  id: number;
-  result?: unknown;
-  error?: { code: number; message: string };
+// ── Streamable HTTP (SSE) response parser ─────────────────────
+// Novus MCP uses Streamable HTTP transport: responses come as SSE (text/event-stream)
+// Each SSE event has data: { jsonrpc result }
+async function parseSSEResponse(resp: Response): Promise<unknown> {
+  const text = await resp.text();
+
+  // Parse SSE lines: "data: {...}"
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("data:")) {
+      const jsonStr = trimmed.slice(5).trim();
+      if (!jsonStr) continue;
+      try {
+        const parsed = JSON.parse(jsonStr) as {
+          result?: unknown;
+          error?: { code: number; message: string };
+        };
+        if (parsed.error) {
+          throw new Error(`Novus MCP error ${parsed.error.code}: ${parsed.error.message}`);
+        }
+        if (parsed.result !== undefined) return parsed.result;
+      } catch (e: any) {
+        if (e.message.startsWith("Novus MCP error")) throw e;
+        // not valid JSON on this line, continue
+      }
+    }
+  }
+
+  throw new Error(`Novus MCP: no result in SSE response. Body: ${text.slice(0, 200)}`);
 }
 
+// ── JSON-RPC over Streamable HTTP ────────────────────────────
 let requestId = 0;
 
 async function novusRpc(method: string, params?: unknown): Promise<unknown> {
+  const token = await getNovusToken();
   const id = ++requestId;
-  const req: JsonRpcRequest = { jsonrpc: "2.0", id, method, params };
-  const resp = await fetch(NOVUS_BASE_URL, {
+
+  const resp = await fetch(NOVUS_MCP_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(NOVUS_API_KEY ? { "Authorization": `Bearer ${NOVUS_API_KEY}` } : {}),
+      "Accept": "application/json, text/event-stream",
+      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
   });
-  const data = (await resp.json()) as JsonRpcResponse & { message?: string; statusCode?: number };
-  // Novus returns errors in different shapes — handle both JSON-RPC and REST-style errors
-  if (data.error || data.statusCode && data.statusCode >= 400) {
-    const msg = data.error?.message || data.message || `HTTP ${data.statusCode}`;
-    const code = data.error?.code || data.statusCode || "unknown";
-    throw new Error(`Novus MCP error ${code}: ${msg}`);
+
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Novus HTTP ${resp.status}: ${body.slice(0, 200)}`);
   }
+
+  const contentType = resp.headers.get("content-type") || "";
+  if (contentType.includes("text/event-stream")) {
+    return parseSSEResponse(resp);
+  }
+
+  // Fallback: plain JSON response
+  const data = (await resp.json()) as { result?: unknown; error?: { code: number; message: string } };
+  if (data.error) throw new Error(`Novus MCP error ${data.error.code}: ${data.error.message}`);
   return data.result;
 }
 
@@ -76,31 +140,23 @@ export async function callNovusTool(name: string, args: Record<string, unknown>)
   const result = await novusRpc("tools/call", { name, arguments: args }) as {
     content: Array<{ type: string; text: string }>;
   };
-  const text = result.content?.find((c) => c.type === "text")?.text || "";
-  return text;
+  return result.content?.find((c) => c.type === "text")?.text || "";
 }
 
 // ── Simple LLM wrapper via Novus generate_text tool ───────────
 export async function callNovusLLM(
   systemPrompt: string,
   userPrompt: string,
-  { maxTokens = 400, timeout = 30000 }: { maxTokens?: number; timeout?: number } = {}
+  { maxTokens = 400 }: { maxTokens?: number; timeout?: number } = {}
 ): Promise<string> {
-  try {
-    const text = await callNovusTool("generate_text", {
-      system: systemPrompt,
-      prompt: userPrompt,
-      max_tokens: maxTokens,
-    });
-    return text;
-  } catch (e: any) {
-    logger.warn({ err: e.message }, "Novus generate_text failed, falling back");
-    throw e;
-  }
+  return callNovusTool("generate_text", {
+    system: systemPrompt,
+    prompt: userPrompt,
+    max_tokens: maxTokens,
+  });
 }
 
-// ── Analytics: Dashboard insights for creators ──────────────────
-
+// ── Analytics: Dashboard insights for creators ────────────────
 export async function analyzeDashboardInsights(data: {
   totalBounties: number;
   totalEarnings: number;
@@ -131,7 +187,6 @@ Give 3-4 concise, actionable insights. Be specific and motivational. Focus on:
 
 Return plain text with bullet points. Keep it under 250 words. No markdown headers.`;
 
-  // Try Novus first, fall back to Qwen for guaranteed availability
   if (hasNovusKey()) {
     try {
       return await callNovusLLM(
@@ -156,7 +211,6 @@ Return plain text with bullet points. Keep it under 250 words. No markdown heade
 }
 
 // ── Analytics: Admin product insights ─────────────────────────
-
 export async function analyzeAdminInsights(data: {
   users: { total: number; last24h: number; last7d: number; last30d: number; activeLast7d: number };
   bounties: { total: number; claimed: number; won: number; lost: number; winRate: number; last7d: number };
@@ -196,7 +250,6 @@ Give 5 concise strategic recommendations covering:
 
 Be direct and data-driven. No generic advice. Keep it under 350 words. Plain text bullet points.`;
 
-  // Try Novus first, fall back to Qwen for guaranteed availability
   if (hasNovusKey()) {
     try {
       return await callNovusLLM(

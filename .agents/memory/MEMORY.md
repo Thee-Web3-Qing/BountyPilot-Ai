@@ -7,4 +7,5 @@
 - [Referral System](referral-system.md) — referral_code auto-generated on signup (4-char prefix + 6 hex). referrals table. Qualifies at 5+ referrals OR 1 active/lifetime. ?ref= param on signup/google flows. /referral page + leaderboard.
 - [Launchpad](launchpad.md) — Campaign hub with 4 isolated campaigns (crypto-50, free-access, yearly-challenge, lifetime-challenge). campaign_enrollments table. /launchpad/campaign/:slug detail pages.
 - [Telegram Alerts](telegram-alerts.md) — bot @Bountypilotaibot; one-time token connect flow; webhook at /api/telegram/webhook; fan-out on site updates; Connect UI in /settings.
+- [Novus MCP Auth](novus-mcp-auth.md) — OAuth2 client_credentials via NOVUS_CLIENT_ID/SECRET/APP_ID; token endpoint /mcp-auth/token; SSE (text/event-stream) transport; Accept header must include both application/json and text/event-stream.
 - **No Stripe** — payments are crypto-only via Dextopus.
