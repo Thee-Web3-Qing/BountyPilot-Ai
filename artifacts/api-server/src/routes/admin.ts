@@ -193,14 +193,34 @@ adminRouter.post("/set-plan/:userId", requireAuth, requireAdmin, async (req: Aut
   try {
     const userId = parseInt(req.params.userId as string);
     const { plan } = req.body;
-    const validPlans = ["pending", "trial", "beta", "expired", "active", "lifetime"];
+    const validPlans = ["pending", "trial", "beta", "expired", "active", "lifetime", "yearly", "monthly"];
     if (!validPlans.includes(plan)) {
       res.status(400).json({ error: "Invalid plan" });
       return;
     }
+
+    // Map tier labels to DB plan values + set expiry
+    let dbPlan = plan;
+    let extraFields: Record<string, unknown> = {};
+    if (plan === "yearly") {
+      dbPlan = "active";
+      const ends = new Date();
+      ends.setDate(ends.getDate() + 365);
+      extraFields = { subscriptionEndsAt: ends, trialEndsAt: null };
+    } else if (plan === "monthly") {
+      dbPlan = "active";
+      const ends = new Date();
+      ends.setDate(ends.getDate() + 31);
+      extraFields = { subscriptionEndsAt: ends, trialEndsAt: null };
+    } else if (plan === "trial") {
+      extraFields = { trialEndsAt: trialEndsAt(14) };
+    } else if (plan === "lifetime") {
+      extraFields = { subscriptionEndsAt: null, trialEndsAt: null };
+    }
+
     const [user] = await db
       .update(usersTable)
-      .set({ plan, ...(plan === "trial" ? { trialEndsAt: trialEndsAt(14) } : {}) })
+      .set({ plan: dbPlan, ...extraFields })
       .where(eq(usersTable.id, userId))
       .returning({ id: usersTable.id, email: usersTable.email, plan: usersTable.plan });
     if (!user) {
