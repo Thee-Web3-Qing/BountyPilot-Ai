@@ -41,3 +41,9 @@ id = "ByoPDlPco9qzr09sI1cLR"
 uri = "file://attached_assets/bountypilot-referral-campaign-banner.png"
 type = "image"
 title = "BountyPilot Referral Campaign — Banner (16:9)"
+
+[[outputs]]
+id = "yHtoQ0k7bLoo1-m1yeIcN"
+uri = "file://attached_assets/bountypilot-referral-campaign-final.png"
+type = "image"
+title = "BountyPilot Referral Campaign Graphic"
