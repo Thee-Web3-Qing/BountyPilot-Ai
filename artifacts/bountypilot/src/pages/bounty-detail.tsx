@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe, Bot, FileText, Copy, Check } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe, Bot, FileText, Copy, Check, Code2, Layers, UsersRound, Tag, Clock, Zap, Wrench } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
 
 // ── Team helpers ─────────────────────────────────────────────
@@ -195,6 +195,101 @@ const SCORE_COLOR = (score: number) => {
   if (score >= 4) return "text-yellow-400";
   return "text-red-400";
 };
+
+// ── Type-specific detail card ─────────────────────────────────
+interface TypeDetailsCardProps {
+  opportunityType: string | null | undefined;
+  contentFormat: string | null | undefined;
+  techStack: string | null | undefined;
+  programmingLanguages: string | null | undefined;
+  teamSize: string | null | undefined;
+  trackCategory: string | null | undefined;
+  difficulty: string | null | undefined;
+  skillsRequired: string | null | undefined;
+  estimatedHours: string | null | undefined;
+}
+
+interface TypeChip { label: string; icon: React.ReactNode }
+
+function TypeDetailsCard({ opportunityType, contentFormat, techStack, programmingLanguages, teamSize, trackCategory, difficulty, skillsRequired, estimatedHours }: TypeDetailsCardProps) {
+  const t = (opportunityType || "").toLowerCase();
+  const f = (contentFormat || "").toLowerCase();
+
+  const isHackathon = t.includes("hackathon");
+  const isDev = t.includes("bug bounty") || t.includes("security") || f.includes("code") || f.includes("develop") || f.includes("smart contract") || f.includes("github");
+  const isJob = t === "job";
+  const isTask = t === "task" || t === "bounty" || t === "campaign" || t === "contest";
+  const isDesign = f.includes("design") || f.includes("ui") || f.includes("ux") || f.includes("figma");
+  const isContent = f.includes("video") || f.includes("article") || f.includes("blog") || f.includes("thread") || f.includes("podcast");
+
+  type FieldItem = { icon: React.ReactNode; label: string; value: string };
+  const fields: FieldItem[] = [];
+
+  if (isHackathon || isDev) {
+    if (techStack) fields.push({ icon: <Layers className="w-3.5 h-3.5" />, label: "Tech Stack", value: techStack });
+    if (programmingLanguages) fields.push({ icon: <Code2 className="w-3.5 h-3.5" />, label: "Languages", value: programmingLanguages });
+  }
+  if (isHackathon) {
+    if (teamSize) fields.push({ icon: <UsersRound className="w-3.5 h-3.5" />, label: "Team Size", value: teamSize });
+    if (trackCategory) fields.push({ icon: <Tag className="w-3.5 h-3.5" />, label: "Track / Theme", value: trackCategory });
+  }
+  if (isJob || isTask || isContent || isDesign) {
+    if (skillsRequired) fields.push({ icon: <Zap className="w-3.5 h-3.5" />, label: "Skills", value: skillsRequired });
+  }
+  if (isDev && skillsRequired) {
+    fields.push({ icon: <Zap className="w-3.5 h-3.5" />, label: "Skills", value: skillsRequired });
+  }
+  if (isTask || isContent) {
+    if (estimatedHours) fields.push({ icon: <Clock className="w-3.5 h-3.5" />, label: "Est. Time", value: estimatedHours });
+  }
+  if (difficulty) fields.push({ icon: <Wrench className="w-3.5 h-3.5" />, label: "Difficulty", value: difficulty });
+
+  if (fields.length === 0) return null;
+
+  const cardTitle = isHackathon ? "Hackathon Details"
+    : isDev ? "Technical Details"
+    : isJob ? "Role Details"
+    : isDesign ? "Design Details"
+    : isContent ? "Content Details"
+    : "Task Details";
+
+  const accentClass = isHackathon
+    ? "border-blue-500/30 bg-blue-500/5"
+    : isDev
+    ? "border-purple-500/30 bg-purple-500/5"
+    : "border-border bg-card";
+
+  return (
+    <Card className={accentClass}>
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          {isHackathon ? <Code2 className="w-3.5 h-3.5" /> : <Layers className="w-3.5 h-3.5" />}
+          {cardTitle}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {fields.map((f, i) => (
+          <div key={i}>
+            <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+              {f.icon}
+              {f.label}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {f.value.split(",").map((chip, j) => chip.trim() && (
+                <span
+                  key={j}
+                  className="px-2 py-0.5 rounded text-xs font-mono border border-border bg-secondary text-foreground"
+                >
+                  {chip.trim()}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 interface OpportunityConfig {
   workflowStatuses: string[];
@@ -708,6 +803,19 @@ export function BountyDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Type-specific details */}
+      <TypeDetailsCard
+        opportunityType={bounty.opportunityType}
+        contentFormat={bounty.contentFormat}
+        techStack={bounty.techStack}
+        programmingLanguages={bounty.programmingLanguages}
+        teamSize={bounty.teamSize}
+        trackCategory={bounty.trackCategory}
+        difficulty={bounty.difficulty}
+        skillsRequired={bounty.skillsRequired}
+        estimatedHours={bounty.estimatedHours}
+      />
 
       {/* Team / Organizer */}
       <TeamCard companyName={bounty.projectName} platform={bounty.platform} url={bounty.url} />

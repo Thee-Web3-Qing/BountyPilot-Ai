@@ -101,6 +101,14 @@ bountiesRouter.post("/", async (req: AuthRequest, res) => {
         scoreExplanation: analysis.scoreExplanation,
         scoreBreakdown: analysis.scoreBreakdown ? JSON.stringify(analysis.scoreBreakdown) : null,
         confidenceScore: scraped.confidenceScore,
+        opportunityType: scraped.opportunityType,
+        techStack: scraped.techStack,
+        programmingLanguages: scraped.programmingLanguages,
+        teamSize: scraped.teamSize,
+        trackCategory: scraped.trackCategory,
+        difficulty: scraped.difficulty,
+        skillsRequired: scraped.skillsRequired,
+        estimatedHours: scraped.estimatedHours,
         status: "discovered",
       })
       .returning();
@@ -287,6 +295,13 @@ bountiesRouter.post("/:id/rescrape", async (req: AuthRequest, res) => {
     if (scraped.deliverables) updates.deliverables = scraped.deliverables;
     if (scraped.eligibilityRules) updates.eligibilityRules = scraped.eligibilityRules;
     if (scraped.importantNotes) updates.importantNotes = scraped.importantNotes;
+    if (scraped.techStack) updates.techStack = scraped.techStack;
+    if (scraped.programmingLanguages) updates.programmingLanguages = scraped.programmingLanguages;
+    if (scraped.teamSize) updates.teamSize = scraped.teamSize;
+    if (scraped.trackCategory) updates.trackCategory = scraped.trackCategory;
+    if (scraped.difficulty) updates.difficulty = scraped.difficulty;
+    if (scraped.skillsRequired) updates.skillsRequired = scraped.skillsRequired;
+    if (scraped.estimatedHours) updates.estimatedHours = scraped.estimatedHours;
 
     // Re-score with fresher data
     const analysis = await analyzeBounty(scraped);

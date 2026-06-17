@@ -72,6 +72,20 @@ export interface Bounty {
   tags?: string | null;
   /** @nullable */
   opportunityType?: string | null;
+  /** @nullable */
+  techStack?: string | null;
+  /** @nullable */
+  programmingLanguages?: string | null;
+  /** @nullable */
+  teamSize?: string | null;
+  /** @nullable */
+  trackCategory?: string | null;
+  /** @nullable */
+  difficulty?: string | null;
+  /** @nullable */
+  skillsRequired?: string | null;
+  /** @nullable */
+  estimatedHours?: string | null;
   createdAt: string;
   /** @nullable */
   updatedAt?: string | null;

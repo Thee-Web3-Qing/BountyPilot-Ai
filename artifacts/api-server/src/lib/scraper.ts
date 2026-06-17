@@ -23,6 +23,13 @@ export interface ScrapedBounty {
   platform: string | null;
   confidenceScore?: number;
   opportunityType?: string;
+  techStack?: string | null;
+  programmingLanguages?: string | null;
+  teamSize?: string | null;
+  trackCategory?: string | null;
+  difficulty?: string | null;
+  skillsRequired?: string | null;
+  estimatedHours?: string | null;
 }
 
 function extractReward(text: string): { amount: string | null; currency: string | null } {
@@ -620,6 +627,15 @@ export async function scrapeBounty(
     if (breakdowns && breakdowns.length > 0) prizeBreakdown = breakdowns;
   } catch {}
 
+  const opportunityType = type || detectOpportunityType(url, searchText);
+  const techStack = extractTechStack(html, searchText);
+  const programmingLanguages = extractProgrammingLanguages(searchText);
+  const teamSize = extractTeamSize(searchText);
+  const trackCategory = extractTrackCategory(html, searchText);
+  const difficulty = extractDifficulty(searchText);
+  const skillsRequired = extractSkillsRequired(searchText);
+  const estimatedHours = extractEstimatedHours(searchText);
+
   return {
     title,
     description,
@@ -638,7 +654,14 @@ export async function scrapeBounty(
       "Open to all creators — check platform listing for specific eligibility.",
     importantNotes: notesArr.join(". "),
     platform,
-    opportunityType: type || detectOpportunityType(url, searchText),
+    opportunityType,
+    techStack,
+    programmingLanguages,
+    teamSize,
+    trackCategory,
+    difficulty,
+    skillsRequired,
+    estimatedHours,
     rawText: searchText.slice(0, 4000),
     confidenceScore,
   };
@@ -682,6 +705,115 @@ function parsePrizeBreakdown(text: string): PrizeBreakdown[] {
   }
 
   return results;
+}
+
+function extractTechStack(html: string, text: string): string | null {
+  const t = text.toLowerCase();
+  // Devpost has a "Built With" or "Technologies Used" section
+  const builtWithMatch = html.match(/(?:built with|technologies used|tech stack)[^<]*<\/[^>]+>([\s\S]{0,600}?)(?:<\/section|<\/div|id="|class="challenge)/i);
+  if (builtWithMatch) {
+    const raw = builtWithMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const items = raw.split(/[,;•·\n]+/).map(s => s.trim()).filter(s => s.length > 1 && s.length < 40);
+    if (items.length > 0) return items.slice(0, 10).join(", ");
+  }
+  // Fallback: look for "uses X, Y, Z" or "built with X" patterns in text
+  const usesMatch = text.match(/(?:built with|using|stack:|tools?:|technologies?:)\s*([A-Za-z0-9\s,./+#-]{5,120})/i);
+  if (usesMatch) {
+    const raw = usesMatch[1].trim();
+    const items = raw.split(/[,;]+/).map(s => s.trim()).filter(s => s.length > 1 && s.length < 40);
+    if (items.length >= 2) return items.slice(0, 8).join(", ");
+  }
+  // Detect common frameworks/tools mentioned in text
+  const known = ["React", "Next.js", "Vue", "Angular", "Svelte", "Node.js", "Express", "FastAPI", "Django", "Flask",
+    "Solidity", "Rust", "Go", "Python", "TypeScript", "JavaScript", "PostgreSQL", "MongoDB", "Redis",
+    "Docker", "Kubernetes", "AWS", "GCP", "Azure", "Vercel", "Supabase", "Hardhat", "Foundry", "Anchor",
+    "TensorFlow", "PyTorch", "OpenAI", "LangChain", "Tailwind", "GraphQL", "tRPC", "Prisma", "Drizzle"];
+  const found = known.filter(k => t.includes(k.toLowerCase()));
+  return found.length >= 2 ? found.slice(0, 8).join(", ") : null;
+}
+
+function extractProgrammingLanguages(text: string): string | null {
+  const langs = ["JavaScript", "TypeScript", "Python", "Rust", "Solidity", "Go", "Kotlin", "Swift",
+    "Java", "C#", "C++", "C", "Ruby", "PHP", "Dart", "Move", "Cairo", "Vyper", "WASM", "R", "Scala"];
+  const t = text.toLowerCase();
+  const found = langs.filter(l => {
+    const lower = l.toLowerCase();
+    // Match as word boundary to avoid false positives
+    return new RegExp(`\\b${lower}\\b`).test(t);
+  });
+  return found.length > 0 ? found.slice(0, 6).join(", ") : null;
+}
+
+function extractTeamSize(text: string): string | null {
+  const m = text.match(/team(?:\s+(?:size|of|up\s+to|limit))?\s*(?::|of)?\s*(\d+)(?:\s*-\s*(\d+))?\s*(?:members?|people|participants?|persons?|hackers?)?/i)
+    || text.match(/(?:solo|individual|teams?\s+of|up\s+to|max(?:imum)?)\s*(\d+)(?:\s*-\s*(\d+))?\s*(?:members?|people|participants?)?/i)
+    || text.match(/(\d+)\s*(?:to|-)\s*(\d+)\s*(?:members?|people|participants?)/i);
+  if (m) {
+    if (m[2]) return `${m[1]}-${m[2]} members`;
+    const n = parseInt(m[1]);
+    if (n === 1) return "Solo only";
+    return `Up to ${n} members`;
+  }
+  if (/\bsolo\b|\bindividual\b/i.test(text)) return "Solo";
+  if (/\bteam(?!\s+name)\b/i.test(text)) return "Teams allowed";
+  return null;
+}
+
+function extractTrackCategory(html: string, text: string): string | null {
+  // Devpost: look for track/category labels
+  const trackMatch = html.match(/(?:track|category|theme)[^<]{0,40}?<\/[^>]+>\s*([A-Za-z0-9 /&:,-]{3,60})/i)
+    || text.match(/(?:track|category|theme)\s*[:\-–]\s*([A-Za-z0-9 /&]{3,60})/i);
+  if (trackMatch) return trackMatch[1].trim().slice(0, 60);
+  // Common hackathon themes
+  const themes = ["AI", "ML", "DeFi", "NFT", "Web3", "Gaming", "Healthcare", "FinTech", "EdTech",
+    "ClimaTech", "SocialFi", "Infrastructure", "Tooling", "Consumer Apps", "Payments", "Identity",
+    "DAOs", "Data", "Privacy", "Security"];
+  const t = text.toLowerCase();
+  const found = themes.filter(th => t.includes(th.toLowerCase()));
+  return found.length > 0 ? found.slice(0, 4).join(", ") : null;
+}
+
+function extractDifficulty(text: string): string | null {
+  const t = text.toLowerCase();
+  if (/\bbeginner\b|\bstarter\b|\bnewcomer\b|\bentry[- ]level\b/i.test(t)) return "Beginner";
+  if (/\badvanced\b|\bexpert\b|\bsenior\b|\bexperienced\b/i.test(t)) return "Advanced";
+  if (/\bintermediate\b|\bsome experience\b|\bfamiliar(?:ity)?\b/i.test(t)) return "Intermediate";
+  if (/\bany level\b|\ball levels?\b|\bopen to all\b|\bwelcome all\b/i.test(t)) return "All Levels";
+  return null;
+}
+
+function extractSkillsRequired(text: string): string | null {
+  const skillMatch = text.match(/(?:skills?\s*(?:required|needed)|requirements?|you(?:'ll)?\s+need)\s*[:\-–]\s*([^\n.]{10,200})/i);
+  if (skillMatch) {
+    const raw = skillMatch[1].trim();
+    const items = raw.split(/[,;•·]+/).map(s => s.trim()).filter(s => s.length > 2 && s.length < 50);
+    if (items.length >= 2) return items.slice(0, 6).join(", ");
+  }
+  // Content-creation skills
+  const skills = ["Video editing", "Copywriting", "Graphic design", "UI/UX", "Writing", "Animation",
+    "Photography", "Illustration", "Music production", "Voice acting", "Community management",
+    "Research", "Translation", "Technical writing", "Smart contract development", "Frontend development",
+    "Backend development", "Full-stack development", "Mobile development", "DevOps", "Data science"];
+  const t = text.toLowerCase();
+  const found = skills.filter(s => t.includes(s.toLowerCase()));
+  return found.length > 0 ? found.slice(0, 5).join(", ") : null;
+}
+
+function extractEstimatedHours(text: string): string | null {
+  const m = text.match(/(\d+)\s*[-–to]+\s*(\d+)\s*(?:hours?|hrs?)\b/i)
+    || text.match(/(?:takes?|spend|approximately|about|est(?:imated)?\.?)\s*(\d+)\s*(?:hours?|hrs?)\b/i)
+    || text.match(/(\d+)\s*(?:hour|hr)\b/i);
+  if (m) {
+    if (m[2]) return `${m[1]}-${m[2]} hours`;
+    return `~${m[1]} hours`;
+  }
+  const dayMatch = text.match(/(\d+)\s*[-–to]+\s*(\d+)\s*days?\b/i)
+    || text.match(/(\d+)\s*days?\b/i);
+  if (dayMatch) {
+    if (dayMatch[2]) return `${dayMatch[1]}-${dayMatch[2]} days`;
+    return `~${dayMatch[1]} days`;
+  }
+  return null;
 }
 
 function detectOpportunityType(url: string, text: string): string {
