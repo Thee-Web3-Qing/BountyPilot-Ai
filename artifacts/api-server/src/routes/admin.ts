@@ -2,7 +2,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, bountiesTable, earningsTable, bountyReportsTable } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
-import { eq, count, desc, gte, sql, isNotNull, and, ilike, or } from "drizzle-orm";
+import { referralsTable, affiliateCommissionsTable } from "@workspace/db";
+import { eq, count, desc, gte, sql, isNotNull, and, ilike, or, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
@@ -511,5 +512,91 @@ adminRouter.get("/dau", requireAuth, requireAdmin, async (_req, res) => {
   } catch (err) {
     logger.error(err, "Admin DAU error");
     res.status(500).json({ error: "Failed to get DAU" });
+  }
+});
+
+// ── POST /admin/backfill-commissions ──────────────────────────
+// One-time idempotent backfill: creates affiliate_commissions rows for any
+// referral that has already converted to a paid plan but has no commission row.
+// Safe to run multiple times — ON CONFLICT DO NOTHING prevents duplicates.
+adminRouter.post("/backfill-commissions", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const PAYING_PLANS = ["active", "yearly", "lifetime"];
+
+    function resolveCommPlan(plan: string, tier: string | null | undefined): string {
+      if (tier === "lifetime" || plan === "lifetime") return "lifetime";
+      if (tier === "yearly" || plan === "yearly") return "yearly";
+      return "monthly";
+    }
+
+    function resolveCommAmount(commPlan: string): number {
+      if (commPlan === "lifetime") return 50;
+      if (commPlan === "yearly") return 9;
+      return 1;
+    }
+
+    function resolveCommStatus(commPlan: string): string {
+      if (commPlan === "lifetime" || commPlan === "yearly") return "approved";
+      return "pending";
+    }
+
+    // Find all converted referrals that are missing a commission row.
+    const qualifying = await db
+      .select({
+        id: referralsTable.id,
+        referrerId: referralsTable.referrerId,
+        referredUserId: referralsTable.referredUserId,
+        referredUserPlan: referralsTable.referredUserPlan,
+        tier: referralsTable.tier,
+      })
+      .from(referralsTable)
+      .where(inArray(referralsTable.referredUserPlan, PAYING_PLANS));
+
+    if (qualifying.length === 0) {
+      res.json({ inserted: 0, skipped: 0, message: "No qualifying referrals found." });
+      return;
+    }
+
+    // Fetch existing commission referral IDs to report skipped count.
+    const existingRows = await db
+      .select({ referralId: affiliateCommissionsTable.referralId })
+      .from(affiliateCommissionsTable)
+      .where(inArray(affiliateCommissionsTable.referralId, qualifying.map((r) => r.id)));
+
+    const existingReferralIds = new Set(existingRows.map((r) => r.referralId));
+
+    const toInsert = qualifying.map((r) => {
+      const commPlan = resolveCommPlan(r.referredUserPlan, r.tier);
+      const commAmount = resolveCommAmount(commPlan);
+      const commStatus = resolveCommStatus(commPlan);
+      return {
+        referrerId: r.referrerId,
+        referredUserId: r.referredUserId,
+        referralId: r.id,
+        plan: commPlan,
+        amount: commAmount.toFixed(2),
+        status: commStatus,
+      };
+    });
+
+    // Batch insert — ON CONFLICT DO NOTHING makes this idempotent.
+    await db
+      .insert(affiliateCommissionsTable)
+      .values(toInsert)
+      .onConflictDoNothing({ target: affiliateCommissionsTable.referralId });
+
+    const inserted = toInsert.filter((r) => !existingReferralIds.has(r.referralId)).length;
+    const skipped = existingReferralIds.size;
+
+    logger.info({ total: qualifying.length, inserted, skipped }, "Commission backfill complete");
+    res.json({
+      inserted,
+      skipped,
+      total: qualifying.length,
+      message: `Backfill complete. ${inserted} commission(s) created, ${skipped} already existed.`,
+    });
+  } catch (err) {
+    logger.error(err, "Commission backfill error");
+    res.status(500).json({ error: "Commission backfill failed" });
   }
 });
