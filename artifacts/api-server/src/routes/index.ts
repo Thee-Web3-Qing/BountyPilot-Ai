@@ -19,6 +19,7 @@ import { gamificationRouter } from "./gamification";
 import { checkinRouter } from "./checkin";
 import { notificationsRouter } from "./notifications";
 import { agentRouter } from "./agent";
+import { telegramRouter } from "./telegram";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use("/gamification", gamificationRouter);
 router.use("/checkin", checkinRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/agent", agentRouter);
+router.use("/telegram", telegramRouter);
 
 export default router;

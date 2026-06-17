@@ -6,4 +6,5 @@
 - [Google Auth](google-auth.md) — google-auth-library backend + @react-oauth/google frontend. GoogleAuthProvider fetches clientId from /api/auth/google-client-id at runtime. Conditionally renders GoogleLogin only when ready=true to avoid crash outside provider.
 - [Referral System](referral-system.md) — referral_code auto-generated on signup (4-char prefix + 6 hex). referrals table. Qualifies at 5+ referrals OR 1 active/lifetime. ?ref= param on signup/google flows. /referral page + leaderboard.
 - [Launchpad](launchpad.md) — Campaign hub with 4 isolated campaigns (crypto-50, free-access, yearly-challenge, lifetime-challenge). campaign_enrollments table. /launchpad/campaign/:slug detail pages.
+- [Telegram Alerts](telegram-alerts.md) — bot @Bountypilotaibot; one-time token connect flow; webhook at /api/telegram/webhook; fan-out on site updates; Connect UI in /settings.
 - **No Stripe** — payments are crypto-only via Dextopus.

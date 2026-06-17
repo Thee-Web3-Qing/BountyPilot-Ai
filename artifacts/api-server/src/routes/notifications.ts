@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { siteUpdatesTable, userNotificationsTable, usersTable } from "@workspace/db";
-import { eq, desc, and, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
+import { sendTelegramMessage } from "../lib/telegram.js";
 
 export const notificationsRouter = Router();
 
@@ -162,7 +163,10 @@ notificationsRouter.post("/updates", requireAuth, requireAdmin, async (req: Auth
       .returning();
 
     // Auto-create notification records for all users (so they show up as unread)
-    const allUsers = await db.select({ id: usersTable.id }).from(usersTable);
+    const allUsers = await db
+      .select({ id: usersTable.id, telegramChatId: usersTable.telegramChatId })
+      .from(usersTable);
+
     if (allUsers.length > 0) {
       await db.insert(userNotificationsTable).values(
         allUsers.map((u) => ({
@@ -171,6 +175,16 @@ notificationsRouter.post("/updates", requireAuth, requireAdmin, async (req: Auth
           read: false,
         }))
       );
+    }
+
+    // Fan-out Telegram alerts to connected users (fire-and-forget)
+    const telegramUsers = allUsers.filter((u) => u.telegramChatId);
+    if (telegramUsers.length > 0) {
+      const emoji = category === "feature" ? "✨" : category === "alert" ? "⚠️" : "🔔";
+      const msg = `${emoji} <b>${title}</b>\n\n${body}\n\n<i>— BountyPilot AI</i>`;
+      for (const u of telegramUsers) {
+        sendTelegramMessage(u.telegramChatId!, msg).catch(() => {});
+      }
     }
 
     res.json({ ok: true, update: inserted });

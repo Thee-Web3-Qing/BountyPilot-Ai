@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { startCrawlerCron } from "./lib/cron.js";
 import { db, referralsTable, campaignEnrollmentsTable, siteUpdatesTable } from "@workspace/db";
 import { sql, eq } from "drizzle-orm";
+import { registerWebhook } from "./lib/telegram.js";
 
 const rawPort = process.env["PORT"];
 
@@ -116,4 +117,6 @@ app.listen(port, async (err) => {
   await seedNotifications();
   await backfillCampaignEnrollments();
   startCrawlerCron();
+  // Register Telegram webhook (production URL)
+  registerWebhook("https://bountypilot.xyz/api/telegram/webhook").catch(() => {});
 });

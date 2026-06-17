@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Zap, Settings2, ShieldCheck, Send, ExternalLink, Unlink } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { API_BASE } from "@/lib/api";
 
@@ -16,12 +16,31 @@ interface LLMStatus {
   novus?: { connected: boolean; serverInfo?: { name: string; version: string } } | null;
 }
 
+interface TelegramStatus {
+  enabled: boolean;
+  connected: boolean;
+  botUsername: string;
+}
+
+function authHeaders() {
+  const token = localStorage.getItem("bountypilot_token");
+  return { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
 export function Settings() {
   const { user, refreshUser } = useAuth();
   const [status, setStatus] = useState<LLMStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [bootstrapState, setBootstrapState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [bootstrapMsg, setBootstrapMsg] = useState("");
+
+  // Telegram state
+  const [tgStatus, setTgStatus] = useState<TelegramStatus | null>(null);
+  const [tgLoading, setTgLoading] = useState(true);
+  const [tgDeepLink, setTgDeepLink] = useState<string | null>(null);
+  const [tgConnecting, setTgConnecting] = useState(false);
+  const [tgDisconnecting, setTgDisconnecting] = useState(false);
+
   async function runBootstrap() {
     setBootstrapState("loading");
     try {
@@ -41,6 +60,15 @@ export function Settings() {
     }
   }
 
+  const fetchTgStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/telegram/status`, { headers: authHeaders() });
+      if (res.ok) setTgStatus(await res.json());
+    } finally {
+      setTgLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetch(`${API_BASE}/settings/status`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("bountypilot_token")}` },
@@ -48,7 +76,49 @@ export function Settings() {
       .then((r) => r.json())
       .then(setStatus)
       .finally(() => setLoading(false));
-  }, []);
+
+    fetchTgStatus();
+  }, [fetchTgStatus]);
+
+  async function connectTelegram() {
+    setTgConnecting(true);
+    setTgDeepLink(null);
+    try {
+      const res = await fetch(`${API_BASE}/telegram/connect`, { method: "POST", headers: authHeaders() });
+      const data = await res.json();
+      if (res.ok) {
+        setTgDeepLink(data.deepLink);
+        // Poll for connection every 3s for up to 2 minutes
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts++;
+          try {
+            const sr = await fetch(`${API_BASE}/telegram/status`, { headers: authHeaders() });
+            const sd = await sr.json();
+            if (sd.connected) {
+              setTgStatus(sd);
+              setTgDeepLink(null);
+              clearInterval(poll);
+            }
+          } catch {}
+          if (attempts >= 40) clearInterval(poll);
+        }, 3000);
+      }
+    } finally {
+      setTgConnecting(false);
+    }
+  }
+
+  async function disconnectTelegram() {
+    setTgDisconnecting(true);
+    try {
+      await fetch(`${API_BASE}/telegram/disconnect`, { method: "DELETE", headers: authHeaders() });
+      await fetchTgStatus();
+      setTgDeepLink(null);
+    } finally {
+      setTgDisconnecting(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -60,12 +130,96 @@ export function Settings() {
         </div>
       </div>
 
+      {/* Telegram Notifications */}
+      <div className="flex flex-col gap-5">
+        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Telegram Alerts</p>
+
+        {tgLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground font-mono text-xs py-4">
+            <Loader2 className="w-4 h-4 animate-spin" /> Checking...
+          </div>
+        ) : !tgStatus?.enabled ? (
+          <Card className="border-border bg-card">
+            <CardContent className="p-5">
+              <p className="font-mono text-xs text-muted-foreground">Telegram integration is not configured on this server.</p>
+            </CardContent>
+          </Card>
+        ) : tgStatus.connected ? (
+          <Card className="border-green-500/30 bg-green-500/5">
+            <CardContent className="p-5 flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <Send className="w-5 h-5 text-green-400 shrink-0" />
+                <div>
+                  <p className="font-mono text-sm font-bold text-green-400">CONNECTED</p>
+                  <p className="font-mono text-xs text-muted-foreground mt-0.5">You'll receive alerts for new opportunities and platform updates via <b>@{tgStatus.botUsername}</b>.</p>
+                </div>
+              </div>
+              <button
+                onClick={disconnectTelegram}
+                disabled={tgDisconnecting}
+                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wider px-3 py-1.5 rounded-sm border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors shrink-0"
+              >
+                {tgDisconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlink className="w-3 h-3" />}
+                Disconnect
+              </button>
+            </CardContent>
+          </Card>
+        ) : tgDeepLink ? (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <Send className="w-5 h-5 text-primary shrink-0" />
+                <div>
+                  <p className="font-mono text-sm font-bold text-primary">WAITING FOR CONNECTION</p>
+                  <p className="font-mono text-xs text-muted-foreground mt-0.5">Open the link below in Telegram and tap <b>Start</b>. This page will update automatically.</p>
+                </div>
+              </div>
+              <a
+                href={tgDeepLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 font-mono text-sm font-bold uppercase tracking-wider px-4 py-3 rounded-sm bg-primary text-black hover:bg-primary/90 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open in Telegram
+              </a>
+              <div className="flex items-center gap-2 text-muted-foreground font-mono text-xs">
+                <Loader2 className="w-3 h-3 animate-spin" /> Waiting for you to connect...
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border bg-card">
+            <CardContent className="p-5 flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <Send className="w-5 h-5 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="font-mono text-sm font-bold text-foreground">NOT CONNECTED</p>
+                  <p className="font-mono text-xs text-muted-foreground mt-0.5">Get instant alerts for new "For You" opportunities and platform updates on Telegram.</p>
+                </div>
+              </div>
+              <button
+                onClick={connectTelegram}
+                disabled={tgConnecting}
+                className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wider px-4 py-2 rounded-sm bg-primary text-black hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0 font-bold"
+              >
+                {tgConnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                Connect Telegram
+              </button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* AI Provider Status */}
       {loading ? (
         <div className="flex items-center gap-3 text-muted-foreground font-mono text-sm py-10">
           <Loader2 className="w-5 h-5 animate-spin" /> Fetching status...
         </div>
       ) : status ? (
         <div className="flex flex-col gap-5">
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">AI Provider</p>
+
           <Card className={`border ${status.status === "active" || status.status === "novus_active" ? "border-green-500/30 bg-green-500/5" : "border-yellow-500/30 bg-yellow-500/5"}`}>
             <CardContent className="p-5 flex items-center gap-4">
               {status.status === "active" || status.status === "novus_active"

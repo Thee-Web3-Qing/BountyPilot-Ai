@@ -21,6 +21,9 @@ export const usersTable = pgTable("users", {
   loginCodeExpires: timestamp("login_code_expires", { withTimezone: true }),
   points: integer("points").notNull().default(0),
   lastRedeemedAt: timestamp("last_redeemed_at", { withTimezone: true }),
+  telegramChatId: text("telegram_chat_id"),
+  telegramConnectToken: text("telegram_connect_token"),
+  telegramConnectTokenExpires: timestamp("telegram_connect_token_expires", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
