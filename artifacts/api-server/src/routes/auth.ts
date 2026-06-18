@@ -195,7 +195,7 @@ authRouter.get("/google-client-id", (_req, res) => {
 // Privy tokens are verified server-side against the Privy API.
 authRouter.post("/privy", async (req, res) => {
   try {
-    const { accessToken, refCode } = req.body as { accessToken?: string; refCode?: string };
+    const { accessToken, refCode, emailOverride } = req.body as { accessToken?: string; refCode?: string; emailOverride?: string };
     if (!accessToken) {
       res.status(400).json({ error: "accessToken is required" });
       return;
@@ -238,9 +238,16 @@ authRouter.post("/privy", async (req, res) => {
     const googleAccount = linkedAccounts.find((a) => a.type === "google_oauth");
     const walletAccount = linkedAccounts.find((a) => a.type === "wallet");
 
-    const email = (emailAccount?.address as string) ?? (googleAccount?.email as string) ?? null;
+    const emailFromToken = (emailAccount?.address as string) ?? (googleAccount?.email as string) ?? null;
+    const email = emailOverride?.trim().toLowerCase() || emailFromToken;
     const walletAddress = (walletAccount?.address as string) ?? null;
     const privyId = payload.sub;
+
+    // If no email at all (e.g. X/Twitter without email permission), ask the client to supply one
+    if (!email) {
+      res.status(200).json({ needsEmailLink: true });
+      return;
+    }
 
     // Upsert user: look up by privyId, then email, then create new
     let [user] = await db.select().from(usersTable).where(eq(usersTable.privyId, privyId));

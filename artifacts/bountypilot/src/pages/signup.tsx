@@ -24,45 +24,51 @@ export function Signup() {
   const { ready: googleReady } = useGoogleAuth();
   const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser, getAccessToken, ready: privyReady } = usePrivy();
   const [privyLoading, setPrivyLoading] = useState(false);
+  const [privyNeedsEmail, setPrivyNeedsEmail] = useState(false);
+  const [privyPendingToken, setPrivyPendingToken] = useState<string | null>(null);
+  const [privyEmailInput, setPrivyEmailInput] = useState("");
   const [, navigate] = useLocation();
   const search = useSearch();
   const urlRefCode = new URLSearchParams(search).get("ref") ?? "";
   const [refCode, setRefCode] = useState(urlRefCode);
 
+  const finishPrivyExchange = async (accessToken: string, emailOverride?: string) => {
+    setPrivyLoading(true);
+    try {
+      const resp = await fetch("/api/auth/privy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken, refCode: refCode.trim() || undefined, emailOverride }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        setError(data.error || "Privy sign-in failed");
+        return;
+      }
+      if (data.needsEmailLink) {
+        setPrivyPendingToken(accessToken);
+        setPrivyNeedsEmail(true);
+        return;
+      }
+      const u = data.user;
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+      setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+      await refreshUser();
+      identifyPendo(String(u.id), u.email, u.plan);
+      trackPendo("UserSignedUpPrivy", { plan: u.plan });
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Privy sign-in failed");
+    } finally {
+      setPrivyLoading(false);
+    }
+  };
+
   // After Privy authenticates, exchange for our JWT
   useEffect(() => {
     if (!privyAuthenticated || !privyUser) return;
-    const doExchange = async () => {
-      setPrivyLoading(true);
-      try {
-        const accessToken = await getAccessToken();
-        if (!accessToken) return;
-        const resp = await fetch("/api/auth/privy", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ accessToken, refCode: refCode.trim() || undefined }),
-        });
-        if (!resp.ok) {
-          const d = await resp.json().catch(() => ({}));
-          setError(d.error || "Privy sign-in failed");
-          return;
-        }
-        const data = await resp.json();
-        const u = data.user;
-        localStorage.setItem(TOKEN_KEY, data.token);
-        localStorage.setItem(USER_KEY, JSON.stringify(u));
-        setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
-        await refreshUser();
-        identifyPendo(String(u.id), u.email, u.plan);
-        trackPendo("UserSignedUpPrivy", { plan: u.plan });
-        navigate("/");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Privy sign-in failed");
-      } finally {
-        setPrivyLoading(false);
-      }
-    };
-    doExchange();
+    getAccessToken().then((t) => { if (t) finishPrivyExchange(t); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [privyAuthenticated, privyUser?.id]);
 
@@ -116,8 +122,43 @@ export function Signup() {
                 </div>
               )}
 
+              {/* Email linking prompt — shown when social login has no email */}
+              {privyNeedsEmail && (
+                <div className="flex flex-col gap-3 border border-primary/30 bg-primary/5 rounded-sm p-4">
+                  <p className="font-mono text-xs uppercase tracking-wider text-primary">Link your email</p>
+                  <p className="text-sm text-muted-foreground">Your social account didn't share an email. Enter one to link to your existing account or create a new one.</p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!privyEmailInput.trim() || !privyPendingToken) return;
+                      setPrivyNeedsEmail(false);
+                      finishPrivyExchange(privyPendingToken, privyEmailInput.trim());
+                    }}
+                    className="flex flex-col gap-2"
+                  >
+                    <Input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={privyEmailInput}
+                      onChange={(e) => setPrivyEmailInput(e.target.value)}
+                      className="font-mono text-sm"
+                      autoFocus
+                      required
+                    />
+                    <div className="flex gap-2">
+                      <Button type="submit" className="flex-1 font-mono uppercase tracking-wider text-xs" disabled={privyLoading}>
+                        {privyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continue"}
+                      </Button>
+                      <Button type="button" variant="outline" className="font-mono uppercase tracking-wider text-xs" onClick={() => { setPrivyNeedsEmail(false); setPrivyPendingToken(null); setPrivyEmailInput(""); }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
               {/* Privy — social login + wallet */}
-              {privyReady && (
+              {privyReady && !privyNeedsEmail && (
                 <Button
                   type="button"
                   variant="outline"
