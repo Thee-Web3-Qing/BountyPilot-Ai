@@ -742,16 +742,6 @@ const PLATFORMS: PlatformConfig[] = [
     maxBounties: 5,
   },
   {
-    name: "Klout",
-    listingUrl: "https://klout.gg",
-    fetchLinks: (html, base) => {
-      const hints = genericLinkExtractor(html, base);
-      if (hints.length === 0) return [{ url: "https://klout.gg" }];
-      return hints;
-    },
-    maxBounties: 5,
-  },
-  {
     name: "Arena Social",
     listingUrl: "https://arena.social",
     fetchLinks: genericLinkExtractor,
@@ -766,12 +756,6 @@ const PLATFORMS: PlatformConfig[] = [
   {
     name: "WPL Earn",
     listingUrl: "https://thewp1.xyz",
-    fetchLinks: genericLinkExtractor,
-    maxBounties: 5,
-  },
-  {
-    name: "Rova",
-    listingUrl: "https://rova.xyz",
     fetchLinks: genericLinkExtractor,
     maxBounties: 5,
   },

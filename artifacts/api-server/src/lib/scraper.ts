@@ -268,6 +268,64 @@ function deepFind(obj: unknown, keys: string[]): string | null {
   return null;
 }
 
+// First Dollar — fetch bounty by slug from listings API (pure CSR, no useful HTML)
+async function tryFirstDollarAPI(url: string): Promise<Partial<ScrapedBounty> | null> {
+  try {
+    // Extract slug from /company/{company}/bounty/{slug} or /bounties/{id}
+    const slug =
+      url.match(/\/company\/[^/]+\/bounty\/([^/?#]+)/)?.[1] ??
+      url.match(/\/bounties\/([^/?#]+)/)?.[1];
+    if (!slug) return null;
+
+    // Fetch listing page to find by slug (no direct slug endpoint)
+    const resp = await fetch("https://app.firstdollar.money/api/bounties?limit=100", {
+      headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) return null;
+    const listData = await resp.json() as { success?: boolean; data?: Array<Record<string, unknown>> };
+    const items = listData.data || [];
+    const bounty = items.find((b) => b.slug === slug);
+    if (!bounty) return null;
+
+    // Fetch detailed data by ID if available
+    let detail: Record<string, unknown> = bounty;
+    if (bounty.id) {
+      try {
+        const detailResp = await fetch(`https://app.firstdollar.money/api/bounties/${bounty.id as string}`, {
+          headers: { "Accept": "application/json" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (detailResp.ok) {
+          const dData = await detailResp.json() as { success?: boolean; data?: Record<string, unknown> };
+          if (dData.data) detail = dData.data;
+        }
+      } catch {}
+    }
+
+    const prize = detail.totalPrizePool ?? bounty.totalPrizePool ?? detail.firstPlacePrize ?? bounty.firstPlacePrize;
+    const rewardAmount = prize != null ? String(prize) : null;
+    const currency = ((detail.paymentToken ?? bounty.paymentToken) as string | undefined) || "USDC";
+    const dl = (detail.submissionDeadline ?? detail.applicationDeadline ?? bounty.submissionDeadline) as string | undefined;
+    let deadline: string | null = null;
+    if (dl) { try { deadline = new Date(dl).toISOString().split("T")[0]; } catch {} }
+
+    const company = bounty.company as Record<string, unknown> | undefined;
+    const projectName = (company?.name as string | undefined) || (detail.companyName as string | undefined);
+    const title = (bounty.title ?? detail.title) as string | undefined;
+
+    // Build a description from questions / prize info so looksLikeBountyPage passes
+    const questions = (detail.questions ?? bounty.questions) as string[] | undefined;
+    const description = questions && questions.length > 0
+      ? `Submit to earn ${rewardAmount || ""} ${currency}. Task: ${questions.slice(0, 2).join("; ")}`
+      : `Earn ${rewardAmount || ""} ${currency} by completing this bounty on First Dollar.`;
+
+    return { title, description, rewardAmount, rewardCurrency: currency.toUpperCase(), deadline, projectName };
+  } catch {
+    return null;
+  }
+}
+
 // Superteam Earn has a public API for listing details
 async function trySuperteamAPI(url: string): Promise<Partial<ScrapedBounty> | null> {
   try {
@@ -511,6 +569,8 @@ export async function scrapeBounty(
   let apiData: Partial<ScrapedBounty> | null = null;
   if (platform === "Superteam Earn") {
     apiData = await trySuperteamAPI(url);
+  } else if (platform === "First Dollar") {
+    apiData = await tryFirstDollarAPI(url);
   }
 
   // Try platform-specific page extraction for rich structured content
