@@ -9,7 +9,7 @@ const USER_KEY = "bountypilot_user";
 const API_BASE = "/api";
 
 export function usePrivyLogin() {
-  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser, ready } = usePrivy();
+  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser, ready, getAccessToken } = usePrivy();
   const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +35,7 @@ export function usePrivyLogin() {
     setError(null);
     try {
       await privyLogin();
-      // After Privy modal resolves, wait for authenticated state + access token
-      // The calling component should watch `authenticated` and call exchangeWithCurrentUser
+      // After Privy modal resolves, authenticated state updates → call exchangeWithCurrentUser
     } finally {
       setLoading(false);
     }
@@ -47,14 +46,16 @@ export function usePrivyLogin() {
     setLoading(true);
     setError(null);
     try {
-      // Get Privy access token via the client SDK
-      // @ts-ignore — getAccessToken is available on the privy client
-      const { getAccessToken } = await import("@privy-io/react-auth");
-      // Fall back: use privyUser.id as a stand-in if access token not available
+      // Get a fresh Privy access token (RS256 JWT) from the SDK
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error("Could not obtain Privy access token. Please try again.");
+      }
+
       const resp = await fetch(`${API_BASE}/auth/privy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ privyUserId: privyUser.id, refCode }),
+        body: JSON.stringify({ accessToken, refCode }),
       });
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
@@ -76,7 +77,7 @@ export function usePrivyLogin() {
     } finally {
       setLoading(false);
     }
-  }, [authenticated, privyUser, refreshUser]);
+  }, [authenticated, privyUser, getAccessToken, refreshUser]);
 
-  return { loginWithPrivy, exchangeWithCurrentUser, loading, error, ready, authenticated, privyUser };
+  return { loginWithPrivy, exchangeWithCurrentUser, exchangeToken, loading, error, ready, authenticated, privyUser };
 }
