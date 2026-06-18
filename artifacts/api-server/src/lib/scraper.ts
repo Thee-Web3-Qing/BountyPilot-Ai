@@ -799,7 +799,7 @@ function extractProgrammingLanguages(text: string): string | null {
     "Java", "C#", "C++", "C", "Ruby", "PHP", "Dart", "Move", "Cairo", "Vyper", "WASM", "R", "Scala"];
   const t = text.toLowerCase();
   const found = langs.filter(l => {
-    const lower = l.toLowerCase();
+    const lower = l.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // Match as word boundary to avoid false positives
     return new RegExp(`\\b${lower}\\b`).test(t);
   });
