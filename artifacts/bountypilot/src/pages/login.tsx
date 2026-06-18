@@ -1,25 +1,70 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Crosshair, Loader2, AlertCircle } from "lucide-react";
+import { Crosshair, Loader2, AlertCircle, Wallet } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { GoogleLogin } from "@react-oauth/google";
 import { useGoogleAuth } from "@/contexts/google-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { identifyPendo, trackPendo } from "@/lib/pendo";
+
+const TOKEN_KEY = "bountypilot_token";
+const USER_KEY = "bountypilot_user";
 
 export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login, loginGoogle, isLoading } = useAuth();
+  const { login, loginGoogle, isLoading, refreshUser } = useAuth();
   const { ready: googleReady } = useGoogleAuth();
+  const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser, getAccessToken, ready: privyReady } = usePrivy();
+  const [privyLoading, setPrivyLoading] = useState(false);
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const refCode = params.get("ref") ?? undefined;
   const redirectTo = params.get("redirect") ?? "/";
+
+  // After Privy authenticates, exchange for our JWT
+  useEffect(() => {
+    if (!privyAuthenticated || !privyUser) return;
+    const doExchange = async () => {
+      setPrivyLoading(true);
+      try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+        const resp = await fetch("/api/auth/privy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken, refCode }),
+        });
+        if (!resp.ok) {
+          const d = await resp.json().catch(() => ({}));
+          setError(d.error || "Privy sign-in failed");
+          return;
+        }
+        const data = await resp.json();
+        const u = data.user;
+        localStorage.setItem(TOKEN_KEY, data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(u));
+        setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+        await refreshUser();
+        identifyPendo(String(u.id), u.email, u.plan);
+        trackPendo("UserLoggedInPrivy", { plan: u.plan });
+        navigate(redirectTo);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Privy sign-in failed");
+      } finally {
+        setPrivyLoading(false);
+      }
+    };
+    doExchange();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privyAuthenticated, privyUser?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +115,22 @@ export function Login() {
                 </div>
               )}
 
+              {/* Privy — social login + wallet */}
+              {privyReady && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full font-mono uppercase tracking-wider border-primary/40 text-primary hover:bg-primary/10 flex items-center gap-2 justify-center"
+                  onClick={() => privyLogin()}
+                  disabled={privyLoading}
+                >
+                  {privyLoading
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Wallet className="w-4 h-4" />}
+                  {privyLoading ? "Signing in…" : "Continue with Privy"}
+                </Button>
+              )}
+
               {/* Google Sign In */}
               {googleReady && (
                 <>
@@ -83,12 +144,15 @@ export function Login() {
                       width="320"
                     />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-border" />
-                    <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
                 </>
+              )}
+
+              {(privyReady || googleReady) && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
               )}
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -190,6 +190,131 @@ authRouter.get("/google-client-id", (_req, res) => {
   res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
 });
 
+// POST /auth/privy — exchange a Privy access token for a BountyPilot JWT
+// Privy tokens are verified server-side against the Privy API.
+authRouter.post("/privy", async (req, res) => {
+  try {
+    const { accessToken, refCode } = req.body as { accessToken?: string; refCode?: string };
+    if (!accessToken) {
+      res.status(400).json({ error: "accessToken is required" });
+      return;
+    }
+
+    const privyAppId = process.env.VITE_PRIVY_APP_ID;
+    if (!privyAppId) {
+      res.status(503).json({ error: "Privy not configured" });
+      return;
+    }
+
+    // Verify the Privy access token via Privy's /api/v1/users/me endpoint
+    type PrivyUserResponse = { id: string; linked_accounts?: Array<Record<string, unknown>> };
+    let privyUser: PrivyUserResponse | null = null;
+    try {
+      const verifyResp = await fetch("https://auth.privy.io/api/v1/users/me", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "privy-app-id": privyAppId,
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!verifyResp.ok) {
+        res.status(401).json({ error: "Invalid Privy token" });
+        return;
+      }
+      privyUser = await verifyResp.json() as PrivyUserResponse;
+    } catch {
+      res.status(401).json({ error: "Could not verify Privy token" });
+      return;
+    }
+
+    if (!privyUser?.id) {
+      res.status(401).json({ error: "Invalid Privy user" });
+      return;
+    }
+
+    // Extract linked email from Privy's linked_accounts array
+    const linkedAccounts = privyUser.linked_accounts ?? [];
+    const emailAccount = linkedAccounts.find((a) => a.type === "email");
+    const googleAccount = linkedAccounts.find((a) => a.type === "google_oauth");
+    const walletAccount = linkedAccounts.find((a) => a.type === "wallet");
+
+    const email = (emailAccount?.address as string) ?? (googleAccount?.email as string) ?? null;
+    const walletAddress = (walletAccount?.address as string) ?? null;
+    const privyId = privyUser.id;
+
+    // Upsert user: look up by privyId, then email, then create new
+    let [user] = await db.select().from(usersTable).where(eq(usersTable.privyId, privyId));
+
+    if (!user && email) {
+      const [byEmail] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
+      if (byEmail) {
+        [user] = await db
+          .update(usersTable)
+          .set({ privyId, walletAddress: walletAddress ?? byEmail.walletAddress, updatedAt: new Date() })
+          .where(eq(usersTable.id, byEmail.id))
+          .returning();
+        logger.info({ userId: user.id }, "Linked Privy account to existing user");
+      }
+    }
+
+    if (!user) {
+      const HACKATHON_DEADLINE = new Date("2026-08-07T20:00:00Z");
+      const now = new Date();
+      const trialEnd = now < HACKATHON_DEADLINE ? HACKATHON_DEADLINE : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const baseEmail = email ?? `${privyId}@privy.user`;
+      const baseUsername = baseEmail.split("@")[0].replace(/[^a-z0-9_]/g, "").slice(0, 20) || "user";
+      let username = baseUsername;
+      let suffix = 1;
+      while (true) {
+        const [taken] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, username));
+        if (!taken) break;
+        username = `${baseUsername}${suffix++}`;
+      }
+
+      let referralCode = generateReferralCode(username);
+      const codeConflict = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, referralCode));
+      if (codeConflict.length > 0) referralCode = `${generateReferralCode(username)}_${randomBytes(2).toString("hex")}`;
+
+      [user] = await db
+        .insert(usersTable)
+        .values({
+          email: baseEmail.toLowerCase(),
+          username,
+          passwordHash: null,
+          privyId,
+          walletAddress: walletAddress ?? null,
+          plan: "trial",
+          trialEndsAt: trialEnd,
+          referralCode,
+        })
+        .returning();
+      await db.insert(userProfilesTable).values({ userId: user.id });
+      await recordReferral(refCode, user.id);
+      logger.info({ userId: user.id }, "New user created via Privy");
+    }
+
+    const token = signToken({ userId: user.id, email: user.email, username: user.username });
+    logger.info({ userId: user.id }, "User signed in via Privy");
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        plan: user.plan,
+        trialEndsAt: user.trialEndsAt,
+        subscriptionEndsAt: user.subscriptionEndsAt,
+        isAdmin: user.isAdmin,
+        walletAddress: user.walletAddress,
+      },
+    });
+  } catch (err) {
+    logger.error(err, "Privy auth error");
+    res.status(500).json({ error: "Privy sign-in failed" });
+  }
+});
+
 // POST /auth/login
 authRouter.post("/login", async (req, res) => {
   try {

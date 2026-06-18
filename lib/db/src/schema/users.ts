@@ -8,6 +8,8 @@ export const usersTable = pgTable("users", {
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash"),
   googleId: text("google_id").unique(),
+  privyId: text("privy_id").unique(),
+  walletAddress: text("wallet_address"),
   referralCode: text("referral_code").unique(),
   referredBy: integer("referred_by"),
   plan: text("plan").notNull().default("pending"),

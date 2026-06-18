@@ -1,25 +1,70 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Crosshair, Loader2, AlertCircle, Gift } from "lucide-react";
+import { Crosshair, Loader2, AlertCircle, Gift, Wallet } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
 import { GoogleLogin } from "@react-oauth/google";
 import { useGoogleAuth } from "@/contexts/google-auth";
+import { usePrivy } from "@privy-io/react-auth";
+import { setAuthTokenGetter } from "@workspace/api-client-react";
+import { identifyPendo, trackPendo } from "@/lib/pendo";
+
+const TOKEN_KEY = "bountypilot_token";
+const USER_KEY = "bountypilot_user";
 
 export function Signup() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { signup, loginGoogle, isLoading } = useAuth();
+  const { signup, loginGoogle, isLoading, refreshUser } = useAuth();
   const { ready: googleReady } = useGoogleAuth();
+  const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser, getAccessToken, ready: privyReady } = usePrivy();
+  const [privyLoading, setPrivyLoading] = useState(false);
   const [, navigate] = useLocation();
   const search = useSearch();
   const urlRefCode = new URLSearchParams(search).get("ref") ?? "";
   const [refCode, setRefCode] = useState(urlRefCode);
+
+  // After Privy authenticates, exchange for our JWT
+  useEffect(() => {
+    if (!privyAuthenticated || !privyUser) return;
+    const doExchange = async () => {
+      setPrivyLoading(true);
+      try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) return;
+        const resp = await fetch("/api/auth/privy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken, refCode: refCode.trim() || undefined }),
+        });
+        if (!resp.ok) {
+          const d = await resp.json().catch(() => ({}));
+          setError(d.error || "Privy sign-in failed");
+          return;
+        }
+        const data = await resp.json();
+        const u = data.user;
+        localStorage.setItem(TOKEN_KEY, data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(u));
+        setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+        await refreshUser();
+        identifyPendo(String(u.id), u.email, u.plan);
+        trackPendo("UserSignedUpPrivy", { plan: u.plan });
+        navigate("/");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Privy sign-in failed");
+      } finally {
+        setPrivyLoading(false);
+      }
+    };
+    doExchange();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privyAuthenticated, privyUser?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,25 +116,42 @@ export function Signup() {
                 </div>
               )}
 
+              {/* Privy — social login + wallet */}
+              {privyReady && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full font-mono uppercase tracking-wider border-primary/40 text-primary hover:bg-primary/10 flex items-center gap-2 justify-center"
+                  onClick={() => privyLogin()}
+                  disabled={privyLoading}
+                >
+                  {privyLoading
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Wallet className="w-4 h-4" />}
+                  {privyLoading ? "Signing up…" : "Continue with Privy"}
+                </Button>
+              )}
+
               {/* Google Sign Up */}
               {googleReady && (
-                <>
-                  <div className="flex justify-center">
-                    <GoogleLogin
-                      onSuccess={(res) => { if (res.credential) handleGoogle(res.credential); }}
-                      onError={() => setError("Google sign-up failed — if you're on the dev preview, this domain may not yet be authorized. Use email/password instead.")}
-                      theme="filled_black"
-                      shape="rectangular"
-                      text="signup_with"
-                      width="320"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-border" />
-                    <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
-                </>
+                <div className="flex justify-center">
+                  <GoogleLogin
+                    onSuccess={(res) => { if (res.credential) handleGoogle(res.credential); }}
+                    onError={() => setError("Google sign-up failed — if you're on the dev preview, this domain may not yet be authorized. Use email/password instead.")}
+                    theme="filled_black"
+                    shape="rectangular"
+                    text="signup_with"
+                    width="320"
+                  />
+                </div>
+              )}
+
+              {(privyReady || googleReady) && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
               )}
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
