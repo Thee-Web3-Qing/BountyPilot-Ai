@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
+import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { db } from "@workspace/db";
 import { usersTable, userProfilesTable, referralsTable } from "@workspace/db";
@@ -201,46 +202,45 @@ authRouter.post("/privy", async (req, res) => {
     }
 
     const privyAppId = process.env.VITE_PRIVY_APP_ID;
-    if (!privyAppId) {
+    const privyAppSecret = process.env.PRIVY_APP_SECRET;
+    if (!privyAppId || !privyAppSecret) {
       res.status(503).json({ error: "Privy not configured" });
       return;
     }
 
-    // Verify the Privy access token via Privy's /api/v1/users/me endpoint
-    type PrivyUserResponse = { id: string; linked_accounts?: Array<Record<string, unknown>> };
-    let privyUser: PrivyUserResponse | null = null;
+    // Verify Privy access token locally using App Secret (no outbound HTTP call)
+    type PrivyTokenPayload = {
+      sub: string; // privy DID, e.g. "did:privy:xxxx"
+      iss: string;
+      aud: string;
+      linked_accounts?: Array<Record<string, unknown>>;
+    };
+    let payload: PrivyTokenPayload;
     try {
-      const verifyResp = await fetch("https://auth.privy.io/api/v1/users/me", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "privy-app-id": privyAppId,
-        },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!verifyResp.ok) {
-        res.status(401).json({ error: "Invalid Privy token" });
-        return;
-      }
-      privyUser = await verifyResp.json() as PrivyUserResponse;
+      payload = jwt.verify(accessToken, privyAppSecret, {
+        algorithms: ["HS256"],
+        audience: privyAppId,
+        issuer: "privy.io",
+      }) as PrivyTokenPayload;
     } catch {
-      res.status(401).json({ error: "Could not verify Privy token" });
+      res.status(401).json({ error: "Invalid Privy token" });
       return;
     }
 
-    if (!privyUser?.id) {
-      res.status(401).json({ error: "Invalid Privy user" });
+    if (!payload.sub) {
+      res.status(401).json({ error: "Invalid Privy token: missing subject" });
       return;
     }
 
-    // Extract linked email from Privy's linked_accounts array
-    const linkedAccounts = privyUser.linked_accounts ?? [];
+    // Extract linked accounts from the JWT payload
+    const linkedAccounts = (payload.linked_accounts ?? []) as Array<Record<string, unknown>>;
     const emailAccount = linkedAccounts.find((a) => a.type === "email");
     const googleAccount = linkedAccounts.find((a) => a.type === "google_oauth");
     const walletAccount = linkedAccounts.find((a) => a.type === "wallet");
 
     const email = (emailAccount?.address as string) ?? (googleAccount?.email as string) ?? null;
     const walletAddress = (walletAccount?.address as string) ?? null;
-    const privyId = privyUser.id;
+    const privyId = payload.sub;
 
     // Upsert user: look up by privyId, then email, then create new
     let [user] = await db.select().from(usersTable).where(eq(usersTable.privyId, privyId));
