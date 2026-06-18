@@ -203,37 +203,48 @@ authRouter.post("/privy", async (req, res) => {
 
     const privyAppId = process.env.VITE_PRIVY_APP_ID;
     const privyAppSecret = process.env.PRIVY_APP_SECRET;
-    if (!privyAppId || !privyAppSecret) {
+    if (!privyAppId) {
       res.status(503).json({ error: "Privy not configured" });
       return;
     }
 
-    // Verify Privy access token locally using App Secret (no outbound HTTP call)
-    type PrivyTokenPayload = {
-      sub: string; // privy DID, e.g. "did:privy:xxxx"
-      iss: string;
-      aud: string;
+    // Verify the Privy access token and get user data.
+    // Privy v3+ uses RS256 (asymmetric) tokens — we verify by calling Privy's API.
+    // The App Secret authenticates our server-to-server call.
+    type PrivyUserResponse = {
+      id: string;
       linked_accounts?: Array<Record<string, unknown>>;
     };
-    let payload: PrivyTokenPayload;
+    let privyUser: PrivyUserResponse;
     try {
-      payload = jwt.verify(accessToken, privyAppSecret, {
-        algorithms: ["HS256"],
-        audience: privyAppId,
-        issuer: "privy.io",
-      }) as PrivyTokenPayload;
-    } catch {
-      res.status(401).json({ error: "Invalid Privy token" });
+      // Privy v3 tokens are RS256 — verify by calling /api/v1/users/me.
+      // The App Secret is sent as privy-app-secret for authenticated server calls.
+      const verifyResp = await fetch("https://auth.privy.io/api/v1/users/me", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "privy-app-id": privyAppId,
+          ...(privyAppSecret ? { "privy-app-secret": privyAppSecret } : {}),
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!verifyResp.ok) {
+        logger.warn({ status: verifyResp.status }, "Privy token verification failed");
+        res.status(401).json({ error: "Invalid Privy token" });
+        return;
+      }
+      privyUser = await verifyResp.json() as PrivyUserResponse;
+    } catch (err) {
+      logger.error(err, "Privy token verification error");
+      res.status(401).json({ error: "Could not verify Privy token" });
       return;
     }
 
-    if (!payload.sub) {
-      res.status(401).json({ error: "Invalid Privy token: missing subject" });
+    if (!privyUser?.id) {
+      res.status(401).json({ error: "Invalid Privy token: missing user ID" });
       return;
     }
 
-    // Extract linked accounts from the JWT payload
-    const linkedAccounts = (payload.linked_accounts ?? []) as Array<Record<string, unknown>>;
+    const linkedAccounts = (privyUser.linked_accounts ?? []) as Array<Record<string, unknown>>;
     const emailAccount = linkedAccounts.find((a) => a.type === "email");
     const googleAccount = linkedAccounts.find((a) => a.type === "google_oauth");
     const walletAccount = linkedAccounts.find((a) => a.type === "wallet");
@@ -241,7 +252,7 @@ authRouter.post("/privy", async (req, res) => {
     const emailFromToken = (emailAccount?.address as string) ?? (googleAccount?.email as string) ?? null;
     const email = emailOverride?.trim().toLowerCase() || emailFromToken;
     const walletAddress = (walletAccount?.address as string) ?? null;
-    const privyId = payload.sub;
+    const privyId = privyUser.id;
 
     // If no email at all (e.g. X/Twitter without email permission), ask the client to supply one
     if (!email) {
