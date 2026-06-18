@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Crosshair, Loader2, AlertCircle, Gift, Wallet } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
-import { GoogleLogin } from "@react-oauth/google";
-import { useGoogleAuth } from "@/contexts/google-auth";
 import { usePrivy } from "@privy-io/react-auth";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { identifyPendo, trackPendo } from "@/lib/pendo";
@@ -20,8 +18,7 @@ export function Signup() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { signup, loginGoogle, isLoading, refreshUser } = useAuth();
-  const { ready: googleReady } = useGoogleAuth();
+  const { signup, isLoading, refreshUser } = useAuth();
   const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser, getAccessToken, ready: privyReady } = usePrivy();
   const [privyLoading, setPrivyLoading] = useState(false);
   const [privyNeedsEmail, setPrivyNeedsEmail] = useState(false);
@@ -81,16 +78,6 @@ export function Signup() {
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
-    }
-  };
-
-  const handleGoogle = async (credential: string) => {
-    setError("");
-    try {
-      await loginGoogle(credential, refCode.trim() || undefined);
-      navigate("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign-in failed");
     }
   };
 
@@ -173,21 +160,7 @@ export function Signup() {
                 </Button>
               )}
 
-              {/* Google Sign Up */}
-              {googleReady && (
-                <div className="flex justify-center">
-                  <GoogleLogin
-                    onSuccess={(res) => { if (res.credential) handleGoogle(res.credential); }}
-                    onError={() => setError("Google sign-up failed — if you're on the dev preview, this domain may not yet be authorized. Use email/password instead.")}
-                    theme="filled_black"
-                    shape="rectangular"
-                    text="signup_with"
-                    width="320"
-                  />
-                </div>
-              )}
-
-              {(privyReady || googleReady) && (
+              {privyReady && (
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px bg-border" />
                   <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">or</span>

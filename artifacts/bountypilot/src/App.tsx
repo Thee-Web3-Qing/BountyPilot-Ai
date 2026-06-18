@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { GoogleAuthProvider } from "@/contexts/google-auth";
 import { PrivyProvider } from "@/contexts/privy-auth";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -114,18 +113,16 @@ function Router() {
 function App() {
   return (
     <PrivyProvider>
-      <GoogleAuthProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <AuthProvider>
-              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                <Router />
-              </WouterRouter>
-            </AuthProvider>
-            <Toaster />
-          </TooltipProvider>
-        </QueryClientProvider>
-      </GoogleAuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+          </AuthProvider>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
     </PrivyProvider>
   );
 }
