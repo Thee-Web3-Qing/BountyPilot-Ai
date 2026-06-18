@@ -1,12 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/auth";
 import { usePrivy, useLinkAccount } from "@privy-io/react-auth";
+import { usePrivyLogin } from "@/hooks/use-privy-login";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, User, Pencil, Globe, Award, Coins, Gift, Zap, Target,
   ArrowLeft, CheckCircle, X, Plus, Link2, Copy, Check, Code2,
-  Bot, Users, Palette, Search, ExternalLink,
+  Bot, Users, Palette, Search, ExternalLink, Wallet,
 } from "lucide-react";
 import { usePageMeta } from "@/lib/use-page-meta";
 
@@ -173,7 +174,11 @@ export function Profile() {
   const { user, token } = useAuth();
   const { user: privyUser, authenticated: privyAuthenticated, unlinkGoogle, unlinkTwitter, unlinkDiscord, unlinkGithub } = usePrivy();
   const { linkGoogle, linkTwitter, linkDiscord, linkGithub } = useLinkAccount();
+  const { loginWithPrivy, exchangeWithCurrentUser, loading: privyLoginLoading } = usePrivyLogin();
   const [unlinkingType, setUnlinkingType] = useState<string | null>(null);
+  const [connectingPrivy, setConnectingPrivy] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const prevPrivyAuth = useRef(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [profile, setProfile] = useState<ProfileData>({});
   const [loading, setLoading] = useState(true);
@@ -184,6 +189,20 @@ export function Profile() {
   const [earningsTotal, setEarningsTotal] = useState(0);
 
   const subStatus = computeSubscriptionStatus(user);
+
+  // When a user who was NOT Privy-authenticated completes Privy login (e.g. from
+  // the "Connect social accounts" button), exchange the Privy token to link
+  // their privy_id to their existing BountyPilot account.
+  useEffect(() => {
+    if (privyAuthenticated && !prevPrivyAuth.current && connectingPrivy) {
+      setConnectingPrivy(false);
+      setConnectError(null);
+      exchangeWithCurrentUser().then((result) => {
+        if (!result) setConnectError("Could not link account — please try again.");
+      }).catch(() => setConnectError("Could not link account — please try again."));
+    }
+    prevPrivyAuth.current = privyAuthenticated;
+  }, [privyAuthenticated, connectingPrivy, exchangeWithCurrentUser]);
 
   useEffect(() => {
     if (!token) return;
@@ -292,20 +311,25 @@ export function Profile() {
         {/* Referral Link */}
         {user?.username && <ReferralCard username={user.username} />}
 
-        {/* Connected Accounts */}
-        {privyAuthenticated && privyUser && (
-          <ConnectedAccountsCard
-            privyUser={privyUser}
-            unlinkingType={unlinkingType}
-            onLink={{ google: linkGoogle, twitter: linkTwitter, discord: linkDiscord, github: linkGithub }}
-            onUnlink={{
-              google: async (subject) => { setUnlinkingType("google_oauth"); try { await unlinkGoogle(subject); } finally { setUnlinkingType(null); } },
-              twitter: async (subject) => { setUnlinkingType("twitter_oauth"); try { await unlinkTwitter(subject); } finally { setUnlinkingType(null); } },
-              discord: async (subject) => { setUnlinkingType("discord_oauth"); try { await unlinkDiscord(subject); } finally { setUnlinkingType(null); } },
-              github: async (subject) => { setUnlinkingType("github_oauth"); try { await unlinkGithub(subject); } finally { setUnlinkingType(null); } },
-            }}
-          />
-        )}
+        {/* Connected Accounts — always shown */}
+        <ConnectedAccountsCard
+          privyUser={privyAuthenticated && privyUser ? privyUser : null}
+          unlinkingType={unlinkingType}
+          connecting={connectingPrivy || privyLoginLoading}
+          connectError={connectError}
+          onConnect={async () => {
+            setConnectingPrivy(true);
+            setConnectError(null);
+            await loginWithPrivy();
+          }}
+          onLink={{ google: linkGoogle, twitter: linkTwitter, discord: linkDiscord, github: linkGithub }}
+          onUnlink={{
+            google: async (subject) => { setUnlinkingType("google_oauth"); try { await unlinkGoogle(subject); } finally { setUnlinkingType(null); } },
+            twitter: async (subject) => { setUnlinkingType("twitter_oauth"); try { await unlinkTwitter(subject); } finally { setUnlinkingType(null); } },
+            discord: async (subject) => { setUnlinkingType("discord_oauth"); try { await unlinkDiscord(subject); } finally { setUnlinkingType(null); } },
+            github: async (subject) => { setUnlinkingType("github_oauth"); try { await unlinkGithub(subject); } finally { setUnlinkingType(null); } },
+          }}
+        />
 
         {/* About */}
         <Card className="bg-card border-border">
@@ -637,16 +661,23 @@ const SOCIAL_PROVIDERS = [
 function ConnectedAccountsCard({
   privyUser,
   unlinkingType,
+  connecting,
+  connectError,
+  onConnect,
   onLink,
   onUnlink,
 }: {
-  privyUser: { linkedAccounts?: PrivyLinkedAccount[] };
+  privyUser: { linkedAccounts?: PrivyLinkedAccount[] } | null;
   unlinkingType: string | null;
+  connecting: boolean;
+  connectError: string | null;
+  onConnect: () => void;
   onLink: { google: () => void; twitter: () => void; discord: () => void; github: () => void };
   onUnlink: { google: (s: string) => void; twitter: (s: string) => void; discord: (s: string) => void; github: (s: string) => void };
 }) {
-  const linked = privyUser.linkedAccounts ?? [];
+  const linked = privyUser?.linkedAccounts ?? [];
   const linkedCount = SOCIAL_PROVIDERS.filter(p => linked.some(a => a.type === p.type)).length;
+  const walletAccount = linked.find(a => a.type === "wallet");
 
   const linkFn = { google_oauth: onLink.google, twitter_oauth: onLink.twitter, discord_oauth: onLink.discord, github_oauth: onLink.github } as Record<string, () => void>;
   const unlinkFn = { google_oauth: (s: string) => onUnlink.google(s), twitter_oauth: (s: string) => onUnlink.twitter(s), discord_oauth: (s: string) => onUnlink.discord(s), github_oauth: (s: string) => onUnlink.github(s) } as Record<string, (s: string) => void>;
@@ -659,63 +690,113 @@ function ConnectedAccountsCard({
             <ExternalLink className="w-3.5 h-3.5 text-primary" />
             <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Connected Accounts</p>
           </div>
-          <span className="font-mono text-[10px] text-muted-foreground">{linkedCount} of {SOCIAL_PROVIDERS.length} linked</span>
+          {privyUser && (
+            <span className="font-mono text-[10px] text-muted-foreground">{linkedCount} of {SOCIAL_PROVIDERS.length} linked</span>
+          )}
         </div>
-        <div className="flex flex-col gap-2">
-          {SOCIAL_PROVIDERS.map(({ type, label, Icon, getLabel }) => {
-            const account = linked.find(a => a.type === type);
-            const isLinked = !!account;
-            const isUnlinking = unlinkingType === type;
-            const canUnlink = linkedCount > 1;
 
-            return (
-              <div
-                key={type}
-                className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-sm border transition-colors ${
-                  isLinked ? "border-primary/20 bg-primary/5" : "border-border bg-transparent"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-7 h-7 rounded-sm flex items-center justify-center flex-shrink-0 ${isLinked ? "bg-primary/10" : "bg-muted/30"}`}>
-                    <Icon className={`w-4 h-4 ${isLinked ? "text-foreground" : "text-muted-foreground"}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`font-mono text-xs font-semibold uppercase tracking-wider ${isLinked ? "text-foreground" : "text-muted-foreground"}`}>
-                      {label}
-                    </p>
-                    {isLinked && account && (
-                      <p className="font-mono text-[10px] text-muted-foreground truncate">{getLabel(account)}</p>
+        {/* Not yet connected to Privy */}
+        {!privyUser && (
+          <div className="flex flex-col gap-3">
+            <p className="font-mono text-[11px] text-muted-foreground leading-relaxed">
+              Link social accounts and a crypto wallet to your profile — sign in with any of them next time, and enable crypto payouts.
+            </p>
+            {connectError && (
+              <p className="font-mono text-[10px] text-red-400 border border-red-500/20 bg-red-500/5 rounded px-3 py-2">{connectError}</p>
+            )}
+            <Button
+              onClick={onConnect}
+              disabled={connecting}
+              className="font-mono uppercase tracking-wider text-xs gap-2 w-full"
+            >
+              {connecting
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Connecting…</>
+                : <><Wallet className="w-3.5 h-3.5" />Connect Wallet &amp; Social Accounts</>
+              }
+            </Button>
+            <div className="grid grid-cols-4 gap-1.5 opacity-50">
+              {SOCIAL_PROVIDERS.map(({ type, label, Icon }) => (
+                <div key={type} className="flex flex-col items-center gap-1 px-2 py-2 rounded-sm border border-border">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-mono text-[9px] text-muted-foreground uppercase">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Connected — show wallet + social rows */}
+        {privyUser && (
+          <>
+            {walletAccount && (
+              <div className="flex items-center gap-2.5 px-3 py-2 rounded-sm border border-primary/20 bg-primary/5">
+                <div className="w-7 h-7 rounded-sm flex items-center justify-center flex-shrink-0 bg-primary/10">
+                  <Wallet className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Payout Wallet</p>
+                  <p className="font-mono text-xs text-foreground truncate">{(walletAccount as PrivyLinkedAccount & { address?: string }).address ?? "Linked"}</p>
+                </div>
+                <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {SOCIAL_PROVIDERS.map(({ type, label, Icon, getLabel }) => {
+                const account = linked.find(a => a.type === type);
+                const isLinked = !!account;
+                const isUnlinking = unlinkingType === type;
+                const canUnlink = linkedCount > 1;
+
+                return (
+                  <div
+                    key={type}
+                    className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-sm border transition-colors ${
+                      isLinked ? "border-primary/20 bg-primary/5" : "border-border bg-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-7 h-7 rounded-sm flex items-center justify-center flex-shrink-0 ${isLinked ? "bg-primary/10" : "bg-muted/30"}`}>
+                        <Icon className={`w-4 h-4 ${isLinked ? "text-foreground" : "text-muted-foreground"}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`font-mono text-xs font-semibold uppercase tracking-wider ${isLinked ? "text-foreground" : "text-muted-foreground"}`}>
+                          {label}
+                        </p>
+                        {isLinked && account && (
+                          <p className="font-mono text-[10px] text-muted-foreground truncate">{getLabel(account)}</p>
+                        )}
+                      </div>
+                    </div>
+                    {isLinked ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={isUnlinking || !canUnlink}
+                        onClick={() => account?.subject && unlinkFn[type]?.(account.subject)}
+                        className="font-mono text-[10px] uppercase tracking-wider h-7 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                        title={!canUnlink ? "Can't unlink your only login method" : "Unlink account"}
+                      >
+                        {isUnlinking ? <Loader2 className="w-3 h-3 animate-spin" /> : <><X className="w-3 h-3 mr-1" />Unlink</>}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => linkFn[type]?.()}
+                        className="font-mono text-[10px] uppercase tracking-wider h-7 px-2.5 border-primary/30 text-primary hover:bg-primary/10 flex-shrink-0"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />Link
+                      </Button>
                     )}
                   </div>
-                </div>
-                {isLinked ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={isUnlinking || !canUnlink}
-                    onClick={() => account?.subject && unlinkFn[type]?.(account.subject)}
-                    className="font-mono text-[10px] uppercase tracking-wider h-7 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
-                    title={!canUnlink ? "Can't unlink your only login method" : "Unlink account"}
-                  >
-                    {isUnlinking ? <Loader2 className="w-3 h-3 animate-spin" /> : <><X className="w-3 h-3 mr-1" />Unlink</>}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => linkFn[type]?.()}
-                    className="font-mono text-[10px] uppercase tracking-wider h-7 px-2.5 border-primary/30 text-primary hover:bg-primary/10 flex-shrink-0"
-                  >
-                    <Plus className="w-3 h-3 mr-1" />Link
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
-          Link multiple accounts to sign in with any of them — they'll all open the same profile.
-        </p>
+                );
+              })}
+            </div>
+            <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
+              Link multiple accounts to sign in with any of them. Your wallet address is used for crypto payouts.
+            </p>
+          </>
+        )}
       </CardContent>
     </Card>
   );
