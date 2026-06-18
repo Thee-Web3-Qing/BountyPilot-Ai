@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send, Coins } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send, Coins, ArrowDownCircle, Copy } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -149,10 +149,26 @@ interface AdminCommission {
   referredEmail: string;
 }
 
+interface AdminPayoutRow {
+  id: number;
+  userId: number;
+  username: string;
+  email: string;
+  walletAddress: string;
+  amount: number;
+  currency: string;
+  network: string;
+  status: string;
+  txHash: string | null;
+  notes: string | null;
+  createdAt: string;
+  paidAt: string | null;
+}
+
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions" | "payouts">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -198,6 +214,12 @@ export function Admin() {
   const [commissionStatusFilter, setCommissionStatusFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [commissionAction, setCommissionAction] = useState<number | null>(null);
 
+  // Payouts state
+  const [adminPayouts, setAdminPayouts] = useState<AdminPayoutRow[]>([]);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
+  const [payoutAction, setPayoutAction] = useState<number | null>(null);
+  const [payoutTxInputs, setPayoutTxInputs] = useState<Record<number, string>>({});
+
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
     loadData();
@@ -209,6 +231,7 @@ export function Admin() {
     if (activeTab === "payments") loadPayments();
     if (activeTab === "updates") loadUpdates();
     if (activeTab === "commissions") loadCommissions();
+    if (activeTab === "payouts") loadPayouts();
   }, [activeTab]);
 
   async function loadData() {
@@ -274,6 +297,34 @@ export function Admin() {
         setCommissions(prev => prev.map(c => c.id === id ? { ...c, status } : c));
       }
     } finally { setCommissionAction(null); }
+  }
+
+  async function loadPayouts() {
+    setLoadingPayouts(true);
+    try {
+      const res = await fetch(`${API}/admin/payouts`, { headers: authHeaders() });
+      const data = await res.json();
+      setAdminPayouts(data.payouts ?? []);
+    } catch { setAdminPayouts([]); }
+    finally { setLoadingPayouts(false); }
+  }
+
+  async function updatePayout(id: number, status: "paid" | "processing" | "failed") {
+    setPayoutAction(id);
+    try {
+      const txHash = payoutTxInputs[id]?.trim() || undefined;
+      const res = await fetch(`${API}/admin/payouts/${id}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ status, txHash }),
+      });
+      if (res.ok) {
+        setAdminPayouts(prev => prev.map(p =>
+          p.id === id ? { ...p, status, txHash: txHash ?? p.txHash, paidAt: status === "paid" ? new Date().toISOString() : p.paidAt } : p
+        ));
+        setPayoutTxInputs(prev => { const n = { ...prev }; delete n[id]; return n; });
+      }
+    } finally { setPayoutAction(null); }
   }
 
   async function postUpdate() {
@@ -496,6 +547,7 @@ export function Admin() {
           { key: "users" as const, label: "Users", icon: Users },
           { key: "payments" as const, label: "Payments", icon: CreditCard },
           { key: "commissions" as const, label: "Commissions", icon: Coins },
+          { key: "payouts" as const, label: "Payouts", icon: ArrowDownCircle },
           { key: "report" as const, label: "Report", icon: BarChart3 },
           { key: "reports" as const, label: "Flagged", icon: Flag },
           { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
@@ -1375,6 +1427,118 @@ export function Admin() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {activeTab === "payouts" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              Payout Requests — send crypto to user wallet, then paste tx hash and mark paid
+            </p>
+            <button onClick={loadPayouts} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded" title="Refresh">
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingPayouts ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+          {loadingPayouts ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : adminPayouts.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <ArrowDownCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+              <p className="font-mono text-sm">No payout requests yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {adminPayouts.map(p => (
+                <div key={p.id} className="bg-card border border-border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-0.5 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                          p.status === "paid" ? "text-green-400 bg-green-500/10 border-green-500/30"
+                          : p.status === "failed" ? "text-red-400 bg-red-500/10 border-red-500/30"
+                          : p.status === "processing" ? "text-blue-400 bg-blue-500/10 border-blue-500/30"
+                          : "text-yellow-400 bg-yellow-500/10 border-yellow-500/30"
+                        }`}>
+                          {p.status}
+                        </span>
+                        <span className="font-mono text-sm font-bold text-foreground">${p.amount.toFixed(2)}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground uppercase">
+                          {p.currency} · {p.network}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        <span className="text-foreground">@{p.username}</span>
+                        {" · "}{p.email}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <p className="font-mono text-[10px] text-primary break-all">{p.walletAddress}</p>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(p.walletAddress)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          title="Copy wallet address"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+                      {p.txHash && (
+                        <a
+                          href={`https://etherscan.io/tx/${p.txHash}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="font-mono text-[10px] text-primary flex items-center gap-1 hover:underline"
+                        >
+                          <ExternalLink className="w-2.5 h-2.5" /> Tx: {p.txHash.slice(0, 24)}…
+                        </a>
+                      )}
+                      <p className="font-mono text-[10px] text-muted-foreground/60">
+                        Requested: {new Date(p.createdAt).toLocaleString()}
+                        {p.paidAt && ` · Paid: ${new Date(p.paidAt).toLocaleString()}`}
+                      </p>
+                    </div>
+                  </div>
+                  {(p.status === "requested" || p.status === "processing") && (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Paste tx hash after sending..."
+                        value={payoutTxInputs[p.id] ?? ""}
+                        onChange={e => setPayoutTxInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        className="w-full bg-background border border-border rounded px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60"
+                      />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => updatePayout(p.id, "processing")}
+                          disabled={payoutAction === p.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 disabled:opacity-40 transition-colors"
+                        >
+                          {payoutAction === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                          Mark Processing
+                        </button>
+                        <button
+                          onClick={() => updatePayout(p.id, "paid")}
+                          disabled={payoutAction === p.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-green-500/30 text-green-400 hover:bg-green-500/10 disabled:opacity-40 transition-colors"
+                        >
+                          {payoutAction === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          Mark Paid
+                        </button>
+                        <button
+                          onClick={() => updatePayout(p.id, "failed")}
+                          disabled={payoutAction === p.id}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
+                        >
+                          {payoutAction === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                          Failed
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

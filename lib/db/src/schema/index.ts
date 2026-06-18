@@ -16,3 +16,4 @@ export * from "./user_checkins";
 export * from "./user_star_transactions";
 export * from "./campaign_enrollments";
 export * from "./affiliate_commissions";
+export * from "./payouts";

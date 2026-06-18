@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, bountiesTable, earningsTable, bountyReportsTable } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
-import { referralsTable, affiliateCommissionsTable } from "@workspace/db";
+import { referralsTable, affiliateCommissionsTable, payoutsTable } from "@workspace/db";
 import { eq, count, desc, gte, sql, isNotNull, and, ilike, or, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -672,5 +672,89 @@ adminRouter.post("/backfill-commissions", requireAuth, requireAdmin, async (_req
   } catch (err) {
     logger.error(err, "Commission backfill error");
     res.status(500).json({ error: "Commission backfill failed" });
+  }
+});
+
+// ── GET /admin/payouts — list all payout requests ────────────
+adminRouter.get("/payouts", requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: payoutsTable.id,
+        userId: payoutsTable.userId,
+        username: usersTable.username,
+        email: usersTable.email,
+        walletAddress: payoutsTable.walletAddress,
+        amount: payoutsTable.amount,
+        currency: payoutsTable.currency,
+        network: payoutsTable.network,
+        status: payoutsTable.status,
+        txHash: payoutsTable.txHash,
+        notes: payoutsTable.notes,
+        createdAt: payoutsTable.createdAt,
+        paidAt: payoutsTable.paidAt,
+      })
+      .from(payoutsTable)
+      .innerJoin(usersTable, eq(usersTable.id, payoutsTable.userId))
+      .orderBy(
+        sql`CASE ${payoutsTable.status} WHEN 'requested' THEN 0 WHEN 'processing' THEN 1 ELSE 2 END`,
+        desc(payoutsTable.createdAt)
+      );
+    res.json({ payouts: rows.map(r => ({ ...r, amount: parseFloat(r.amount as string) })) });
+  } catch (err) {
+    logger.error(err, "Admin get payouts error");
+    res.status(500).json({ error: "Failed to get payouts" });
+  }
+});
+
+// ── PATCH /admin/payouts/:id — mark paid / processing / failed ─
+adminRouter.patch("/payouts/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params["id"] as string);
+    const { status, txHash, notes } = req.body as { status: "paid" | "processing" | "failed"; txHash?: string; notes?: string };
+
+    if (!["paid", "processing", "failed"].includes(status)) {
+      res.status(400).json({ error: "Invalid status" });
+      return;
+    }
+
+    const [payout] = await db
+      .select({ userId: payoutsTable.userId })
+      .from(payoutsTable)
+      .where(eq(payoutsTable.id, id));
+
+    if (!payout) { res.status(404).json({ error: "Payout not found" }); return; }
+
+    await db.update(payoutsTable)
+      .set({
+        status,
+        ...(txHash ? { txHash } : {}),
+        ...(notes ? { notes } : {}),
+        ...(status === "paid" ? { paidAt: new Date() } : {}),
+      })
+      .where(eq(payoutsTable.id, id));
+
+    if (status === "paid") {
+      await db.update(affiliateCommissionsTable)
+        .set({ status: "paid" })
+        .where(and(
+          eq(affiliateCommissionsTable.referrerId, payout.userId),
+          eq(affiliateCommissionsTable.status, "processing")
+        ));
+    }
+    if (status === "failed") {
+      await db.update(affiliateCommissionsTable)
+        .set({ status: "approved" })
+        .where(and(
+          eq(affiliateCommissionsTable.referrerId, payout.userId),
+          eq(affiliateCommissionsTable.status, "processing")
+        ));
+    }
+
+    logger.info({ id, status, txHash }, "Admin updated payout");
+    res.json({ updated: true });
+  } catch (err) {
+    logger.error(err, "Admin update payout error");
+    res.status(500).json({ error: "Failed to update payout" });
   }
 });

@@ -6,7 +6,8 @@ import { usePageMeta } from "@/lib/use-page-meta";
 import {
   Copy, Check, Share2, Link2, DollarSign, Clock, TrendingUp,
   ArrowDownCircle, Users, BarChart3, Trophy, Zap, Gift,
-  AlertCircle, ExternalLink, ChevronRight, Megaphone,
+  AlertCircle, ExternalLink, ChevronRight, Megaphone, Wallet,
+  SendHorizonal, CheckCircle2, XCircle, Loader2,
 } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -69,12 +70,25 @@ interface ReferredUser {
 interface ReferralStats {
   referralCode: string;
   referralLink: string;
+  walletAddress: string | null;
   totalReferrals: number;
   paidReferrals: number;
   yearlyReferrals: number;
   lifetimeReferrals: number;
   freeReferrals: number;
   referrals: ReferredUser[];
+}
+
+interface PayoutRow {
+  id: number;
+  walletAddress: string;
+  amount: number;
+  currency: string;
+  network: string;
+  status: string;
+  txHash: string | null;
+  createdAt: string;
+  paidAt: string | null;
 }
 
 interface Commission {
@@ -112,7 +126,12 @@ export function Referral() {
   const [lb, setLb] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [withdrawing, setWithdrawing] = useState(false);
+  const [payouts, setPayouts] = useState<PayoutRow[]>([]);
+  const [requestingPayout, setRequestingPayout] = useState(false);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [payoutSuccess, setPayoutSuccess] = useState(false);
+  const [payoutCurrency, setPayoutCurrency] = useState("USDC");
+  const [payoutNetwork, setPayoutNetwork] = useState("ethereum");
 
   const referralLink = user
     ? `${window.location.origin}/signup?ref=${encodeURIComponent(user.username)}`
@@ -125,10 +144,12 @@ export function Referral() {
       fetch("/api/referrals/my", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch("/api/referrals/leaderboard").then(r => r.json()),
       fetch("/api/referrals/commissions", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ]).then(([myStats, lbData, comData]) => {
+      fetch("/api/referrals/payouts", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ payouts: [] })),
+    ]).then(([myStats, lbData, comData, payoutsData]) => {
       if (myStats && !myStats.error) setStats(myStats);
       if (lbData?.paidLeaderboard) setLb(lbData.paidLeaderboard);
       if (comData && !comData.error) setCommissionData(comData);
+      if (payoutsData?.payouts) setPayouts(payoutsData.payouts);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [token]);
 
@@ -150,10 +171,38 @@ export function Referral() {
     }
   };
 
+  const requestPayout = async () => {
+    if (!token) return;
+    setRequestingPayout(true);
+    setPayoutError(null);
+    setPayoutSuccess(false);
+    try {
+      const res = await fetch("/api/referrals/payout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currency: payoutCurrency, network: payoutNetwork }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayoutError(data.error ?? "Payout request failed.");
+        return;
+      }
+      setPayoutSuccess(true);
+      setPayouts(prev => [data.payout, ...prev]);
+      // Refresh commission data to reflect "processing" status
+      const comRes = await fetch("/api/referrals/commissions", { headers: { Authorization: `Bearer ${token}` } });
+      const comData = await comRes.json();
+      if (comData && !comData.error) setCommissionData(comData);
+    } finally {
+      setRequestingPayout(false);
+    }
+  };
+
   // ── Derived numbers ──────────────────────────────────────────
   const commissions = commissionData?.commissions ?? [];
   const freeRefs = (stats?.referrals ?? []).filter(r => !r.isPaid);
 
+  const walletAddress = stats?.walletAddress ?? null;
   const availableBalance = commissionData?.availableBalance ?? 0;
   const pendingEarnings = commissionData?.pendingBalance ?? 0;
   const lifetimeEarnings = commissionData?.lifetimeEarnings ?? 0;
@@ -165,10 +214,10 @@ export function Referral() {
   const yearlyCount = stats?.yearlyReferrals ?? 0;
   const lifetimeCount = stats?.lifetimeReferrals ?? 0;
   const conversionRate = totalReferrals > 0 ? Math.round((paidCount / totalReferrals) * 100) : 0;
-  const revenueGenerated =
-    (paidCount * 5) + (yearlyCount * 45) + (lifetimeCount * 250);
+  const revenueGenerated = (paidCount * 5) + (yearlyCount * 45) + (lifetimeCount * 250);
 
-  const canWithdraw = availableBalance >= 5;
+  const hasPendingPayout = payouts.some(p => p.status === "requested" || p.status === "processing");
+  const canWithdraw = availableBalance >= 5 && !!walletAddress && !hasPendingPayout;
 
   if (loading) {
     return (
@@ -358,7 +407,12 @@ export function Referral() {
       {/* ── 6: Withdraw Earnings ───────────────────────────── */}
       <Card className="bg-card border-border">
         <CardContent className="p-5 flex flex-col gap-4">
-          <SectionHead label="Withdraw Earnings" />
+          <div className="flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary" />
+            <SectionHead label="Withdraw Earnings" />
+          </div>
+
+          {/* Balance summary */}
           <div className="grid grid-cols-3 gap-2 text-center">
             {[
               { label: "Available", value: `$${availableBalance.toFixed(2)}`, accent: true },
@@ -371,29 +425,149 @@ export function Referral() {
               </div>
             ))}
           </div>
+
+          {/* Wallet address */}
+          <div className="flex flex-col gap-1.5">
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Payout Wallet</p>
+            {walletAddress ? (
+              <div className="flex items-center gap-2 bg-background border border-border rounded-sm px-3 py-2">
+                <Wallet className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="font-mono text-xs text-foreground truncate flex-1">{walletAddress}</span>
+                <span className="font-mono text-[9px] text-green-400 uppercase tracking-wider border border-green-500/30 bg-green-500/10 px-1.5 py-0.5 rounded shrink-0">Linked</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-background border border-amber-500/30 rounded-sm px-3 py-2.5">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="font-mono text-xs text-amber-400 flex-1">No wallet linked — connect one on your Profile page to receive payouts.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Network & currency selector */}
+          {walletAddress && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Network</p>
+                <select
+                  value={payoutNetwork}
+                  onChange={e => setPayoutNetwork(e.target.value)}
+                  className="bg-background border border-border rounded-sm px-3 py-2 font-mono text-xs text-foreground focus:outline-none focus:border-primary/60"
+                >
+                  <option value="ethereum">Ethereum</option>
+                  <option value="base">Base</option>
+                  <option value="solana">Solana</option>
+                  <option value="polygon">Polygon</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Currency</p>
+                <select
+                  value={payoutCurrency}
+                  onChange={e => setPayoutCurrency(e.target.value)}
+                  className="bg-background border border-border rounded-sm px-3 py-2 font-mono text-xs text-foreground focus:outline-none focus:border-primary/60"
+                >
+                  <option value="USDC">USDC</option>
+                  <option value="USDT">USDT</option>
+                  <option value="ETH">ETH</option>
+                  <option value="SOL">SOL</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Action */}
           <div className="flex flex-col gap-2">
+            {payoutSuccess && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-sm border border-green-500/30 bg-green-500/10">
+                <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                <p className="font-mono text-xs text-green-400">Payout requested! You'll receive your crypto once it's processed.</p>
+              </div>
+            )}
+            {payoutError && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-sm border border-red-500/30 bg-red-500/10">
+                <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <p className="font-mono text-xs text-red-400">{payoutError}</p>
+              </div>
+            )}
+            {hasPendingPayout && !payoutSuccess && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-sm border border-amber-500/30 bg-amber-500/10">
+                <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <p className="font-mono text-xs text-amber-400">Payout in progress — you'll receive it shortly.</p>
+              </div>
+            )}
             <Button
-              disabled={!canWithdraw || withdrawing}
+              disabled={!canWithdraw || requestingPayout}
               className="font-mono uppercase tracking-wider w-full gap-2"
-              onClick={() => setWithdrawing(true)}
+              onClick={requestPayout}
             >
-              <ArrowDownCircle className="w-4 h-4" />
-              Withdraw Earnings
+              {requestingPayout
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Requesting...</>
+                : <><SendHorizonal className="w-4 h-4" /> Request Payout — ${availableBalance.toFixed(2)}</>
+              }
             </Button>
-            {!canWithdraw && (
+            {!walletAddress && (
               <p className="font-mono text-[10px] text-muted-foreground text-center">
-                You need at least $5 in approved earnings before you can withdraw.
+                Link a wallet on your <a href="/profile" className="text-primary underline">Profile page</a> to enable payouts.
+              </p>
+            )}
+            {walletAddress && !hasPendingPayout && availableBalance < 5 && (
+              <p className="font-mono text-[10px] text-muted-foreground text-center">
+                You need at least $5 in approved earnings to withdraw.
               </p>
             )}
           </div>
+
           <div className="space-y-1 font-mono text-[10px] text-muted-foreground">
-            <p>• Minimum withdrawal is $5</p>
-            <p>• Earnings must be approved before withdrawal</p>
-            <p>• Refunded purchases do not qualify</p>
-            <p>• Fraudulent referrals are ineligible</p>
+            <p>• Minimum withdrawal is $5 • Paid to your linked wallet address</p>
+            <p>• Earnings must be approved before withdrawal • Fraud is ineligible</p>
           </div>
         </CardContent>
       </Card>
+
+      {/* ── 6b: Payout History ─────────────────────────────── */}
+      {payouts.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-5 flex flex-col gap-3">
+            <SectionHead label="Payout History" />
+            <div className="space-y-2">
+              {payouts.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-sm border border-border bg-background">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-sm font-bold text-foreground">${p.amount.toFixed(2)}</span>
+                      <span className="font-mono text-[9px] uppercase tracking-wider border border-border text-muted-foreground px-1.5 py-0.5 rounded">
+                        {p.currency} · {p.network}
+                      </span>
+                    </div>
+                    {p.txHash ? (
+                      <a
+                        href={`https://etherscan.io/tx/${p.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[10px] text-primary flex items-center gap-1 mt-0.5 hover:underline truncate"
+                      >
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        {p.txHash.slice(0, 20)}...
+                      </a>
+                    ) : (
+                      <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                        {new Date(p.createdAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded border shrink-0 ${
+                    p.status === "paid" ? "text-green-400 border-green-500/30 bg-green-500/10"
+                    : p.status === "failed" ? "text-red-400 border-red-500/30 bg-red-500/10"
+                    : "text-amber-400 border-amber-500/30 bg-amber-500/10"
+                  }`}>
+                    {p.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── 7: Create Content. Earn More. ─────────────────── */}
       <Card className="bg-card border-border">

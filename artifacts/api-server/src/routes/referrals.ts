@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, referralsTable, campaignEnrollmentsTable, affiliateCommissionsTable } from "@workspace/db";
+import { usersTable, referralsTable, campaignEnrollmentsTable, affiliateCommissionsTable, payoutsTable } from "@workspace/db";
 import { eq, desc, count, sql, and, or, isNull } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -48,7 +48,7 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const [user] = await db
-      .select({ referralCode: usersTable.referralCode, username: usersTable.username })
+      .select({ referralCode: usersTable.referralCode, username: usersTable.username, walletAddress: usersTable.walletAddress })
       .from(usersTable)
       .where(eq(usersTable.id, userId));
 
@@ -89,6 +89,7 @@ referralsRouter.get("/my", requireAuth, async (req: AuthRequest, res) => {
     res.json({
       referralCode: user.username,
       referralLink,
+      walletAddress: user.walletAddress,
       totalReferrals: total,
       paidReferrals: cryptoRefs,
       yearlyReferrals: yearlyRefs,
@@ -689,5 +690,90 @@ referralsRouter.get("/challenges", async (_req, res) => {
   } catch (err) {
     logger.error(err, "Challenge leaderboard error");
     res.status(500).json({ error: "Failed to get challenges" });
+  }
+});
+
+// ── POST /referrals/payout — request a withdrawal ────────────
+referralsRouter.post("/payout", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const [user] = await db
+      .select({ walletAddress: usersTable.walletAddress })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+
+    if (!user?.walletAddress) {
+      res.status(400).json({ error: "No wallet linked. Connect a wallet via your profile to receive payouts." });
+      return;
+    }
+
+    const approved = await db
+      .select({ id: affiliateCommissionsTable.id, amount: affiliateCommissionsTable.amount })
+      .from(affiliateCommissionsTable)
+      .where(and(
+        eq(affiliateCommissionsTable.referrerId, userId),
+        eq(affiliateCommissionsTable.status, "approved")
+      ));
+
+    const available = approved.reduce((sum, c) => sum + parseFloat(c.amount), 0);
+
+    if (available < 5) {
+      res.status(400).json({ error: `Minimum withdrawal is $5. Available balance: $${available.toFixed(2)}.` });
+      return;
+    }
+
+    const existingOpen = await db
+      .select({ id: payoutsTable.id })
+      .from(payoutsTable)
+      .where(and(
+        eq(payoutsTable.userId, userId),
+        sql`${payoutsTable.status} IN ('requested', 'processing')`
+      ));
+
+    if (existingOpen.length > 0) {
+      res.status(400).json({ error: "You already have a payout request in progress." });
+      return;
+    }
+
+    const { currency = "USDC", network = "ethereum" } = req.body;
+
+    const [payout] = await db.insert(payoutsTable).values({
+      userId,
+      walletAddress: user.walletAddress,
+      amount: available.toFixed(2),
+      currency,
+      network,
+      status: "requested",
+    }).returning();
+
+    await db.update(affiliateCommissionsTable)
+      .set({ status: "processing" })
+      .where(and(
+        eq(affiliateCommissionsTable.referrerId, userId),
+        eq(affiliateCommissionsTable.status, "approved")
+      ));
+
+    logger.info({ userId, payoutId: payout.id, amount: available }, "Payout requested");
+    res.json({ payout, amount: available });
+  } catch (err) {
+    logger.error(err, "Request payout error");
+    res.status(500).json({ error: "Failed to request payout" });
+  }
+});
+
+// ── GET /referrals/payouts — user payout history ─────────────
+referralsRouter.get("/payouts", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const rows = await db
+      .select()
+      .from(payoutsTable)
+      .where(eq(payoutsTable.userId, userId))
+      .orderBy(desc(payoutsTable.createdAt));
+    res.json({ payouts: rows.map(r => ({ ...r, amount: parseFloat(r.amount as string) })) });
+  } catch (err) {
+    logger.error(err, "Get payouts error");
+    res.status(500).json({ error: "Failed to get payouts" });
   }
 });
