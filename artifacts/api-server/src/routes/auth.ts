@@ -568,6 +568,35 @@ authRouter.get("/me", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// PATCH /auth/wallet — save or update the user's payout wallet address
+authRouter.patch("/wallet", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { walletAddress } = req.body as { walletAddress: string };
+    if (!walletAddress || typeof walletAddress !== "string") {
+      res.status(400).json({ error: "walletAddress is required" });
+      return;
+    }
+    const address = walletAddress.trim();
+    // Basic sanity: EVM (0x...) or Solana (base58, 32-44 chars)
+    const isEvm = /^0x[0-9a-fA-F]{40}$/.test(address);
+    const isSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
+    if (!isEvm && !isSolana) {
+      res.status(400).json({ error: "Invalid wallet address format" });
+      return;
+    }
+    const [updated] = await db
+      .update(usersTable)
+      .set({ walletAddress: address, updatedAt: new Date() })
+      .where(eq(usersTable.id, userId))
+      .returning({ walletAddress: usersTable.walletAddress });
+    res.json({ walletAddress: updated.walletAddress });
+  } catch (err) {
+    logger.error(err, "Wallet update error");
+    res.status(500).json({ error: "Failed to update wallet address" });
+  }
+});
+
 // PUT /auth/profile
 authRouter.put("/profile", requireAuth, async (req: AuthRequest, res) => {
   try {

@@ -179,6 +179,12 @@ export function Profile() {
   const [connectingPrivy, setConnectingPrivy] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const prevPrivyAuth = useRef(false);
+  const [walletAddress, setWalletAddress] = useState("");
+  const [savedWallet, setSavedWallet] = useState<string | null>(null);
+  const [walletSaving, setWalletSaving] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [walletSaved, setWalletSaved] = useState(false);
+  const [editingWallet, setEditingWallet] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [profile, setProfile] = useState<ProfileData>({});
   const [loading, setLoading] = useState(true);
@@ -213,11 +219,32 @@ export function Profile() {
       fetch("/api/earnings", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()).catch(() => ({ totalEarned: 0 })),
     ]).then(([me, bounties, submissions, earnings]) => {
       if (me.profile) setProfile(me.profile);
+      if (me.walletAddress) { setSavedWallet(me.walletAddress); setWalletAddress(me.walletAddress); }
       setBountyCount(bounties.bounties?.length || 0);
       setSubmissionCount(submissions.submissions?.length || 0);
       setEarningsTotal(earnings.totalEarned || 0);
     }).finally(() => setLoading(false));
   }, [token]);
+
+  const saveWallet = async () => {
+    if (!token) return;
+    setWalletSaving(true);
+    setWalletError(null);
+    setWalletSaved(false);
+    try {
+      const res = await fetch("/api/auth/wallet", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ walletAddress: walletAddress.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setWalletError(data.error || "Failed to save wallet"); return; }
+      setSavedWallet(data.walletAddress);
+      setEditingWallet(false);
+      setWalletSaved(true);
+      setTimeout(() => setWalletSaved(false), 3000);
+    } finally { setWalletSaving(false); }
+  };
 
   const setField = (k: keyof ProfileData, v: string | number) =>
     setProfile((p) => ({ ...p, [k]: v }));
@@ -310,6 +337,84 @@ export function Profile() {
 
         {/* Referral Link */}
         {user?.username && <ReferralCard username={user.username} />}
+
+        {/* Payout Wallet */}
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-3.5 h-3.5 text-primary" />
+                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Payout Wallet</p>
+              </div>
+              {savedWallet && !editingWallet && (
+                <button
+                  onClick={() => setEditingWallet(true)}
+                  className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <Pencil className="w-3 h-3" />Edit
+                </button>
+              )}
+            </div>
+
+            {!savedWallet || editingWallet ? (
+              <div className="flex flex-col gap-2">
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  Paste your crypto wallet address — this is where referral payouts will be sent.
+                </p>
+                <input
+                  type="text"
+                  value={walletAddress}
+                  onChange={e => { setWalletAddress(e.target.value); setWalletError(null); }}
+                  placeholder="0x... or Solana address"
+                  className="w-full bg-background border border-border rounded-sm px-3 py-2.5 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60"
+                />
+                {walletError && (
+                  <p className="font-mono text-[10px] text-red-400">{walletError}</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={saveWallet}
+                    disabled={walletSaving || !walletAddress.trim()}
+                    className="font-mono uppercase tracking-wider text-xs gap-2 flex-1"
+                  >
+                    {walletSaving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</> : <><Check className="w-3.5 h-3.5" />Save Wallet</>}
+                  </Button>
+                  {editingWallet && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => { setEditingWallet(false); setWalletAddress(savedWallet ?? ""); setWalletError(null); }}
+                      className="font-mono uppercase tracking-wider text-xs px-3"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 bg-background border border-primary/20 rounded-sm px-3 py-2.5">
+                  <Wallet className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="font-mono text-xs text-foreground truncate flex-1">{savedWallet}</span>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(savedWallet!); }}
+                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Copy address"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {walletSaved && (
+                  <p className="font-mono text-[10px] text-green-400 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />Wallet saved successfully
+                  </p>
+                )}
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  Supports EVM (0x...) and Solana addresses. Used for all referral payouts.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Connected Accounts — always shown */}
         <ConnectedAccountsCard
