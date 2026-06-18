@@ -301,7 +301,7 @@ export function BountyAdd() {
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://earn.superteam.fun/listing/... or any bounty URL"
+                placeholder="https://superteam.fun/earn/listing/... or any bounty URL"
                 className="font-mono text-sm flex-1 bg-background border-border focus:ring-primary"
                 disabled={isLoading || !!extracted}
               />

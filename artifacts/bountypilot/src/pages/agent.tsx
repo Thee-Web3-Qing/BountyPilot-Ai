@@ -587,7 +587,7 @@ function LiveAgentPanel({ token }: { token: string | null }) {
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") runAgent(); }}
               disabled={running}
-              placeholder="https://earn.superteam.fun/listing/..."
+              placeholder="https://superteam.fun/earn/listing/..."
               className="w-full bg-background border border-border rounded-sm pl-9 pr-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60 transition-colors disabled:opacity-50"
             />
           </div>

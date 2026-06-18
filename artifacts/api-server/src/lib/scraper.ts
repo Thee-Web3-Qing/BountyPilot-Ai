@@ -190,9 +190,9 @@ function getMeta(html: string, name: string): string {
 
 function getTitle(html: string): string {
   const og = getMeta(html, "og:title");
-  if (og && !og.toLowerCase().includes("| superteam") && !og.toLowerCase().includes("listing |")) return og;
+  if (og && !og.toLowerCase().includes("| superteam") && !og.toLowerCase().includes("listing |") && !og.toLowerCase().includes("superteam earn")) return og;
   const tw = getMeta(html, "twitter:title");
-  if (tw && !tw.toLowerCase().includes("| superteam")) return tw;
+  if (tw && !tw.toLowerCase().includes("| superteam") && !tw.toLowerCase().includes("superteam earn")) return tw;
   const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
   const t = m?.[1]?.trim() || "";
   // Strip trailing site name patterns like " | Superteam Earn" or " - GibWork"
@@ -208,7 +208,7 @@ function getDescription(html: string): string {
 }
 
 function detectPlatform(url: string): string {
-  if (url.includes("earn.superteam")) return "Superteam Earn";
+  if (url.includes("earn.superteam") || (url.includes("superteam.fun") && (url.includes("/earn/") || url.includes("/listing/") || url.includes("/bounties")))) return "Superteam Earn";
   if (url.includes("gibwork")) return "GibWork";
   if (url.includes("firstdollar")) return "First Dollar";
   if (url.includes("dorahacks")) return "DoraHacks";
@@ -271,11 +271,13 @@ function deepFind(obj: unknown, keys: string[]): string | null {
 // Superteam Earn has a public API for listing details
 async function trySuperteamAPI(url: string): Promise<Partial<ScrapedBounty> | null> {
   try {
-    const slug = url.split("/listing/")[1]?.split("?")[0]?.replace(/\/$/, "");
+    // Handle both old (earn.superteam.fun/listing/slug) and new (superteam.fun/earn/listing/slug)
+    const slug = (url.split("/earn/listing/")[1] ?? url.split("/listing/")[1])?.split("?")[0]?.replace(/\/$/, "");
     if (!slug) return null;
-    const apiUrl = `https://earn.superteam.fun/api/listings/${slug}`;
+    const apiUrl = `https://superteam.fun/api/listings/${slug}`;
     const resp = await fetch(apiUrl, {
       headers: { "Accept": "application/json" },
+      redirect: "follow",
       signal: AbortSignal.timeout(8000),
     });
     if (!resp.ok) return null;

@@ -218,7 +218,7 @@ function genericLinkExtractor(html: string, baseUrl: string): PlatformBountyHint
 // ─── Superteam Earn — public JSON API ───────────────────────
 async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
   try {
-    const resp = await fetch("https://earn.superteam.fun/api/listings?limit=10", {
+    const resp = await fetch("https://superteam.fun/api/listings?limit=10", {
       headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
@@ -237,7 +237,7 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
           const sponsor = b.sponsor as Record<string, unknown> | undefined;
           const listingType = b.type as string | undefined;
           const hint: PlatformBountyHint = {
-            url: `https://earn.superteam.fun/listing/${slug}`,
+            url: `https://superteam.fun/earn/listing/${slug}`,
             title: b.title as string | undefined,
             rewardAmount: b.rewardAmount != null ? String(b.rewardAmount) : undefined,
             rewardCurrency: (b.token as string | undefined) || "USDC",
@@ -249,7 +249,7 @@ async function fetchSuperteam(): Promise<PlatformBountyHint[]> {
           // Fetch detailed listing for prize breakdown
           if (slug) {
             try {
-              const detail = await fetch(`https://earn.superteam.fun/api/listings/${slug}`, {
+              const detail = await fetch(`https://superteam.fun/api/listings/${slug}`, {
                 headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (compatible; BountyPilot/1.0)" },
                 signal: AbortSignal.timeout(8000),
               });
@@ -719,7 +719,7 @@ async function fixUnspecifiedBounties(): Promise<void> {
 const PLATFORMS: PlatformConfig[] = [
   {
     name: "Superteam Earn",
-    listingUrl: "https://earn.superteam.fun/bounties",
+    listingUrl: "https://superteam.fun/earn/bounties",
     fetchLinks: genericLinkExtractor,
     maxBounties: 8,
   },
