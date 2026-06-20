@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Loader2, RefreshCw, Globe, Plus, CheckCircle,
   Clock, Search, Zap, Shield, ExternalLink, X,
-  Sparkles, AlertCircle, Building2, Crown,
+  Sparkles, AlertCircle, Building2, Crown, Copy, Check,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListBountiesQueryKey } from "@workspace/api-client-react";
@@ -356,6 +356,16 @@ function BountyCard({
   const score = bounty.opportunityScore ?? 0;
   const dl = daysLeft(bounty.deadline);
   const tl = timeLeft(bounty.deadline);
+  const [copied, setCopied] = useState(false);
+
+  function copyLink(e: React.MouseEvent) {
+    e.stopPropagation();
+    const link = bounty.url || `${window.location.origin}/bounties/${bounty.id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
 
   return (
     <div
@@ -444,7 +454,7 @@ function BountyCard({
         </div>
       </div>
 
-      {/* Row 4: add button */}
+      {/* Row 4: add button + copy link */}
       <div className="mt-3 flex items-center gap-2">
         <Button
           onClick={onClaim}
@@ -456,9 +466,16 @@ function BountyCard({
             : isClaimed ? <><CheckCircle className="w-3.5 h-3.5 mr-1.5" />Added</>
             : <><Plus className="w-3.5 h-3.5 mr-1.5" />Add to Pipeline</>}
         </Button>
-        <span className="font-mono text-[10px] text-muted-foreground/50 ml-auto">
-          Tap for details
-        </span>
+        <button
+          onClick={copyLink}
+          title="Copy link"
+          className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+        >
+          {copied
+            ? <><Check className="w-3 h-3 text-green-400" /><span className="font-mono text-[10px] text-green-400">Copied!</span></>
+            : <><Copy className="w-3 h-3" /><span className="font-mono text-[10px]">Share</span></>
+          }
+        </button>
       </div>
     </div>
   );

@@ -685,6 +685,7 @@ export async function generateApplicationDraft(
 export interface ExtractedBounty {
   title: string;
   projectName: string;
+  opportunityType: string;
   rewardAmount: string;
   rewardCurrency: string;
   prizeBreakdown: string;
@@ -708,9 +709,10 @@ export async function extractBountyFromText(rawText: string, sourceUrl?: string)
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Short, clear bounty title (e.g. '$DEGX Content Contest — $500 USDC')" },
-          projectName: { type: "string", description: "Name of the project or company running the bounty" },
-          rewardAmount: { type: "string", description: "Total reward pool as a number string, e.g. '500'" },
+          title: { type: "string", description: "Short, clear title (e.g. '$DEGX Content Contest — $500 USDC' or 'Content Lead @ Acme Protocol')" },
+          projectName: { type: "string", description: "Name of the project or company posting this opportunity" },
+          opportunityType: { type: "string", enum: ["Bounty", "Job", "Gig", "Outreach", "Grant", "Contest"], description: "Bounty=one-off paid task/contest; Job=ongoing employment/role; Gig=short freelance contract; Outreach=collab/partnership/ambassador invite; Grant=non-repayable funding; Contest=competition with prizes" },
+          rewardAmount: { type: "string", description: "Total reward/salary/budget as a number string, e.g. '500'" },
           rewardCurrency: { type: "string", description: "Currency ticker: USDC, SOL, ETH, etc." },
           prizeBreakdown: { type: "string", description: "Prize breakdown for each rank, e.g. '1st: $200, 2nd: $100, 3rd: $75'" },
           deadline: { type: "string", description: "Deadline in YYYY-MM-DD format. Leave empty string if unknown." },
@@ -723,7 +725,7 @@ export async function extractBountyFromText(rawText: string, sourceUrl?: string)
           opportunityScore: { type: "integer", description: "Score 1–100 reflecting opportunity quality for Web3 content creators", minimum: 1, maximum: 100 },
           scoreExplanation: { type: "string", description: "2-sentence explanation of the score: why it is or isn't a great opportunity" },
         },
-        required: ["title", "projectName", "rewardAmount", "rewardCurrency", "prizeBreakdown", "deadline", "contentFormat", "submissionRequirements", "deliverables", "trackCategory", "skillsRequired", "tags", "opportunityScore", "scoreExplanation"],
+        required: ["title", "projectName", "opportunityType", "rewardAmount", "rewardCurrency", "prizeBreakdown", "deadline", "contentFormat", "submissionRequirements", "deliverables", "trackCategory", "skillsRequired", "tags", "opportunityScore", "scoreExplanation"],
       },
     },
   };
@@ -732,7 +734,7 @@ export async function extractBountyFromText(rawText: string, sourceUrl?: string)
     [
       {
         role: "system",
-        content: `You are BountyPilot's extraction AI. Given a raw bounty announcement (tweet, post, or message), extract all structured data about the bounty. Be precise with numbers and dates. If a field is not mentioned, use an empty string. For the deadline, convert any relative or fuzzy dates to YYYY-MM-DD using today's date (${new Date().toISOString().slice(0, 10)}) as reference.`,
+        content: `You are BountyPilot's extraction AI. Given a raw announcement (tweet, post, or message), extract all structured data. The opportunity can be a bounty, job, gig, outreach, grant, or contest — classify accordingly. Be precise with numbers and dates. If a field is not mentioned, use an empty string. For the deadline, convert any relative or fuzzy dates to YYYY-MM-DD using today's date (${new Date().toISOString().slice(0, 10)}) as reference.`,
       },
       {
         role: "user",

@@ -24,6 +24,28 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, ExternalLink, RefreshCw, Loader2, CheckCircle, AlertCircle, Sparkles, Flag, X, Users, Linkedin, Twitter, Globe, Bot, FileText, Copy, Check, Code2, Layers, UsersRound, Tag, Clock, Zap, Wrench } from "lucide-react";
 import { AIFeatureGate } from "@/components/trial-gate";
 
+// ── Copy Link button ─────────────────────────────────────────
+function CopyLinkButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors text-sm"
+    >
+      {copied
+        ? <><Check className="w-3.5 h-3.5 text-green-400" /><span className="font-mono text-xs text-green-400">Copied!</span></>
+        : <><Copy className="w-3.5 h-3.5" /><span className="font-mono text-xs">Copy Link</span></>
+      }
+    </button>
+  );
+}
+
 // ── Team helpers ─────────────────────────────────────────────
 function buildTeamSearchUrl(companyName: string | null | undefined, _platform: string | null | undefined, _url: string | null | undefined): string | null {
   if (!companyName) return null;
@@ -795,11 +817,12 @@ export function BountyDetail() {
               </a>
             </div>
           )}
-          <div>
+          <div className="flex items-center gap-3 flex-wrap">
             <a href={bounty.url} target="_blank" rel="noopener noreferrer"
               className="text-primary flex items-center gap-1 text-sm hover:underline">
               Original URL <ExternalLink className="w-3 h-3" />
             </a>
+            <CopyLinkButton url={bounty.url || `${window.location.origin}/bounties/${bounty.id}`} />
           </div>
         </CardContent>
       </Card>
