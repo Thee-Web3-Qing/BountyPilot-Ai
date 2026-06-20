@@ -175,3 +175,26 @@ discoverRouter.post("/:id/claim", async (req: AuthRequest, res) => {
     res.status(500).json({ error: "Failed to claim bounty" });
   }
 });
+
+// GET /discover/spotlight/:key — look up a pinned global bounty by URL key
+// Returns { id } so the frontend can navigate to the correct bounty regardless of environment
+const SPOTLIGHT_URLS: Record<string, string> = {
+  degx: "https://x.com/teddi_speaks/status/2068000633517428897",
+};
+
+discoverRouter.get("/spotlight/:key", async (req, res) => {
+  const url = SPOTLIGHT_URLS[req.params.key];
+  if (!url) return res.status(404).json({ error: "Unknown spotlight key" });
+  try {
+    const rows = await db
+      .select({ id: bountiesTable.id })
+      .from(bountiesTable)
+      .where(and(isNull(bountiesTable.userId), eq(bountiesTable.url, url)))
+      .limit(1);
+    if (rows.length === 0) return res.status(404).json({ error: "Bounty not found" });
+    res.json({ id: rows[0].id });
+  } catch (err) {
+    logger.error(err, "Spotlight lookup failed");
+    res.status(500).json({ error: "Lookup failed" });
+  }
+});

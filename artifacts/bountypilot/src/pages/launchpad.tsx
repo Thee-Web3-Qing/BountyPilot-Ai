@@ -287,6 +287,20 @@ export function Launchpad() {
   const { token } = useAuth();
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
+  const { data: degxSpotlight } = useQuery({
+    queryKey: ["spotlight", "degx"],
+    queryFn: async () => {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const r = await fetch("/api/discover/spotlight/degx", { headers });
+      if (!r.ok) return null;
+      return r.json() as Promise<{ id: number }>;
+    },
+    staleTime: 60_000,
+  });
+
+  const degxBountyPath = degxSpotlight ? `/bounties/${degxSpotlight.id}` : null;
+
   const { data: campaignData, isLoading } = useQuery({
     queryKey: ["campaigns"],
     queryFn: async () => {
@@ -333,7 +347,7 @@ export function Launchpad() {
           <CardContent className="p-5 space-y-3">
             <div
               className="flex items-start justify-between gap-3 cursor-pointer"
-              onClick={() => navigate("/bounties/505")}
+              onClick={() => degxBountyPath && navigate(degxBountyPath)}
             >
               <div className="flex items-start gap-2">
                 <Twitter className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
@@ -375,7 +389,8 @@ export function Launchpad() {
                   size="sm"
                   variant="outline"
                   className="font-mono text-xs uppercase tracking-wider h-7 gap-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
-                  onClick={() => navigate("/bounties/505")}
+                  onClick={() => degxBountyPath && navigate(degxBountyPath)}
+                  disabled={!degxBountyPath}
                 >
                   View <ArrowRight className="w-3 h-3" />
                 </Button>

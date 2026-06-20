@@ -1,8 +1,8 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startCrawlerCron } from "./lib/cron.js";
-import { db, referralsTable, campaignEnrollmentsTable, siteUpdatesTable } from "@workspace/db";
-import { sql, eq } from "drizzle-orm";
+import { db, referralsTable, campaignEnrollmentsTable, siteUpdatesTable, bountiesTable } from "@workspace/db";
+import { sql, eq, isNull, and } from "drizzle-orm";
 import { registerWebhook } from "./lib/telegram.js";
 
 const rawPort = process.env["PORT"];
@@ -107,6 +107,41 @@ async function backfillCampaignEnrollments() {
   }
 }
 
+async function seedSpotlightBounties() {
+  const DEGX_URL = "https://x.com/teddi_speaks/status/2068000633517428897";
+  try {
+    const existing = await db
+      .select({ id: bountiesTable.id })
+      .from(bountiesTable)
+      .where(and(isNull(bountiesTable.userId), eq(bountiesTable.url, DEGX_URL)))
+      .limit(1);
+    if (existing.length > 0) return; // already present
+    await db.insert(bountiesTable).values({
+      title: "$DEGX Content Contest — $500 USDC",
+      platform: "X",
+      projectName: "Degxifi",
+      rewardAmount: "500",
+      rewardCurrency: "USDC",
+      url: DEGX_URL,
+      opportunityType: "Contest",
+      opportunityScore: 82,
+      scoreExplanation: "A $500 USDC prize pool split across 10 winners for $DEGX content — memes, threads, videos, graphics, or market analysis. Clear judging criteria (creativity, quality, engagement) and a structured multi-step submission process make this a well-defined, accessible opportunity for Web3 content creators.",
+      contentFormat: "Memes, Threads, Videos, Graphics, Market Analysis",
+      trackCategory: "Content",
+      skillsRequired: "Content Creation, Social Media, Crypto Knowledge",
+      tags: "x-contest,content,crypto,degx,meme",
+      submissionRequirements: "Follow @Degxifi, like & repost the contest post, tag @Degxifi in your post, use the ticker $DEGX",
+      deliverables: "Original content about $DEGX — memes, threads, videos, graphics, or market analysis",
+      confidenceScore: 95,
+      userId: null,
+      status: "discovered",
+    });
+    logger.info("Seeded DEGX spotlight bounty");
+  } catch (err) {
+    logger.warn({ err }, "Spotlight seed failed (non-fatal)");
+  }
+}
+
 app.listen(port, async (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -116,6 +151,7 @@ app.listen(port, async (err) => {
   logger.info({ port }, "Server listening");
   await seedNotifications();
   await backfillCampaignEnrollments();
+  await seedSpotlightBounties();
   startCrawlerCron();
   // Register Telegram webhook (production URL)
   registerWebhook("https://bountypilot.xyz/api/telegram/webhook").catch(() => {});
