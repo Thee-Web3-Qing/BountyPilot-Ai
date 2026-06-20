@@ -249,7 +249,7 @@ function DetailDrawer({
             </div>
             <div className={`border rounded-sm p-3 text-center ${scoreBg(score)}`}>
               <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">Score <span className="inline-block ml-0.5 px-1 py-0 bg-primary/10 rounded text-[8px] text-primary/70">AI</span></div>
-              <div className={`font-bold text-xl leading-tight ${scoreColor(score)}`}>{score}<span className="text-xs font-normal text-muted-foreground">/10</span></div>
+              <div className={`font-bold text-xl leading-tight ${scoreColor(score)}`}>{score}<span className="text-xs font-normal text-muted-foreground">/100</span></div>
             </div>
           </div>
 
@@ -474,7 +474,7 @@ function BountyCard({
 
         <div className={`ml-auto flex items-center gap-0.5 border px-2 py-1 rounded-sm shrink-0 ${scoreBg(score)}`}>
           <span className={`font-mono text-base font-bold leading-none ${scoreColor(score)}`}>{score}</span>
-          <span className="font-mono text-[10px] text-muted-foreground">/10</span>
+          <span className="font-mono text-[10px] text-muted-foreground">/100</span>
           <span className="inline-block ml-0.5 px-0.5 py-0 bg-primary/10 rounded text-[8px] text-primary/70 font-mono">AI</span>
         </div>
       </div>

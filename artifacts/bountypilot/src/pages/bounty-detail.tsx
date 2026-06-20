@@ -655,7 +655,7 @@ export function BountyDetail() {
               <span className={`text-3xl md:text-5xl font-bold font-mono ${SCORE_COLOR(bounty.opportunityScore)}`}>
                 {bounty.opportunityScore}
               </span>
-              <span className="text-muted-foreground font-mono text-lg">/10</span>
+              <span className="text-muted-foreground font-mono text-lg">/100</span>
               <span className="inline-block ml-1 px-1.5 py-0 bg-primary/10 rounded text-xs text-primary/70 font-mono">AI</span>
             </div>
           )}
@@ -1145,7 +1145,7 @@ export function BountyDetail() {
                   <p className={`text-3xl font-bold font-mono ${bounty.opportunityScore >= 7 ? "text-green-400" : bounty.opportunityScore >= 5 ? "text-yellow-400" : "text-red-400"}`}>
                     {bounty.opportunityScore}
                   </p>
-                  <p className="text-xs text-muted-foreground font-mono">/10</p>
+                  <p className="text-xs text-muted-foreground font-mono">/100</p>
                 </div>
                 <div className="flex-1">
                   <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Qwen AI Score</p>
