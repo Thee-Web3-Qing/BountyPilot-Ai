@@ -9,6 +9,7 @@ import { requireAuth, requireAdmin, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { trialEndsAt } from "../lib/access.js";
 import { analyzeAdminInsights } from "../lib/novus.js";
+import { extractBountyFromText } from "../lib/qwen.js";
 import { awardPointsAndBadges } from "../lib/gamification.js";
 import { siteUpdatesTable, userNotificationsTable } from "@workspace/db";
 
@@ -806,6 +807,47 @@ adminRouter.patch("/bounty-entries/:id", requireAuth, requireAdmin, async (req: 
   } catch (err) {
     logger.error(err, "Admin update bounty entry error");
     res.status(500).json({ error: "Failed to update entry" });
+  }
+});
+
+// POST /admin/bounties/manual — AI-extract a bounty from raw text and add to Discover
+adminRouter.post("/bounties/manual", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { rawText, sourceUrl } = req.body as { rawText: string; sourceUrl?: string };
+    if (!rawText?.trim()) {
+      res.status(400).json({ error: "rawText is required" });
+      return;
+    }
+
+    const extracted = await extractBountyFromText(rawText.trim(), sourceUrl?.trim());
+
+    const [inserted] = await db.insert(bountiesTable).values({
+      userId: null,
+      url: sourceUrl?.trim() || `https://x.com/search?q=${encodeURIComponent(extracted.projectName)}`,
+      title: extracted.title,
+      platform: "X",
+      projectName: extracted.projectName,
+      rewardAmount: extracted.rewardAmount,
+      rewardCurrency: extracted.rewardCurrency,
+      prizeBreakdown: extracted.prizeBreakdown || null,
+      deadline: extracted.deadline || null,
+      contentFormat: extracted.contentFormat || null,
+      submissionRequirements: extracted.submissionRequirements || null,
+      deliverables: extracted.deliverables || null,
+      trackCategory: extracted.trackCategory || null,
+      skillsRequired: extracted.skillsRequired || null,
+      tags: extracted.tags || null,
+      opportunityScore: extracted.opportunityScore,
+      scoreExplanation: extracted.scoreExplanation || null,
+      opportunityType: "Bounty",
+      status: "discovered",
+    }).returning();
+
+    logger.info({ id: inserted.id, title: inserted.title }, "Admin manually added bounty via AI extraction");
+    res.json({ ok: true, bounty: inserted, extracted });
+  } catch (err) {
+    logger.error(err, "Admin manual bounty extraction error");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Extraction failed" });
   }
 });
 

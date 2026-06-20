@@ -679,3 +679,70 @@ export async function generateApplicationDraft(
 
   return templateApplicationDraft(bounty, profile);
 }
+
+// ── Manual bounty extraction from raw text ──────────────────────────────────
+
+export interface ExtractedBounty {
+  title: string;
+  projectName: string;
+  rewardAmount: string;
+  rewardCurrency: string;
+  prizeBreakdown: string;
+  deadline: string;
+  contentFormat: string;
+  submissionRequirements: string;
+  deliverables: string;
+  trackCategory: string;
+  skillsRequired: string;
+  tags: string;
+  opportunityScore: number;
+  scoreExplanation: string;
+}
+
+export async function extractBountyFromText(rawText: string, sourceUrl?: string): Promise<ExtractedBounty> {
+  const extractTool: QwenTool = {
+    type: "function",
+    function: {
+      name: "submit_extracted_bounty",
+      description: "Submit the structured bounty data extracted from the raw announcement text",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short, clear bounty title (e.g. '$DEGX Content Contest — $500 USDC')" },
+          projectName: { type: "string", description: "Name of the project or company running the bounty" },
+          rewardAmount: { type: "string", description: "Total reward pool as a number string, e.g. '500'" },
+          rewardCurrency: { type: "string", description: "Currency ticker: USDC, SOL, ETH, etc." },
+          prizeBreakdown: { type: "string", description: "Prize breakdown for each rank, e.g. '1st: $200, 2nd: $100, 3rd: $75'" },
+          deadline: { type: "string", description: "Deadline in YYYY-MM-DD format. Leave empty string if unknown." },
+          contentFormat: { type: "string", description: "Comma-separated list of accepted content formats, e.g. 'Memes, Threads, Videos, Graphics'" },
+          submissionRequirements: { type: "string", description: "Step-by-step rules/requirements for participants" },
+          deliverables: { type: "string", description: "What the participant must actually produce or submit" },
+          trackCategory: { type: "string", description: "Category: Content, Design, Development, Research, Marketing, Community, Other" },
+          skillsRequired: { type: "string", description: "Comma-separated skills needed, e.g. 'Content Creation, Social Media'" },
+          tags: { type: "string", description: "Comma-separated relevant tags, e.g. 'x-contest,content,crypto,meme'" },
+          opportunityScore: { type: "integer", description: "Score 1–100 reflecting opportunity quality for Web3 content creators", minimum: 1, maximum: 100 },
+          scoreExplanation: { type: "string", description: "2-sentence explanation of the score: why it is or isn't a great opportunity" },
+        },
+        required: ["title", "projectName", "rewardAmount", "rewardCurrency", "prizeBreakdown", "deadline", "contentFormat", "submissionRequirements", "deliverables", "trackCategory", "skillsRequired", "tags", "opportunityScore", "scoreExplanation"],
+      },
+    },
+  };
+
+  const result = await callQwenWithTool<ExtractedBounty>(
+    [
+      {
+        role: "system",
+        content: `You are BountyPilot's extraction AI. Given a raw bounty announcement (tweet, post, or message), extract all structured data about the bounty. Be precise with numbers and dates. If a field is not mentioned, use an empty string. For the deadline, convert any relative or fuzzy dates to YYYY-MM-DD using today's date (${new Date().toISOString().slice(0, 10)}) as reference.`,
+      },
+      {
+        role: "user",
+        content: `Extract bounty data from this announcement:\n\n${rawText}${sourceUrl ? `\n\nSource URL: ${sourceUrl}` : ""}`,
+      },
+    ],
+    extractTool,
+    { maxTokens: 800, timeout: 45000 }
+  );
+
+  if (!result) throw new Error("Qwen extraction returned no result");
+  return result;
+}

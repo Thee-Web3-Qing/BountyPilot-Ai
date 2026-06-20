@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send, Coins, ArrowDownCircle, Copy } from "lucide-react";
+import { ShieldCheck, RefreshCw, X, Check, Loader2, Clock, ChevronRight, BarChart3, Users, TrendingUp, DollarSign, Hourglass, Award, Target, Flag, Trash2, ExternalLink, AlertTriangle, AlertCircle, Brain, Rocket, Plus, ChevronDown, ChevronUp, Edit2, Lock, Unlock, Star, CreditCard, Search, BellDot, Pin, Send, Coins, ArrowDownCircle, Copy, Sparkles, Twitter, PlusCircle } from "lucide-react";
 import { useAuth } from "@/contexts/auth";
 import { useLocation } from "wouter";
 
@@ -168,7 +168,7 @@ interface AdminPayoutRow {
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions" | "payouts" | "entries">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions" | "payouts" | "entries" | "add">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -224,6 +224,13 @@ export function Admin() {
   const [entries, setEntries] = useState<any[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [entryStatusAction, setEntryStatusAction] = useState<number | null>(null);
+
+  // Add Bounty (manual AI extraction) state
+  const [addRawText, setAddRawText] = useState("");
+  const [addSourceUrl, setAddSourceUrl] = useState("");
+  const [addExtracting, setAddExtracting] = useState(false);
+  const [addResult, setAddResult] = useState<any | null>(null);
+  const [addError, setAddError] = useState("");
 
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
@@ -313,6 +320,26 @@ export function Admin() {
       setAdminPayouts(data.payouts ?? []);
     } catch { setAdminPayouts([]); }
     finally { setLoadingPayouts(false); }
+  }
+
+  async function addBountyManual() {
+    if (!addRawText.trim()) return;
+    setAddExtracting(true);
+    setAddError("");
+    setAddResult(null);
+    try {
+      const res = await fetch(`${API}/admin/bounties/manual`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText: addRawText, sourceUrl: addSourceUrl || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setAddError(data.error ?? "Extraction failed"); return; }
+      setAddResult(data);
+      setAddRawText("");
+      setAddSourceUrl("");
+    } catch { setAddError("Network error — try again."); }
+    finally { setAddExtracting(false); }
   }
 
   async function loadEntries() {
@@ -597,6 +624,7 @@ export function Admin() {
           { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
           { key: "updates" as const, label: "Updates", icon: BellDot },
           { key: "entries" as const, label: "Entries", icon: Send },
+          { key: "add" as const, label: "Add Bounty", icon: PlusCircle },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -1762,6 +1790,116 @@ export function Admin() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === "add" && (
+        <div className="space-y-5 max-w-2xl">
+          <div>
+            <h2 className="font-bold font-mono text-sm uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" /> Add Bounty via AI Extraction
+            </h2>
+            <p className="font-mono text-[11px] text-muted-foreground mt-1">
+              Paste raw text from a tweet, post, or announcement. Qwen will extract all fields and add it to the Discover feed under the X platform.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {/* Raw text */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Bounty Announcement Text <span className="text-red-400">*</span>
+              </label>
+              <textarea
+                value={addRawText}
+                onChange={e => setAddRawText(e.target.value)}
+                placeholder="Paste the full tweet, post, or announcement here…"
+                rows={8}
+                className="w-full bg-background border border-input rounded-md px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            {/* Source URL */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Twitter className="w-3 h-3 text-sky-400" /> Source URL <span className="font-normal text-muted-foreground">(tweet link, optional)</span>
+              </label>
+              <input
+                value={addSourceUrl}
+                onChange={e => setAddSourceUrl(e.target.value)}
+                placeholder="https://x.com/user/status/..."
+                className="w-full bg-background border border-input rounded-md px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            {addError && (
+              <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded p-3">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <p className="font-mono text-xs">{addError}</p>
+              </div>
+            )}
+
+            <button
+              onClick={addBountyManual}
+              disabled={addExtracting || !addRawText.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded bg-primary text-primary-foreground font-mono text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-40"
+            >
+              {addExtracting
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting with Qwen…</>
+                : <><Sparkles className="w-3.5 h-3.5" /> Extract & Add to Discover</>
+              }
+            </button>
+          </div>
+
+          {/* Result preview */}
+          {addResult && (
+            <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span className="font-mono text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                  Added to Discover — ID #{addResult.bounty.id}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
+                {[
+                  ["Title", addResult.extracted.title],
+                  ["Project", addResult.extracted.projectName],
+                  ["Reward", `${addResult.extracted.rewardAmount} ${addResult.extracted.rewardCurrency}`],
+                  ["Deadline", addResult.extracted.deadline || "—"],
+                  ["Category", addResult.extracted.trackCategory],
+                  ["Score", `${addResult.extracted.opportunityScore}/100`],
+                  ["Format", addResult.extracted.contentFormat],
+                  ["Tags", addResult.extracted.tags],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <span className="text-muted-foreground">{k}: </span>
+                    <span className="text-foreground">{v}</span>
+                  </div>
+                ))}
+              </div>
+              {addResult.extracted.scoreExplanation && (
+                <p className="font-mono text-[11px] text-muted-foreground italic border-t border-border pt-2">
+                  {addResult.extracted.scoreExplanation}
+                </p>
+              )}
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={`/bounties/${addResult.bounty.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] text-sky-400 hover:underline flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3 h-3" /> View bounty #{addResult.bounty.id}
+                </a>
+                <button
+                  onClick={() => setAddResult(null)}
+                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground ml-auto"
+                >
+                  + Add another
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
