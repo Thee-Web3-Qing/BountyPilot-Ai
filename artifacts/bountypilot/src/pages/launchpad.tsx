@@ -239,7 +239,7 @@ function SubmitEntryModal({ token, onClose }: SubmitEntryModalProps) {
               <Input
                 value={walletAddress}
                 onChange={e => setWalletAddress(e.target.value)}
-                placeholder="Solana / EVM wallet address"
+                placeholder="Solana wallet address"
                 className="font-mono text-xs"
               />
             </div>
