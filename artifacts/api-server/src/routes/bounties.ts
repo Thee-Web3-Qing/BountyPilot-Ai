@@ -7,7 +7,7 @@ import {
   productionPlansTable,
   userProfilesTable,
 } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, isNull } from "drizzle-orm";
 import { CreateBountyBody, UpdateBountyBody } from "@workspace/api-zod";
 import { logger } from "../lib/logger.js";
 import { scrapeBounty } from "../lib/scraper.js";
@@ -128,7 +128,7 @@ bountiesRouter.get("/:id", async (req: AuthRequest, res) => {
     const [bounty] = await db
       .select()
       .from(bountiesTable)
-      .where(and(eq(bountiesTable.id, id), eq(bountiesTable.userId, userId)));
+      .where(and(eq(bountiesTable.id, id), or(eq(bountiesTable.userId, userId), isNull(bountiesTable.userId))));
     if (!bounty) {
       res.status(404).json({ error: "Not found" });
       return;
