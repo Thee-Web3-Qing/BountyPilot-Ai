@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Rocket, Trophy, Gift, Calendar, Star, ArrowRight, Users, Loader2, Clock,
+  Zap, Twitter,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +117,63 @@ export function Launchpad() {
         <p className="font-mono text-sm text-muted-foreground mt-1">
           BountyPilot campaigns — refer, compete, and win. Each leaderboard is completely isolated.
         </p>
+      </div>
+
+      {/* ── Spotlight Bounties ─────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Zap className="w-4 h-4 text-yellow-400" />
+          <span className="font-mono text-xs uppercase tracking-widest text-yellow-400">Spotlight Bounty</span>
+        </div>
+
+        <Card
+          className="bg-card border-yellow-500/30 hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
+          onClick={() => navigate("/bounties/505")}
+        >
+          <div className="h-0.5 w-full bg-yellow-500" />
+          <CardContent className="p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <Twitter className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                    <span className="font-mono text-[10px] text-yellow-400 border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                      Live
+                    </span>
+                    <span className="font-mono text-[10px] text-sky-400 border border-sky-400/30 bg-sky-400/10 px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                      X / Twitter
+                    </span>
+                    <span className="font-mono text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                      Content
+                    </span>
+                  </div>
+                  <h3 className="font-bold font-sans text-sm uppercase tracking-tight leading-tight">
+                    $DEGX Content Contest
+                  </h3>
+                  <p className="font-mono text-[10px] text-muted-foreground mt-0.5">by Degxifi · hosted by King.sol</p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-bold font-mono text-xl leading-none text-yellow-400">$500</p>
+                <p className="font-mono text-[10px] text-muted-foreground mt-0.5">USDC pool</p>
+              </div>
+            </div>
+
+            <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+              Create content about $DEGX — memes, threads, videos, graphics, or market analysis. 10 winners. Judged on creativity, quality &amp; engagement.
+            </p>
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-3 font-mono text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Ends Jun 24</span>
+                <span className="text-yellow-400">🥇 $200 · 🥈 $100 · 🥉 $75 · ×7 $25</span>
+              </div>
+              <Button size="sm" variant="outline" className="font-mono text-xs uppercase tracking-wider h-7 gap-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
+                View <ArrowRight className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Campaign grid */}
