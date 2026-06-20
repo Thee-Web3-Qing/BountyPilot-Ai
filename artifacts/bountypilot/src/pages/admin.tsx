@@ -168,7 +168,7 @@ interface AdminPayoutRow {
 export function Admin() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions" | "payouts">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "report" | "reports" | "launchpad" | "payments" | "updates" | "commissions" | "payouts" | "entries">("users");
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [report, setReport] = useState<ReportData | null>(null);
@@ -220,6 +220,11 @@ export function Admin() {
   const [payoutAction, setPayoutAction] = useState<number | null>(null);
   const [payoutTxInputs, setPayoutTxInputs] = useState<Record<number, string>>({});
 
+  // Entries state
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const [entryStatusAction, setEntryStatusAction] = useState<number | null>(null);
+
   useEffect(() => {
     if (!(user as any)?.isAdmin) { navigate("/"); return; }
     loadData();
@@ -232,6 +237,7 @@ export function Admin() {
     if (activeTab === "updates") loadUpdates();
     if (activeTab === "commissions") loadCommissions();
     if (activeTab === "payouts") loadPayouts();
+    if (activeTab === "entries") loadEntries();
   }, [activeTab]);
 
   async function loadData() {
@@ -307,6 +313,44 @@ export function Admin() {
       setAdminPayouts(data.payouts ?? []);
     } catch { setAdminPayouts([]); }
     finally { setLoadingPayouts(false); }
+  }
+
+  async function loadEntries() {
+    setLoadingEntries(true);
+    try {
+      const res = await fetch(`${API}/admin/bounty-entries?bountyId=505`, { headers: authHeaders() });
+      const data = await res.json();
+      setEntries(data.entries ?? []);
+    } catch { setEntries([]); }
+    finally { setLoadingEntries(false); }
+  }
+
+  async function updateEntryStatus(id: number, status: string) {
+    setEntryStatusAction(id);
+    try {
+      const res = await fetch(`${API}/admin/bounty-entries/${id}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) setEntries(prev => prev.map(e => e.id === id ? { ...e, status } : e));
+    } finally { setEntryStatusAction(null); }
+  }
+
+  function exportEntries() {
+    const token = localStorage.getItem("auth_token");
+    const url = `${API}/admin/bounty-entries/export?bountyId=505`;
+    const a = document.createElement("a");
+    a.href = url + `&_token=${encodeURIComponent(token ?? "")}`;
+    fetch(url, { headers: authHeaders() })
+      .then(r => r.blob())
+      .then(blob => {
+        const objUrl = URL.createObjectURL(blob);
+        a.href = objUrl;
+        a.download = "bounty-entries-505.csv";
+        a.click();
+        URL.revokeObjectURL(objUrl);
+      });
   }
 
   async function updatePayout(id: number, status: "paid" | "processing" | "failed") {
@@ -552,6 +596,7 @@ export function Admin() {
           { key: "reports" as const, label: "Flagged", icon: Flag },
           { key: "launchpad" as const, label: "Launchpad", icon: Rocket },
           { key: "updates" as const, label: "Updates", icon: BellDot },
+          { key: "entries" as const, label: "Entries", icon: Send },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -1717,6 +1762,110 @@ export function Admin() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {activeTab === "entries" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                $DEGX Contest Entries — {entries.length} total
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={loadEntries} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded" title="Refresh">
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingEntries ? "animate-spin" : ""}`} />
+              </button>
+              <button
+                onClick={exportEntries}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-border text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              >
+                <ArrowDownCircle className="w-3.5 h-3.5" />
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          {loadingEntries ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Send className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+              <p className="font-mono text-sm">No entries yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {entries.map((entry: any) => (
+                <div key={entry.id} className="bg-card border border-border rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                          entry.status === "winner" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/30"
+                          : entry.status === "reviewed" ? "text-blue-400 bg-blue-500/10 border-blue-500/30"
+                          : entry.status === "disqualified" ? "text-red-400 bg-red-500/10 border-red-500/30"
+                          : "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+                        }`}>
+                          {entry.status}
+                        </span>
+                        {entry.contentType && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+                            {entry.contentType.replace("_", " ")}
+                          </span>
+                        )}
+                        <span className="font-mono text-xs font-bold text-foreground">@{entry.xHandle}</span>
+                        {entry.username && (
+                          <span className="font-mono text-[10px] text-muted-foreground">({entry.username})</span>
+                        )}
+                      </div>
+                      <a
+                        href={entry.xPostUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-xs text-sky-400 hover:text-sky-300 underline underline-offset-2 block truncate max-w-xs"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {entry.xPostUrl}
+                      </a>
+                      {entry.walletAddress && (
+                        <p className="font-mono text-[10px] text-muted-foreground truncate max-w-xs">
+                          💳 {entry.walletAddress}
+                        </p>
+                      )}
+                      {entry.notes && (
+                        <p className="font-mono text-[10px] text-muted-foreground italic">{entry.notes}</p>
+                      )}
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        {new Date(entry.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                      {(["submitted", "reviewed", "winner", "disqualified"] as const).map(s => (
+                        <button
+                          key={s}
+                          disabled={entry.status === s || entryStatusAction === entry.id}
+                          onClick={() => updateEntryStatus(entry.id, s)}
+                          className={`text-[10px] font-mono px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
+                            entry.status === s
+                              ? s === "winner" ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
+                                : s === "reviewed" ? "border-blue-500 text-blue-400 bg-blue-500/10"
+                                : s === "disqualified" ? "border-red-500 text-red-400 bg-red-500/10"
+                                : "border-emerald-500 text-emerald-400 bg-emerald-500/10"
+                              : "border-border text-muted-foreground hover:border-foreground/30"
+                          }`}
+                        >
+                          {entryStatusAction === entry.id ? "…" : s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

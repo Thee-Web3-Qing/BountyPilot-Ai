@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Rocket, Trophy, Gift, Calendar, Star, ArrowRight, Users, Loader2, Clock,
-  Zap, Twitter,
+  Zap, Twitter, Send, CheckCircle, AlertCircle, X,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,6 +83,201 @@ const CAMPAIGNS: CampaignMeta[] = [
   },
 ];
 
+const CONTENT_TYPES = [
+  { value: "meme", label: "Meme" },
+  { value: "thread", label: "Thread" },
+  { value: "video", label: "Video" },
+  { value: "graphic", label: "Graphic" },
+  { value: "market_analysis", label: "Market Analysis" },
+  { value: "creative_post", label: "Creative Post" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Submit Entry Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SubmitEntryModalProps {
+  token: string;
+  onClose: () => void;
+}
+
+function SubmitEntryModal({ token, onClose }: SubmitEntryModalProps) {
+  const [xHandle, setXHandle] = useState("");
+  const [xPostUrl, setXPostUrl] = useState("");
+  const [contentType, setContentType] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!xHandle.trim() || !xPostUrl.trim()) {
+      setError("X handle and post URL are required.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/bounty-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ bountyId: 505, xHandle, xPostUrl, contentType: contentType || null, walletAddress: walletAddress || null, notes: notes || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Submission failed");
+      } else {
+        setSuccess(true);
+      }
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-card border border-yellow-500/30 rounded-lg w-full max-w-md shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Twitter className="w-4 h-4 text-sky-400" />
+            <span className="font-bold font-mono text-sm uppercase tracking-wider">Submit $DEGX Entry</span>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="p-6 text-center space-y-3">
+            <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto" />
+            <p className="font-bold font-mono text-sm uppercase tracking-wider text-emerald-500">Entry Submitted!</p>
+            <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+              Your entry has been recorded. Winners will be announced after June 24. Good luck! 🏆
+            </p>
+            <Button onClick={onClose} className="font-mono text-xs uppercase tracking-wider w-full mt-2">
+              Close
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            {/* Rules reminder */}
+            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded p-3 space-y-1">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-yellow-400 mb-1.5">Before submitting, make sure you:</p>
+              {["Followed @Degxifi", "Liked & reposted the contest post", "Tagged @Degxifi in your post", "Used the ticker $DEGX"].map(r => (
+                <p key={r} className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span className="text-yellow-400">✓</span> {r}
+                </p>
+              ))}
+            </div>
+
+            {/* X Handle */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Your X Handle <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">@</span>
+                <Input
+                  value={xHandle}
+                  onChange={e => setXHandle(e.target.value.replace(/^@/, ""))}
+                  placeholder="yourhandle"
+                  className="pl-7 font-mono text-sm"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Post URL */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                X Post URL <span className="text-red-400">*</span>
+              </label>
+              <Input
+                value={xPostUrl}
+                onChange={e => setXPostUrl(e.target.value)}
+                placeholder="https://x.com/yourhandle/status/..."
+                className="font-mono text-xs"
+                required
+              />
+              <p className="font-mono text-[10px] text-muted-foreground">Paste the direct link to your submission post</p>
+            </div>
+
+            {/* Content Type */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Content Type</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {CONTENT_TYPES.map(ct => (
+                  <button
+                    key={ct.value}
+                    type="button"
+                    onClick={() => setContentType(ct.value)}
+                    className={`font-mono text-[10px] uppercase tracking-wider px-2 py-1.5 rounded border transition-colors ${
+                      contentType === ct.value
+                        ? "border-yellow-500 bg-yellow-500/10 text-yellow-400"
+                        : "border-border text-muted-foreground hover:border-yellow-500/40"
+                    }`}
+                  >
+                    {ct.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Wallet Address */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                Wallet Address <span className="text-muted-foreground font-normal">(for prize delivery)</span>
+              </label>
+              <Input
+                value={walletAddress}
+                onChange={e => setWalletAddress(e.target.value)}
+                placeholder="Solana / EVM wallet address"
+                className="font-mono text-xs"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <label className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">Notes (optional)</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Anything else you'd like to add..."
+                rows={2}
+                className="w-full bg-background border border-input rounded-md px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded p-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <p className="font-mono text-xs">{error}</p>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full font-mono text-xs uppercase tracking-wider gap-2 bg-yellow-500 hover:bg-yellow-400 text-black"
+            >
+              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {submitting ? "Submitting..." : "Submit Entry"}
+            </Button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Launchpad page
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,6 +285,7 @@ const CAMPAIGNS: CampaignMeta[] = [
 export function Launchpad() {
   const [, navigate] = useLocation();
   const { token } = useAuth();
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const { data: campaignData, isLoading } = useQuery({
     queryKey: ["campaigns"],
@@ -108,6 +306,10 @@ export function Launchpad() {
 
   return (
     <div className="w-full flex flex-col gap-4">
+      {showSubmitModal && token && (
+        <SubmitEntryModal token={token} onClose={() => setShowSubmitModal(false)} />
+      )}
+
       {/* Header */}
       <div className="mb-2">
         <h1 className="font-bold font-sans text-2xl uppercase tracking-tighter flex items-center gap-2">
@@ -126,13 +328,13 @@ export function Launchpad() {
           <span className="font-mono text-xs uppercase tracking-widest text-yellow-400">Spotlight Bounty</span>
         </div>
 
-        <Card
-          className="bg-card border-yellow-500/30 hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
-          onClick={() => navigate("/bounties/505")}
-        >
+        <Card className="bg-card border-yellow-500/30 overflow-hidden">
           <div className="h-0.5 w-full bg-yellow-500" />
           <CardContent className="p-5 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+            <div
+              className="flex items-start justify-between gap-3 cursor-pointer"
+              onClick={() => navigate("/bounties/505")}
+            >
               <div className="flex items-start gap-2">
                 <Twitter className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
                 <div>
@@ -166,11 +368,26 @@ export function Launchpad() {
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-3 font-mono text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Ends Jun 24</span>
-                <span className="text-yellow-400">🥇 $200 · 🥈 $100 · 🥉 $75 · ×7 $25</span>
+                <span className="text-yellow-400 hidden sm:inline">🥇 $200 · 🥈 $100 · 🥉 $75 · ×7 $25</span>
               </div>
-              <Button size="sm" variant="outline" className="font-mono text-xs uppercase tracking-wider h-7 gap-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
-                View <ArrowRight className="w-3 h-3" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="font-mono text-xs uppercase tracking-wider h-7 gap-1 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                  onClick={() => navigate("/bounties/505")}
+                >
+                  View <ArrowRight className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  className="font-mono text-xs uppercase tracking-wider h-7 gap-1 bg-yellow-500 hover:bg-yellow-400 text-black"
+                  onClick={() => setShowSubmitModal(true)}
+                >
+                  <Send className="w-3 h-3" />
+                  Submit
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

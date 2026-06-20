@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { usersTable, bountiesTable, earningsTable, bountyReportsTable } from "@workspace/db";
 import { dextopusDepositsTable } from "@workspace/db";
 import { referralsTable, affiliateCommissionsTable, payoutsTable } from "@workspace/db";
+import { bountyEntriesTable } from "@workspace/db";
 import { eq, count, desc, gte, sql, isNotNull, and, ilike, or, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
@@ -756,5 +757,98 @@ adminRouter.patch("/payouts/:id", requireAuth, requireAdmin, async (req: AuthReq
   } catch (err) {
     logger.error(err, "Admin update payout error");
     res.status(500).json({ error: "Failed to update payout" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// Bounty Entries
+// ─────────────────────────────────────────────────────────────
+
+// GET /admin/bounty-entries?bountyId=X — list all entries for a bounty
+adminRouter.get("/bounty-entries", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const bountyId = req.query.bountyId ? Number(req.query.bountyId) : null;
+
+    const rows = await db
+      .select({
+        id: bountyEntriesTable.id,
+        bountyId: bountyEntriesTable.bountyId,
+        userId: bountyEntriesTable.userId,
+        xHandle: bountyEntriesTable.xHandle,
+        xPostUrl: bountyEntriesTable.xPostUrl,
+        contentType: bountyEntriesTable.contentType,
+        walletAddress: bountyEntriesTable.walletAddress,
+        notes: bountyEntriesTable.notes,
+        status: bountyEntriesTable.status,
+        createdAt: bountyEntriesTable.createdAt,
+        username: usersTable.username,
+        email: usersTable.email,
+      })
+      .from(bountyEntriesTable)
+      .leftJoin(usersTable, eq(bountyEntriesTable.userId, usersTable.id))
+      .where(bountyId ? eq(bountyEntriesTable.bountyId, bountyId) : undefined)
+      .orderBy(desc(bountyEntriesTable.createdAt));
+
+    res.json({ entries: rows, total: rows.length });
+  } catch (err) {
+    logger.error(err, "Admin list bounty entries error");
+    res.status(500).json({ error: "Failed to list entries" });
+  }
+});
+
+// PATCH /admin/bounty-entries/:id — update entry status
+adminRouter.patch("/bounty-entries/:id", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { status } = req.body as { status: string };
+    await db.update(bountyEntriesTable).set({ status }).where(eq(bountyEntriesTable.id, id));
+    res.json({ updated: true });
+  } catch (err) {
+    logger.error(err, "Admin update bounty entry error");
+    res.status(500).json({ error: "Failed to update entry" });
+  }
+});
+
+// GET /admin/bounty-entries/export — download CSV
+adminRouter.get("/bounty-entries/export", requireAuth, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const bountyId = req.query.bountyId ? Number(req.query.bountyId) : null;
+
+    const rows = await db
+      .select({
+        id: bountyEntriesTable.id,
+        bountyId: bountyEntriesTable.bountyId,
+        xHandle: bountyEntriesTable.xHandle,
+        xPostUrl: bountyEntriesTable.xPostUrl,
+        contentType: bountyEntriesTable.contentType,
+        walletAddress: bountyEntriesTable.walletAddress,
+        notes: bountyEntriesTable.notes,
+        status: bountyEntriesTable.status,
+        createdAt: bountyEntriesTable.createdAt,
+        username: usersTable.username,
+        email: usersTable.email,
+      })
+      .from(bountyEntriesTable)
+      .leftJoin(usersTable, eq(bountyEntriesTable.userId, usersTable.id))
+      .where(bountyId ? eq(bountyEntriesTable.bountyId, bountyId) : undefined)
+      .orderBy(desc(bountyEntriesTable.createdAt));
+
+    const header = ["id", "bounty_id", "username", "email", "x_handle", "x_post_url", "content_type", "wallet_address", "notes", "status", "submitted_at"];
+    const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [
+      header.join(","),
+      ...rows.map(r => [
+        r.id, r.bountyId, r.username ?? "", r.email ?? "",
+        r.xHandle, r.xPostUrl, r.contentType ?? "", r.walletAddress ?? "",
+        r.notes ?? "", r.status, r.createdAt?.toISOString() ?? "",
+      ].map(escape).join(","))
+    ];
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="bounty-entries-${bountyId ?? "all"}.csv"`);
+    res.send(lines.join("\n"));
+  } catch (err) {
+    logger.error(err, "Admin export bounty entries error");
+    res.status(500).json({ error: "Failed to export entries" });
   }
 });

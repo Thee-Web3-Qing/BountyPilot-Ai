@@ -20,6 +20,7 @@ import { checkinRouter } from "./checkin";
 import { notificationsRouter } from "./notifications";
 import { agentRouter } from "./agent";
 import { telegramRouter } from "./telegram";
+import { bountyEntriesRouter } from "./bounty-entries.js";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use("/checkin", checkinRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/agent", agentRouter);
 router.use("/telegram", telegramRouter);
+router.use("/bounty-entries", bountyEntriesRouter);
 
 export default router;
