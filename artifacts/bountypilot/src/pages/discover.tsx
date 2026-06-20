@@ -210,8 +210,8 @@ function DetailDrawer({
                   {bounty.contentFormat}
                 </span>
               )}
-              {bounty.opportunityType && bounty.opportunityType !== "Bounty" && (
-                <span className="font-mono text-[10px] border border-amber-500/30 bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+              {bounty.opportunityType && (
+                <span className={`font-mono text-[10px] border px-1.5 py-0.5 rounded-sm whitespace-nowrap ${typeChipClass(bounty.opportunityType)}`}>
                   {bounty.opportunityType}
                 </span>
               )}
@@ -339,6 +339,31 @@ function DetailDrawer({
   );
 }
 
+// ─── Opportunity type helpers ──────────────────────────────────────────────
+const ALL_OPPORTUNITY_TYPES = ["Bounty", "Job", "Gig", "Outreach", "Grant", "Contest"] as const;
+
+function typeChipClass(type: string): string {
+  switch (type) {
+    case "Job":     return "border-purple-500/40 bg-purple-500/10 text-purple-400";
+    case "Gig":     return "border-cyan-500/40 bg-cyan-500/10 text-cyan-400";
+    case "Outreach":return "border-pink-500/40 bg-pink-500/10 text-pink-400";
+    case "Grant":   return "border-green-500/40 bg-green-500/10 text-green-400";
+    case "Contest": return "border-amber-500/40 bg-amber-500/10 text-amber-400";
+    default:        return "border-primary/30 bg-primary/10 text-primary/80"; // Bounty
+  }
+}
+
+function typeFilterActive(type: string): string {
+  switch (type) {
+    case "Job":     return "bg-purple-500 text-white border-purple-500";
+    case "Gig":     return "bg-cyan-500 text-black border-cyan-500";
+    case "Outreach":return "bg-pink-500 text-white border-pink-500";
+    case "Grant":   return "bg-green-500 text-black border-green-500";
+    case "Contest": return "bg-amber-500 text-black border-amber-500";
+    default:        return "bg-primary text-primary-foreground border-primary";
+  }
+}
+
 // ─── Bounty Card ───────────────────────────────────────────────────────────
 function BountyCard({
   bounty,
@@ -360,7 +385,7 @@ function BountyCard({
 
   function copyLink(e: React.MouseEvent) {
     e.stopPropagation();
-    const link = bounty.url || `${window.location.origin}/bounties/${bounty.id}`;
+    const link = `${window.location.origin}/bounties/${bounty.id}`;
     navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
@@ -434,8 +459,8 @@ function BountyCard({
             {bounty.contentFormat.split("/")[0].trim()}
           </span>
         )}
-        {bounty.opportunityType && bounty.opportunityType !== "Bounty" && (
-          <span className="font-mono text-[10px] border border-amber-500/30 bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+        {bounty.opportunityType && (
+          <span className={`font-mono text-[10px] border px-1.5 py-0.5 rounded-sm whitespace-nowrap ${typeChipClass(bounty.opportunityType)}`}>
             {bounty.opportunityType}
           </span>
         )}
@@ -727,28 +752,30 @@ export function Discover() {
         ))}
       </div>
 
-      {/* Opportunity type filter */}
-      {opportunityTypes.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap">
-          <span className="font-mono text-[11px] text-muted-foreground/60 px-1 py-1">Type:</span>
-          <button
-            onClick={() => { setFilterBeginner(!filterBeginner); setForYouMode(false); }}
-            className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${filterBeginner ? "bg-green-500 text-black border-green-500" : "border-border text-muted-foreground hover:text-foreground"}`}
-          >
-            <Zap className="w-3 h-3" />
-            Beginner/Vibe ({bounties.filter((b) => b.tags?.toLowerCase().includes("beginner-friendly")).length})
-          </button>
-          {opportunityTypes.map((t) => (
+      {/* Opportunity type filter — always shows all 6 types */}
+      <div className="flex gap-1.5 flex-wrap">
+        <span className="font-mono text-[11px] text-muted-foreground/60 px-1 py-1">Type:</span>
+        <button
+          onClick={() => { setFilterBeginner(!filterBeginner); setForYouMode(false); }}
+          className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap flex items-center gap-1 ${filterBeginner ? "bg-green-500 text-black border-green-500" : "border-border text-muted-foreground hover:text-foreground"}`}
+        >
+          <Zap className="w-3 h-3" />
+          Beginner ({bounties.filter((b) => b.tags?.toLowerCase().includes("beginner-friendly")).length})
+        </button>
+        {ALL_OPPORTUNITY_TYPES.map((t) => {
+          const count = bounties.filter((b) => (b.opportunityType ?? "Bounty") === t).length;
+          const isActive = filterType === t;
+          return (
             <button
               key={t}
-              onClick={() => { setFilterType(filterType === t ? "" : t); setForYouMode(false); }}
-              className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${filterType === t ? "bg-amber-500 text-black border-amber-500" : "border-border text-muted-foreground hover:text-foreground"}`}
+              onClick={() => { setFilterType(isActive ? "" : t); setForYouMode(false); }}
+              className={`font-mono text-[11px] px-2.5 py-1 rounded-sm border transition-colors whitespace-nowrap ${isActive ? typeFilterActive(t) : "border-border text-muted-foreground hover:text-foreground"}`}
             >
-              {t} ({bounties.filter((b) => b.opportunityType === t).length})
+              {t} ({count})
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {/* For You context banner */}
       {forYouMode && profile && (

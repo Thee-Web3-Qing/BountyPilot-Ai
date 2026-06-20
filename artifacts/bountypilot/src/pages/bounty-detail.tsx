@@ -822,7 +822,7 @@ export function BountyDetail() {
               className="text-primary flex items-center gap-1 text-sm hover:underline">
               Original URL <ExternalLink className="w-3 h-3" />
             </a>
-            <CopyLinkButton url={bounty.url || `${window.location.origin}/bounties/${bounty.id}`} />
+            <CopyLinkButton url={`${window.location.origin}/bounties/${bounty.id}`} />
           </div>
         </CardContent>
       </Card>
