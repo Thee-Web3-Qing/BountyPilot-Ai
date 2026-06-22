@@ -1,4 +1,4 @@
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivySafe } from "@/contexts/privy-auth";
 import { useCallback, useState } from "react";
 import { useAuth } from "@/contexts/auth";
 import { identifyPendo, trackPendo } from "@/lib/pendo";
@@ -9,7 +9,7 @@ const USER_KEY = "bountypilot_user";
 const API_BASE = "/api";
 
 export function usePrivyLogin() {
-  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser, ready, getAccessToken } = usePrivy();
+  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser, ready, getAccessToken } = usePrivySafe();
   const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

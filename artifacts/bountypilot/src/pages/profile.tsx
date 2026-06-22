@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/auth";
-import { usePrivy, useLinkAccount } from "@privy-io/react-auth";
+import { usePrivySafe } from "@/contexts/privy-auth";
 import { usePrivyLogin } from "@/hooks/use-privy-login";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -172,8 +172,11 @@ function chipList(value?: string): string[] {
 export function Profile() {
   usePageMeta({ title: "Profile", description: "Your BountyPilot profile", canonical: "/profile" });
   const { user, token } = useAuth();
-  const { user: privyUser, authenticated: privyAuthenticated, unlinkGoogle, unlinkTwitter, unlinkDiscord, unlinkGithub } = usePrivy();
-  const { linkGoogle, linkTwitter, linkDiscord, linkGithub } = useLinkAccount();
+  const {
+    user: privyUser, authenticated: privyAuthenticated,
+    unlinkGoogle, unlinkTwitter, unlinkDiscord, unlinkGithub,
+    linkGoogle, linkTwitter, linkDiscord, linkGithub,
+  } = usePrivySafe();
   const { loginWithPrivy, exchangeWithCurrentUser, loading: privyLoginLoading } = usePrivyLogin();
   const [unlinkingType, setUnlinkingType] = useState<string | null>(null);
   const [connectingPrivy, setConnectingPrivy] = useState(false);

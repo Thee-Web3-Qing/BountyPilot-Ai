@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Crosshair, Loader2, AlertCircle, Wallet } from "lucide-react";
 import { NotificationBell } from "@/components/NotificationBell";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivySafe } from "@/contexts/privy-auth";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { identifyPendo, trackPendo } from "@/lib/pendo";
 
@@ -18,7 +18,7 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { login, isLoading, refreshUser } = useAuth();
-  const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser, getAccessToken, ready: privyReady } = usePrivy();
+  const { login: privyLogin, authenticated: privyAuthenticated, user: privyUser, getAccessToken, ready: privyReady } = usePrivySafe();
   const [privyLoading, setPrivyLoading] = useState(false);
   const [privyNeedsEmail, setPrivyNeedsEmail] = useState(false);
   const [privyPendingToken, setPrivyPendingToken] = useState<string | null>(null);
