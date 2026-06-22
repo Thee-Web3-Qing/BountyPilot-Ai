@@ -112,7 +112,7 @@ const AGENT_TOOLS = [
     type: "function" as const,
     function: {
       name: "score_bounty",
-      description: "Score the bounty opportunity on a 1-10 scale based on reward, deadline, and creator fit. Always call this first.",
+      description: "Score the bounty opportunity on a 1-100 scale based on reward, deadline, and creator fit. Always call this first.",
       parameters: {
         type: "object",
         properties: {
@@ -252,9 +252,9 @@ export async function runBountyAgentPipeline(
     const analysis = await analyzeBounty(scraped);
     opportunityScore = analysis.opportunityScore;
     scoreExplanation = analysis.scoreExplanation;
-    emit?.({ type: "tool_result", step: stepCount, tool: "score_bounty", durationMs: Date.now() - t1, preview: `Score: ${opportunityScore}/10 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
+    emit?.({ type: "tool_result", step: stepCount, tool: "score_bounty", durationMs: Date.now() - t1, preview: `Score: ${opportunityScore}/100 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
 
-    if (opportunityScore >= 5) {
+    if (opportunityScore >= 50) {
       emit?.({ type: "tool_call", step: ++stepCount, tool: "generate_research_brief", label: "Generating Research Brief" });
       const t2 = Date.now();
       const brief = await generateResearchBrief(scraped);
@@ -280,7 +280,7 @@ export async function runBountyAgentPipeline(
     const result: AgentPipelineResult = {
       scraped, opportunityScore, scoreExplanation, briefGenerated, planGenerated, draftGenerated,
       researchBrief, productionPlan, applicationDraft,
-      agentDecision: opportunityScore >= 5 ? "Pursued — score meets threshold" : "Skipped brief — low score",
+      agentDecision: opportunityScore >= 50 ? "Pursued — score meets threshold" : "Skipped brief — low score",
       toolCallLog: [], durationMs: Date.now() - start,
     };
     emit?.({ type: "done", opportunityScore, scoreExplanation, briefGenerated, planGenerated, draftGenerated, applicationDraft, agentDecision: result.agentDecision, durationMs: result.durationMs, title: scraped.title ?? "Untitled", platform: scraped.platform ?? "Unknown" });
@@ -294,7 +294,7 @@ export async function runBountyAgentPipeline(
 
 Follow this sequence using the available tools:
 1. Call score_bounty to evaluate the opportunity
-2. If the bounty looks worthwhile (score 5+), call generate_research_brief
+2. If the bounty looks worthwhile (score 50+), call generate_research_brief
 3. After the research brief, call generate_production_plan
 4. After the production plan, call draft_application to write a ready-to-submit cover letter
 5. Always finish by calling finalize_pipeline with your recommendation
@@ -338,8 +338,8 @@ Work through the pipeline step by step using the available tools.`,
         const analysis = await analyzeBounty(scraped);
         opportunityScore = analysis.opportunityScore;
         scoreExplanation = analysis.scoreExplanation;
-        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: `Score: ${opportunityScore}/10 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
-        return { opportunityScore, scoreExplanation, decision: opportunityScore >= 5 ? "proceed_to_brief" : "skip_brief" };
+        emit?.({ type: "tool_result", step: stepCount, tool: name, durationMs: Date.now() - t, preview: `Score: ${opportunityScore}/100 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
+        return { opportunityScore, scoreExplanation, decision: opportunityScore >= 50 ? "proceed_to_brief" : "skip_brief" };
       }
 
       case "generate_research_brief": {
@@ -419,7 +419,7 @@ Work through the pipeline step by step using the available tools.`,
     const analysis = await analyzeBounty(scraped);
     opportunityScore = analysis.opportunityScore;
     scoreExplanation = analysis.scoreExplanation;
-    emit?.({ type: "tool_result", step: stepCount, tool: "score_bounty", durationMs: Date.now() - t1, preview: `Score: ${opportunityScore}/10 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
+    emit?.({ type: "tool_result", step: stepCount, tool: "score_bounty", durationMs: Date.now() - t1, preview: `Score: ${opportunityScore}/100 — ${scoreExplanation.slice(0, 100)}`, score: opportunityScore });
 
     const durationMs = Date.now() - start;
     agentDecision = isQuotaErr

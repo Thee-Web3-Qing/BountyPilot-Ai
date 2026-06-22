@@ -623,13 +623,13 @@ async function fixUnspecifiedBounties(): Promise<void> {
         ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
         : null;
       const deadlineNote = dl !== null ? `${dl} days until deadline` : "no deadline specified";
-      const score = bounty.opportunityScore ?? 5;
+      const score = bounty.opportunityScore ?? 50;
       const verdict =
-        score >= 7 ? "Strong opportunity — clear deliverables and solid reward."
-        : score >= 5 ? "Moderate opportunity — worth pursuing if format aligns with your strengths."
+        score >= 70 ? "Strong opportunity — clear deliverables and solid reward."
+        : score >= 50 ? "Moderate opportunity — worth pursuing if format aligns with your strengths."
         : "Lower priority — limited reward or tight timeline.";
       const rewardPart = reward ? `${reward} reward` : "reward listed on platform";
-      const newExplanation = `Score ${score}/10: ${rewardPart}. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
+      const newExplanation = `Score ${score}/100: ${rewardPart}. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
 
       await db
         .update(bountiesTable)
@@ -654,16 +654,16 @@ async function fixUnspecifiedBounties(): Promise<void> {
       );
 
     for (const bounty of nullRewardStale) {
-      const score = bounty.opportunityScore ?? 5;
+      const score = bounty.opportunityScore ?? 50;
       const dl = bounty.deadline
         ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
         : null;
       const deadlineNote = dl !== null ? (dl < 0 ? "deadline passed" : `${dl} days to deadline`) : "open deadline";
       const verdict =
-        score >= 7 ? "Strong pick — solid reward and clear deliverables."
-        : score >= 5 ? "Worth pursuing if the format fits your strengths."
+        score >= 70 ? "Strong pick — solid reward and clear deliverables."
+        : score >= 50 ? "Worth pursuing if the format fits your strengths."
         : "Lower priority — limited reward or tight timeline.";
-      const newExplanation = `Score ${score}/10: reward listed on platform. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
+      const newExplanation = `Score ${score}/100: reward listed on platform. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
 
       await db
         .update(bountiesTable)
@@ -687,16 +687,16 @@ async function fixUnspecifiedBounties(): Promise<void> {
       );
 
     for (const bounty of zeroRewardStale) {
-      const score = bounty.opportunityScore ?? 4;
+      const score = bounty.opportunityScore ?? 40;
       const dl = bounty.deadline
         ? Math.round((new Date(bounty.deadline).getTime() - Date.now()) / 86400000)
         : null;
       const deadlineNote = dl !== null ? (dl < 0 ? "deadline passed" : dl === 0 ? "deadline today" : `${dl} days to deadline`) : "open deadline";
       const verdict =
-        score >= 7 ? "Strong pick — solid reward and clear deliverables."
-        : score >= 5 ? "Worth pursuing if the format fits your strengths."
+        score >= 70 ? "Strong pick — solid reward and clear deliverables."
+        : score >= 50 ? "Worth pursuing if the format fits your strengths."
         : "Lower priority — limited reward or tight timeline.";
-      const newExplanation = `Score ${score}/10: reward listed on platform. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
+      const newExplanation = `Score ${score}/100: reward listed on platform. ${deadlineNote}. Format: ${bounty.contentFormat || "open"}. ${verdict}`;
 
       await db
         .update(bountiesTable)

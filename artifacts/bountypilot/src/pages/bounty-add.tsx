@@ -85,8 +85,8 @@ function WorkflowSteps({ isRunning }: { isRunning: boolean }) {
 }
 
 const SCORE_COLOR = (score: number) => {
-  if (score >= 7) return "text-green-400 border-green-400/50 bg-green-400/10";
-  if (score >= 4) return "text-yellow-400 border-yellow-400/50 bg-yellow-400/10";
+  if (score >= 70) return "text-green-400 border-green-400/50 bg-green-400/10";
+  if (score >= 40) return "text-yellow-400 border-yellow-400/50 bg-yellow-400/10";
   return "text-red-400 border-red-400/50 bg-red-400/10";
 };
 

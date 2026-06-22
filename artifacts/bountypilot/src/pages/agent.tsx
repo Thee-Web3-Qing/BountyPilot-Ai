@@ -110,9 +110,9 @@ function ConfirmCard({
   onContinue: () => void;
   onStop: () => void;
 }) {
-  const isHigh   = score >= 8;
-  const isMedium = score >= 5 && score < 8;
-  const isLow    = score < 5;
+  const isHigh   = score >= 80;
+  const isMedium = score >= 50 && score < 80;
+  const isLow    = score < 50;
 
   const accent = isHigh ? "border-green-500/50 bg-green-500/5"
     : isMedium ? "border-yellow-500/50 bg-yellow-500/5"
@@ -135,7 +135,7 @@ function ConfirmCard({
         </span>
       </div>
       <div className="flex items-center gap-3 pl-6">
-        <span className={cn("font-bold text-2xl font-mono", scoreColor)}>{score}/10</span>
+        <span className={cn("font-bold text-2xl font-mono", scoreColor)}>{score}/100</span>
         <p className="font-mono text-xs text-foreground leading-snug">{message}</p>
       </div>
       <div className="flex items-center gap-2 pl-6">
@@ -312,9 +312,9 @@ function EventRow({ event, token, bountyUrl }: {
             {event.score != null && (
               <span className={cn(
                 "font-bold ml-0.5",
-                event.score >= 7 ? "text-green-400" : event.score >= 5 ? "text-yellow-400" : "text-red-400"
+                event.score >= 70 ? "text-green-400" : event.score >= 50 ? "text-yellow-400" : "text-red-400"
               )}>
-                {event.score}/10
+                {event.score}/100
               </span>
             )}
             {isLong && (
@@ -352,8 +352,8 @@ function EventRow({ event, token, bountyUrl }: {
       return (
         <div className={cn(
           "rounded-sm border p-3 flex flex-col gap-2 mt-1",
-          event.opportunityScore >= 7 ? "border-green-500/40 bg-green-500/5"
-            : event.opportunityScore >= 5 ? "border-yellow-500/40 bg-yellow-500/5"
+          event.opportunityScore >= 70 ? "border-green-500/40 bg-green-500/5"
+            : event.opportunityScore >= 50 ? "border-yellow-500/40 bg-yellow-500/5"
             : "border-red-500/40 bg-red-500/5"
         )}>
           <div className="flex items-center justify-between gap-2">
@@ -366,9 +366,9 @@ function EventRow({ event, token, bountyUrl }: {
           <div className="flex items-center gap-3 pl-6">
             <span className={cn(
               "font-bold text-2xl font-mono",
-              event.opportunityScore >= 7 ? "text-green-400" : event.opportunityScore >= 5 ? "text-yellow-400" : "text-red-400"
+              event.opportunityScore >= 70 ? "text-green-400" : event.opportunityScore >= 50 ? "text-yellow-400" : "text-red-400"
             )}>
-              {event.opportunityScore}/10
+              {event.opportunityScore}/100
             </span>
             <div className="flex flex-col gap-0.5">
               <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">Opportunity Score</span>

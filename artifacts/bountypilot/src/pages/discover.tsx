@@ -112,8 +112,8 @@ function daysLeft(deadline: string | null): number | null {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 7) return "text-green-400";
-  if (score >= 5) return "text-yellow-400";
+  if (score >= 70) return "text-green-400";
+  if (score >= 50) return "text-yellow-400";
   return "text-red-400";
 }
 
@@ -132,8 +132,8 @@ function formatReward(amount: string | null, currency: string | null): string {
 }
 
 function scoreBg(score: number): string {
-  if (score >= 7) return "border-green-500/40 bg-green-500/10";
-  if (score >= 5) return "border-yellow-500/40 bg-yellow-500/10";
+  if (score >= 70) return "border-green-500/40 bg-green-500/10";
+  if (score >= 50) return "border-yellow-500/40 bg-yellow-500/10";
   return "border-red-500/40 bg-red-500/10";
 }
 

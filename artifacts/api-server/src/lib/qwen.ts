@@ -37,7 +37,7 @@ export interface QwenMessage {
 
 export interface ScoreCriterion {
   label: string;
-  score: number; // 1-10
+  score: number; // 1-100
   note: string;
 }
 
@@ -185,22 +185,22 @@ export async function runQwenAgentLoop(
 // ── Rule-based scoring (fallback) ─────────────────────────────
 
 function ruleBasedScore(rewardAmount: string | null, deadline: string | null): number {
-  let score = 5;
+  let score = 50;
   if (rewardAmount) {
     const num = parseFloat(rewardAmount.replace(/[^0-9.]/g, ""));
-    if (num >= 5000) score += 2;
-    else if (num >= 1500) score += 1.5;
-    else if (num >= 500) score += 0.5;
-    else if (num < 100) score -= 1;
+    if (num >= 5000) score += 20;
+    else if (num >= 1500) score += 15;
+    else if (num >= 500) score += 5;
+    else if (num < 100) score -= 10;
   }
   if (deadline) {
     const daysLeft = (new Date(deadline).getTime() - Date.now()) / 86400000;
-    if (daysLeft < 0) score -= 3;
-    else if (daysLeft < 3) score -= 1;
-    else if (daysLeft > 14) score += 1;
-    else if (daysLeft > 7) score += 0.5;
+    if (daysLeft < 0) score -= 30;
+    else if (daysLeft < 3) score -= 10;
+    else if (daysLeft > 14) score += 10;
+    else if (daysLeft > 7) score += 5;
   }
-  return Math.max(1, Math.min(10, Math.round(score)));
+  return Math.max(1, Math.min(100, Math.round(score)));
 }
 
 function templateExplanation(score: number, scraped: ScrapedBounty): string {
@@ -215,10 +215,10 @@ function templateExplanation(score: number, scraped: ScrapedBounty): string {
       })()
     : "open deadline";
   const verdict =
-    score >= 7 ? "Strong pick — solid reward and clear deliverables."
-    : score >= 5 ? "Worth pursuing if the format fits your strengths."
+    score >= 70 ? "Strong pick — solid reward and clear deliverables."
+    : score >= 50 ? "Worth pursuing if the format fits your strengths."
     : "Lower priority — limited reward or tight timeline.";
-  return `Score ${score}/10: ${rewardPart}. ${deadlineNote}. Format: ${scraped.contentFormat || "open"}. ${verdict}`;
+  return `Score ${score}/100: ${rewardPart}. ${deadlineNote}. Format: ${scraped.contentFormat || "open"}. ${verdict}`;
 }
 
 function getSubject(scraped: ScrapedBounty): string {
@@ -365,9 +365,9 @@ Creator profile (personalise the score for THIS creator):
         properties: {
           opportunityScore: {
             type: "integer",
-            description: "Score from 1 (very poor) to 10 (excellent) reflecting creator opportunity",
+            description: "Score from 1 (very poor) to 100 (excellent) reflecting creator opportunity",
             minimum: 1,
-            maximum: 10,
+            maximum: 100,
           },
           scoreExplanation: {
             type: "string",
@@ -375,12 +375,12 @@ Creator profile (personalise the score for THIS creator):
           },
           scoreBreakdown: {
             type: "array",
-            description: "Breakdown of the 5 scoring criteria, each rated 1-10 with a short note",
+            description: "Breakdown of the 5 scoring criteria, each rated 1-100 with a short note",
             items: {
               type: "object",
               properties: {
                 label: { type: "string", description: "Criterion name: Reward, Deadline, Requirements, Format Fit, or Creator Fit" },
-                score: { type: "integer", minimum: 1, maximum: 10, description: "Individual score for this criterion" },
+                score: { type: "integer", minimum: 1, maximum: 100, description: "Individual score for this criterion" },
                 note: { type: "string", description: "One-sentence note explaining this score" },
               },
               required: ["label", "score", "note"],
@@ -398,7 +398,7 @@ Creator profile (personalise the score for THIS creator):
         {
           role: "system",
           content: `You are BountyPilot, an AI assistant helping Web3 content creators evaluate bounty opportunities.
-Score from 1-10 based on: reward size, deadline feasibility, requirement clarity, format match, and creator fit.
+Score from 1-100 based on: reward size, deadline feasibility, requirement clarity, format match, and creator fit.
 
 You MUST return scoreBreakdown as an array of exactly 5 criteria:
 1. Reward — how generous the reward is relative to the work required
@@ -429,7 +429,7 @@ ${profileContext}`,
 
     if (result) {
       return {
-        opportunityScore: Math.max(1, Math.min(10, parseInt(String(result.opportunityScore)) || baseScore)),
+        opportunityScore: Math.max(1, Math.min(100, parseInt(String(result.opportunityScore)) || baseScore)),
         scoreExplanation: result.scoreExplanation || templateExplanation(baseScore, scraped),
         scoreBreakdown: result.scoreBreakdown,
       };

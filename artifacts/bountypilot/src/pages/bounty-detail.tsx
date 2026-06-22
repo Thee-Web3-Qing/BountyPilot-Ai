@@ -213,8 +213,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const SCORE_COLOR = (score: number) => {
-  if (score >= 7) return "text-green-400";
-  if (score >= 4) return "text-yellow-400";
+  if (score >= 70) return "text-green-400";
+  if (score >= 40) return "text-yellow-400";
   return "text-red-400";
 };
 

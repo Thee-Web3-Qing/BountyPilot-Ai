@@ -6,7 +6,8 @@ description: How Privy auth is wired into BountyPilot alongside existing JWT/Goo
 ## Setup
 
 - `@privy-io/react-auth@3.31.0` installed. pnpm hoisting does NOT auto-create symlink in artifact's `node_modules` — must manually create: `mkdir -p artifacts/bountypilot/node_modules/@privy-io && ln -sfn <store-path> artifacts/bountypilot/node_modules/@privy-io/react-auth`
-- `VITE_PRIVY_APP_ID` env var required on frontend. `PRIVY_APP_SECRET` secret for backend API calls.
+- `VITE_PRIVY_APP_ID=cmqjb2mgv00dz0cjy1zniz7pq` set as shared env var (public — not a secret). `PRIVY_APP_SECRET` secret for backend API calls. Requires redeploy to take effect in prod (Vite bakes it at build time).
+- CSP "Refused to frame" warning in Replit dev preview is normal — dev domain not in Privy's allowed origins. Works on bountypilot.xyz.
 - `PrivyProvider` wraps entire app in `App.tsx` (outermost provider).
 - Google login removed from UI — Privy handles all social logins including Google.
 
