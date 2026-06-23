@@ -21,6 +21,7 @@ import { notificationsRouter } from "./notifications";
 import { agentRouter } from "./agent";
 import { telegramRouter } from "./telegram";
 import { bountyEntriesRouter } from "./bounty-entries.js";
+import ramphubRouter from "./ramphub.js";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use("/notifications", notificationsRouter);
 router.use("/agent", agentRouter);
 router.use("/telegram", telegramRouter);
 router.use("/bounty-entries", bountyEntriesRouter);
+router.use("/ramphub", ramphubRouter);
 
 export default router;

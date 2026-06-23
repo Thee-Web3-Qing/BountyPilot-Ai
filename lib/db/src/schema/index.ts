@@ -18,3 +18,4 @@ export * from "./campaign_enrollments";
 export * from "./affiliate_commissions";
 export * from "./payouts";
 export * from "./bounty_entries";
+export * from "./ramphub_orders";

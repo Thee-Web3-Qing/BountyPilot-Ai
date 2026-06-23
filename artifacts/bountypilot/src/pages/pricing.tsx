@@ -18,6 +18,11 @@ import {
   Settings2,
   Gift,
   RefreshCw,
+  Banknote,
+  Building2,
+  Hash,
+  User,
+  DollarSign,
 } from "lucide-react";
 
 interface Chain {
@@ -117,13 +122,31 @@ export function Pricing() {
   const [chainsLoading, setChainsLoading] = useState(false);
   const [tokensLoading, setTokensLoading] = useState(false);
 
+  // RampHub (Naira) checkout flow
+  const [ramphubEnabled, setRamphubEnabled] = useState(false);
+  const [showNairaCheckout, setShowNairaCheckout] = useState(false);
+  const [nairaSelectedTier, setNairaSelectedTier] = useState<string | null>(null);
+  const [nairaQuote, setNairaQuote] = useState<{ ngnAmount: number; usdtAmount: number; rate: number; provider: string } | null>(null);
+  const [nairaQuoteLoading, setNairaQuoteLoading] = useState(false);
+  const [nairaOrder, setNairaOrder] = useState<{ transactionId: string; requestReference: string; providerDetails: Record<string, unknown>; ngnAmount: number; usdtAmount: number; selectedProvider: string } | null>(null);
+  const [nairaOrderLoading, setNairaOrderLoading] = useState(false);
+  const [nairaSubmitted, setNairaSubmitted] = useState(false);
+  const [nairaError, setNairaError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/dextopus/status`);
-        const json = await res.json();
-        if (!cancelled) setDextopusEnabled(json.enabled);
+        const [dextRes, rhRes] = await Promise.all([
+          fetch(`${API_BASE}/dextopus/status`),
+          fetch(`${API_BASE}/ramphub/status`),
+        ]);
+        const dextJson = await dextRes.json();
+        const rhJson = await rhRes.json();
+        if (!cancelled) {
+          setDextopusEnabled(dextJson.enabled);
+          setRamphubEnabled(rhJson.enabled);
+        }
       } catch {
         // ignore
       }
@@ -220,6 +243,66 @@ export function Pricing() {
     setTxSubmitted(false);
   };
 
+  const handleStartNairaCheckout = async (tier: string) => {
+    if (!token) {
+      navigate("/login?redirect=pricing");
+      return;
+    }
+    setNairaSelectedTier(tier);
+    setNairaOrder(null);
+    setNairaQuote(null);
+    setNairaSubmitted(false);
+    setNairaError(null);
+    setShowNairaCheckout(true);
+    setNairaQuoteLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/ramphub/quote?tier=${tier}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Quote failed");
+      setNairaQuote({ ngnAmount: json.ngnAmount, usdtAmount: json.usdtAmount, rate: json.rate, provider: json.provider });
+    } catch (e: any) {
+      setNairaError(e.message || "Could not fetch NGN quote. Try again.");
+    } finally {
+      setNairaQuoteLoading(false);
+    }
+  };
+
+  const handleCreateNairaOrder = async () => {
+    if (!nairaSelectedTier || !nairaQuote || !token) return;
+    setNairaOrderLoading(true);
+    setNairaError(null);
+    try {
+      const res = await fetch(`${API_BASE}/ramphub/order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tier: nairaSelectedTier, ngnAmount: nairaQuote.ngnAmount }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (json.error === "ACTIVE_INTENT_CONFLICT") {
+          const retryRes = await fetch(`${API_BASE}/ramphub/order`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ tier: nairaSelectedTier, ngnAmount: nairaQuote.ngnAmount, overrideActiveIntent: true }),
+          });
+          const retryJson = await retryRes.json();
+          if (!retryRes.ok) throw new Error(retryJson.error || "Order creation failed");
+          setNairaOrder(retryJson.data);
+        } else {
+          throw new Error(json.error || "Order creation failed");
+        }
+      } else {
+        setNairaOrder(json.data);
+      }
+    } catch (e: any) {
+      setNairaError(e.message || "Failed to create order. Please try again.");
+    } finally {
+      setNairaOrderLoading(false);
+    }
+  };
+
   const handleGenerateDeposit = async () => {
     if (!selectedChain || !selectedToken || !selectedTier) return;
 
@@ -298,6 +381,156 @@ export function Pricing() {
     }
     return { label: "Pay with Crypto", disabled: !dextopusEnabled || !!loading, variant: "outline" as const, icon: <Wallet className="w-3.5 h-3.5 mr-1" /> };
   };
+
+  const canPayNaira = (tier: string) => {
+    if (!ramphubEnabled) return false;
+    if (planStatus === "active" && (userActiveTier === tier || (tier === "lifetime" && user?.plan === "lifetime"))) return false;
+    return true;
+  };
+
+  const renderNairaCheckout = () => (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-background border border-border rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Banknote className="w-5 h-5 text-green-400" />
+            <h2 className="font-sans font-bold text-lg">Pay with Naira (₦)</h2>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setShowNairaCheckout(false)}>Close</Button>
+        </div>
+
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-green-500/5 border border-green-500/20 rounded-sm">
+          <span className="text-xs font-mono text-green-400 uppercase tracking-wider">
+            {DISPLAY_TIER[nairaSelectedTier as keyof typeof DISPLAY_TIER]?.name} Plan
+          </span>
+          <span className="text-xs font-mono text-muted-foreground ml-auto">
+            {DISPLAY_TIER[nairaSelectedTier as keyof typeof DISPLAY_TIER]?.displayPrice} USD
+          </span>
+        </div>
+
+        {nairaError && (
+          <div className="flex items-center gap-2 text-red-400 text-sm font-mono border border-red-400/30 bg-red-400/5 px-3 py-2 rounded-sm mb-4">
+            {nairaError}
+          </div>
+        )}
+
+        {!nairaOrder ? (
+          <div className="space-y-4">
+            {nairaQuoteLoading ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-3">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <p className="text-sm font-mono text-muted-foreground">Fetching live NGN rate...</p>
+              </div>
+            ) : nairaQuote ? (
+              <div className="space-y-4">
+                <div className="bg-muted/20 rounded-lg p-4 space-y-3 border border-border">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono text-muted-foreground uppercase">You pay</span>
+                    <span className="text-2xl font-bold font-mono text-green-400">
+                      ₦{nairaQuote.ngnAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono text-muted-foreground uppercase">We receive</span>
+                    <span className="text-sm font-mono">{nairaQuote.usdtAmount} USDT</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                    <span className="text-xs font-mono text-muted-foreground uppercase">Rate</span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      1 USDT ≈ ₦{nairaQuote.rate?.toLocaleString()}
+                    </span>
+                  </div>
+                  {nairaQuote.provider && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-mono text-muted-foreground uppercase">Provider</span>
+                      <span className="text-xs font-mono text-muted-foreground">{nairaQuote.provider}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs font-mono text-muted-foreground">
+                  After clicking "Create Order" you'll receive bank transfer details. Transfer the exact NGN amount shown above.
+                </p>
+                <Button
+                  className="w-full font-mono uppercase tracking-wider"
+                  onClick={handleCreateNairaOrder}
+                  disabled={nairaOrderLoading}
+                >
+                  {nairaOrderLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <><Banknote className="w-4 h-4 mr-2" /> Create Order & Get Bank Details</>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-mono text-muted-foreground">Could not load quote.</p>
+                <Button variant="outline" className="w-full font-mono" onClick={() => handleStartNairaCheckout(nairaSelectedTier!)}>
+                  Retry
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : nairaSubmitted ? (
+          <div className="flex items-center gap-2 p-3 rounded bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-mono">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            Transfer noted! Your plan will activate once payment is confirmed by the provider (usually within minutes).
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-green-400">
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="font-mono text-sm">Order created! Transfer NGN to activate.</span>
+            </div>
+
+            <div className="bg-muted/20 rounded-lg p-4 space-y-3 border border-border">
+              <div className="flex justify-between">
+                <span className="text-xs font-mono text-muted-foreground uppercase">Amount to transfer</span>
+                <span className="font-bold font-mono text-green-400">₦{nairaOrder.ngnAmount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs font-mono text-muted-foreground uppercase">Provider</span>
+                <span className="text-xs font-mono">{nairaOrder.selectedProvider}</span>
+              </div>
+              {nairaOrder.transactionId && (
+                <div className="flex justify-between items-start gap-2 pt-2 border-t border-border/50">
+                  <span className="text-xs font-mono text-muted-foreground uppercase shrink-0">Ref</span>
+                  <span className="text-xs font-mono text-right break-all">{nairaOrder.requestReference || nairaOrder.transactionId}</span>
+                </div>
+              )}
+            </div>
+
+            {nairaOrder.providerDetails && Object.keys(nairaOrder.providerDetails).length > 0 && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+                <p className="text-xs font-mono text-primary uppercase tracking-wider font-bold">Bank Transfer Details</p>
+                {Object.entries(nairaOrder.providerDetails).map(([key, val]) => {
+                  if (val === null || val === undefined || typeof val === "object") return null;
+                  const label = key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").toLowerCase();
+                  return (
+                    <div key={key} className="flex justify-between items-start gap-3">
+                      <span className="text-xs font-mono text-muted-foreground capitalize shrink-0">{label}</span>
+                      <span className="text-xs font-mono text-right break-all">{String(val)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="text-xs font-mono text-muted-foreground border border-border/40 rounded px-3 py-2">
+              Use the reference number above when making your transfer. Your plan activates automatically once payment is confirmed.
+            </p>
+
+            <Button
+              className="w-full font-mono uppercase tracking-wider"
+              onClick={() => setNairaSubmitted(true)}
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" /> I've Made the Transfer
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const renderCheckout = () => (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -590,6 +823,12 @@ export function Pricing() {
                   {p.icon}{p.label}
                 </Button>
               ); })()}
+              {canPayNaira("monthly") && (
+                <Button variant="outline" className="font-mono text-xs uppercase tracking-wider border-green-500/40 text-green-400 hover:bg-green-500/10"
+                  onClick={() => handleStartNairaCheckout("monthly")}>
+                  <Banknote className="w-3.5 h-3.5 mr-1" /> Pay with Naira (₦)
+                </Button>
+              )}
             </div>
           </div>
 
@@ -622,6 +861,12 @@ export function Pricing() {
                   {p.icon}{p.label}
                 </Button>
               ); })()}
+              {canPayNaira("yearly") && (
+                <Button variant="outline" className="font-mono text-xs uppercase tracking-wider border-green-500/40 text-green-400 hover:bg-green-500/10"
+                  onClick={() => handleStartNairaCheckout("yearly")}>
+                  <Banknote className="w-3.5 h-3.5 mr-1" /> Pay with Naira (₦)
+                </Button>
+              )}
             </div>
           </div>
 
@@ -654,18 +899,26 @@ export function Pricing() {
                   {p.icon}{p.label}
                 </Button>
               ); })()}
+              {canPayNaira("lifetime") && (
+                <Button variant="outline" className="font-mono text-xs uppercase tracking-wider border-green-500/40 text-green-400 hover:bg-green-500/10"
+                  onClick={() => handleStartNairaCheckout("lifetime")}>
+                  <Banknote className="w-3.5 h-3.5 mr-1" /> Pay with Naira (₦)
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
         <p className="text-muted-foreground font-mono text-xs text-center mt-8">
-          {!dextopusEnabled
-            ? "Crypto payments coming soon — Dextopus integration not configured."
-            : "Pay with any crypto — Dextopus auto-bridges to our treasury."}
+          {dextopusEnabled && "Pay with any crypto — Dextopus auto-bridges to our treasury."}
+          {dextopusEnabled && ramphubEnabled && " · "}
+          {ramphubEnabled && "Pay with Naira (₦) via bank transfer — powered by RampHub."}
+          {!dextopusEnabled && !ramphubEnabled && "Payment options coming soon."}
         </p>
       </div>
 
       {showCheckout && renderCheckout()}
+      {showNairaCheckout && renderNairaCheckout()}
     </div>
   );
 }
