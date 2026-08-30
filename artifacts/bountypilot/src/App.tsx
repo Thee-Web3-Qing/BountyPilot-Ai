@@ -106,6 +106,9 @@ function Router() {
           )}
         </Route>
       </Switch>
+      <div data-developer-credit style={{ fontSize: "10px", lineHeight: 1.2, textAlign: "center", padding: "8px 12px", opacity: 0.58 }}>
+        Developed by{" "}<a href="https://qingthecreator.xyz" style={{ color: "inherit", textDecoration: "none" }}>Qing</a>
+      </div>
     </>
   );
 }
